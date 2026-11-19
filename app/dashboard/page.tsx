@@ -84,6 +84,7 @@ interface Project {
   closingAt?: Timestamp | null;
   coverUrl?: string | null;
   coverPath?: string | null;
+  modules?: { accounting?: boolean; team?: boolean };
 }
 
 interface Invitation {
@@ -193,6 +194,7 @@ export default function Dashboard() {
                 closingAt: projectData.closingAt || null,
                 coverUrl: projectData.coverUrl || null,
                 coverPath: projectData.coverPath || null,
+                modules: projectData.modules || undefined,
               } as Project;
             })
           )
@@ -333,8 +335,8 @@ export default function Dashboard() {
 
   const renderProjectCard = (project: Project, archived = false) => {
     const hasConfig = project.permissions.config;
-    const hasAccounting = project.permissions.accounting;
-    const hasTeam = project.permissions.team;
+    const hasAccounting = project.permissions.accounting && project.modules?.accounting !== false;
+    const hasTeam = project.permissions.team && project.modules?.team !== false;
     const daysUntilClose = archived ? null : getDaysUntilClose(project.closingAt);
 
     return (

@@ -1,10 +1,8 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { adminAuth } from "@/lib/firebase-admin";
 import { resetPasswordHtml, resetPasswordText } from "@/lib/emails/reset-password";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,13 +37,11 @@ export async function POST(req: NextRequest) {
       throw err;
     }
 
-    const { data, error } = await resend.emails.send({
-      from:           process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+    const { data, error } = await sendEmail({
       to:             [email],
       subject:        "Filma Workspace | Restablecer tu contraseña",
       html:           resetPasswordHtml({ name, resetUrl }),
       text:           resetPasswordText({ name, resetUrl }),
-      attachments:           emailAttachments(),
       tags:           [{ name: "type", value: "reset-password" }],
     }, { idempotencyKey: `reset-password/${email}/${Date.now()}` });
 

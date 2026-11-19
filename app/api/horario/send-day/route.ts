@@ -1,13 +1,11 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { horarioInviteHtml, horarioInviteText } from "@/lib/emails/horario-invite";
 import { requireUserOrCronSecret } from "@/lib/require-auth";
 import { ScheduleType, ScheduleTimes, resolveScheduleTimes } from "@/lib/horarioSchedules";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");
@@ -88,13 +86,11 @@ export async function POST(req: NextRequest) {
       const formUrl = `${base}/timesheet/${formId}`;
       const subject = `${projectLabel} | Control horario ${formattedDate} #${jornada}`;
 
-      const { error } = await resend.emails.send({
-        from:    process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+      const { error } = await sendEmail({
         to:      [recipient.email],
         subject,
         html:    horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
         text:    horarioInviteText({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
-        attachments:    emailAttachments(),
         tags:    [{ name: "type", value: "horario" }],
       });
 

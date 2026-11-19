@@ -4,7 +4,7 @@ import { getStorage } from "firebase-admin/storage";
 import { requireAdmin } from "@/lib/require-admin";
 
 export async function POST(req: NextRequest) {
-  const admin = await requireAdmin(req);
+  const admin = await requireAdmin(req, { recentAuthMinutes: 5 });
   if (!admin.ok) return admin.response;
 
   try {

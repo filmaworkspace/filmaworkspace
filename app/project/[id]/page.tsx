@@ -63,6 +63,9 @@ interface ProjectData {
   closingAt?: Timestamp | null;
   coverUrl?: string | null;
   coverPath?: string | null;
+  /** Módulos del plan de la cuenta (los fija el admin); false = no incluido. */
+  modules?: { accounting?: boolean; team?: boolean };
+  frozen?: boolean;
 }
 
 interface UserPermissions {
@@ -334,12 +337,13 @@ export default function ProjectOverviewPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {userPermissions.accounting && (
+            {project.frozen && <span className="mr-1 text-xs text-sky-700">Proyecto congelado · solo lectura</span>}
+            {userPermissions.accounting && project.modules?.accounting !== false && (
               <Link href={`/project/${id}/accounting`} className={ui.softButton}>
                 <Receipt size={14} style={{ color: MODULE_COLORS.accounting }} /> Contabilidad
               </Link>
             )}
-            {userPermissions.team && (
+            {userPermissions.team && project.modules?.team !== false && (
               <Link href={`/project/${id}/team`} className={ui.softButton}>
                 <Users size={14} style={{ color: MODULE_COLORS.team }} /> Equipo
               </Link>

@@ -161,63 +161,20 @@ export default function GuidesListPage() {
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-4 left-4 z-50">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white`}>
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-slate-900" : "bg-red-600"} text-white`}>
             <span className="text-sm font-medium">{toast.message}</span>
           </div>
         </div>
       )}
 
-      <div className="mt-[53px] flex items-stretch" style={{ minHeight: "calc(100vh - 53px)" }}>
-        {/* Sidebar */}
-        <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">
-          <div className="px-5 py-5 border-b border-slate-800/60">
-            <Link
-              href="/admindashboard"
-              className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 mb-3 font-mono"
-            >
-              <ArrowLeft size={12} />
-              admin.console
-            </Link>
-            <h1 className="text-white font-bold text-base leading-tight">Guías</h1>
-            <p className="font-mono text-[10px] text-slate-500 mt-1">base de conocimiento</p>
-          </div>
-          <div className="flex-1 px-2.5 py-4">
-            <div className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium bg-slate-800/80 text-white relative">
-              <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
-              <BookOpen size={15} className="text-emerald-400" />
-              <span className="flex-1 text-left">Guías</span>
-            </div>
-          </div>
-        </aside>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0 bg-slate-50/60 flex flex-col">
-          <div className="px-8 py-5 bg-white border-b border-slate-200">
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
-              <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white">
-                <span className="inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 text-blue-600 bg-blue-50"><FileText size={14} /></span>
-                <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{guides.length}</p>
-                <p className="text-[11px] text-slate-500 mt-1.5">Guías totales</p>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white">
-                <span className="inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 text-emerald-600 bg-emerald-50"><Eye size={14} /></span>
-                <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{publishedCount}</p>
-                <p className="text-[11px] text-slate-500 mt-1.5">Publicadas</p>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white">
-                <span className="inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 text-violet-600 bg-violet-50"><Eye size={14} /></span>
-                <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{totalViews}</p>
-                <p className="text-[11px] text-slate-500 mt-1.5">Vistas totales</p>
-              </div>
-            </div>
-          </div>
-
-          <main className="flex-1 px-8 py-6">
-            <div className="mb-5">
-              <p className="font-mono text-[10px] text-slate-400 tracking-widest uppercase mb-1">// guides</p>
-              <h2 className="text-xl font-bold text-slate-900">Guías</h2>
-            </div>
-
+      <main className="mx-auto px-6 pb-24 pt-[85px] sm:px-10">
+        <Link href="/admindashboard/support" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Soporte</Link>
+        <div className="mb-6 flex min-h-[44px] items-center justify-between gap-4 border-b border-slate-200 pb-4">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
+            Guías <span className="text-[15px] font-normal text-slate-400">{guides.length}</span>
+          </h1>
+          <span className="text-xs text-slate-500">{publishedCount} publicadas · {totalViews} vistas</span>
+        </div>
             {/* Toolbar */}
             <div className="flex flex-row gap-3 items-center mb-6">
               <div className="relative flex-1 max-w-sm">
@@ -227,22 +184,22 @@ export default function GuidesListPage() {
                   placeholder="Buscar guías"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-md focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm bg-white"
                 />
               </div>
               {/* Category Dropdown */}
               <div className="relative" ref={categoryDropdownRef}>
                 <button
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors min-w-[180px] ${
-                    categoryFilter !== "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
+                  className={`flex items-center gap-2 px-4 py-2.5 border rounded-md text-sm font-medium transition-colors min-w-[180px] ${
+                    categoryFilter !== "all" ? "border-slate-300 bg-[#F1F1F3] text-slate-900" : "border-slate-200 hover:border-slate-300 text-slate-700 bg-white"
                   }`}
                 >
                   <span className="flex-1 text-left truncate">{categoryFilter === "all" ? "Todas las categorías" : categoryFilter}</span>
-                  <ChevronDown size={14} className={`transition-transform ${showCategoryDropdown ? "rotate-180" : ""} ${categoryFilter !== "all" ? "text-white" : "text-slate-400"}`} />
+                  <ChevronDown size={14} className={`transition-transform ${showCategoryDropdown ? "rotate-180" : ""} text-slate-400`} />
                 </button>
                 {showCategoryDropdown && (
-                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden min-w-full">
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-md shadow-lg z-50 py-1 overflow-hidden min-w-full">
                     <button
                       onClick={() => { setCategoryFilter("all"); setShowCategoryDropdown(false); }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors whitespace-nowrap ${
@@ -267,7 +224,7 @@ export default function GuidesListPage() {
               </div>
               <Link
                 href="/admindashboard/guides/new"
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-medium ml-auto"
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-sm font-medium ml-auto"
               >
                 <Plus size={14} />
                 Nueva guía
@@ -275,7 +232,7 @@ export default function GuidesListPage() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+              <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center">
                 <BookOpen size={28} className="text-slate-300 mx-auto mb-3" />
                 <h3 className="font-semibold text-slate-900 mb-4">
                   {guides.length === 0 ? "Aún no hay guías" : "No se encontraron guías"}
@@ -283,7 +240,7 @@ export default function GuidesListPage() {
                 {guides.length === 0 && (
                   <Link
                     href="/admindashboard/guides/new"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#E4E4E7] bg-[#F1F1F3] px-3 text-[13px] font-medium text-slate-900 hover:bg-[#E8E8EB]"
                   >
                     <Plus size={14} />
                     Crear la primera
@@ -291,7 +248,7 @@ export default function GuidesListPage() {
                 )}
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl">
+              <div className="bg-white border border-slate-200 rounded-md">
                 <table className="tbl w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -368,21 +325,19 @@ export default function GuidesListPage() {
                 </table>
               </div>
             )}
-          </main>
-        </div>
-      </div>
+      </main>
 
       {/* Confirm delete */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">Eliminar &quot;{confirmDelete.title}&quot;</h3>
             <p className="text-sm text-slate-600 mb-6">Esta acción no se puede deshacer. El link público dejará de funcionar.</p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-sm">
                 Cancelar
               </button>
-              <button onClick={() => doDelete(confirmDelete)} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm">
+              <button onClick={() => doDelete(confirmDelete)} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium text-sm">
                 Eliminar
               </button>
             </div>
@@ -391,17 +346,17 @@ export default function GuidesListPage() {
       )}
 
       {announceTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !announcing && setAnnounceTarget(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => !announcing && setAnnounceTarget(null)}>
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">Avisar de &quot;{announceTarget.title}&quot;</h3>
             <p className="text-sm text-slate-600 mb-6">
               Se mandará un correo a todos los usuarios de la plataforma con un enlace a esta guía. No hay forma de saber quién ya la ha visto, así que va a todos por igual.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setAnnounceTarget(null)} disabled={announcing} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm disabled:opacity-50">
+              <button onClick={() => setAnnounceTarget(null)} disabled={announcing} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 font-medium text-sm disabled:opacity-50">
                 Cancelar
               </button>
-              <button onClick={() => handleAnnounceGuide(announceTarget)} disabled={announcing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-sm disabled:opacity-50">
+              <button onClick={() => handleAnnounceGuide(announceTarget)} disabled={announcing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-medium text-sm disabled:opacity-50">
                 {announcing && <Loader2 size={14} className="animate-spin" />}
                 {announcing ? "Enviando..." : "Enviar aviso"}
               </button>

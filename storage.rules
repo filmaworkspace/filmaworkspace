@@ -20,6 +20,11 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // "Ver como" (sesión de solo lectura de un admin): no puede subir ni borrar.
+    function notImpersonating() {
+      return request.auth == null || request.auth.token.get('impersonatedBy', null) == null;
+    }
+
     function userProject(projectId) {
       return /databases/(default)/documents/userProjects/$(request.auth.uid)/projects/$(projectId);
     }
@@ -77,17 +82,19 @@ service firebase.storage {
     // ── Proyectos ──────────────────────────────────────────────────────────
     match /projects/{projectId}/crew/{allPaths=**} {
       allow read: if isAdmin() || hasTeamAccess(projectId);
-      allow write: if isAdmin() || hasTeamAccess(projectId);
+      allow write: if notImpersonating() && (isAdmin() || hasTeamAccess(projectId));
     }
 
     match /projects/{projectId}/cover/{allPaths=**} {
       allow read: if isAdmin() || hasProjectAccess(projectId);
-      allow write: if isAdmin() || hasPermission(projectId, 'config') || isEPorPM(projectId);
+      allow write: if notImpersonating() && (isAdmin() || hasPermission(projectId, 'config') || isEPorPM(projectId));
     }
 
     match /projects/{projectId}/{folder}/{allPaths=**} {
-      allow read, write: if folder in ['invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash'] &&
-                            (isAdmin() || hasAccounting(projectId));
+      allow read: if folder in ['invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash'] &&
+                     (isAdmin() || hasAccounting(projectId));
+      allow write: if notImpersonating() && (folder in ['invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash'] &&
+                      (isAdmin() || hasAccounting(projectId)));
     }
 
     // Otras carpetas de proyecto que pueda haber: como antes (lee el
@@ -95,8 +102,8 @@ service firebase.storage {
     match /projects/{projectId}/{folder}/{allPaths=**} {
       allow read: if !(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
                      (isAdmin() || hasProjectAccess(projectId));
-      allow write: if !(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
-                      (isAdmin() || hasPermission(projectId, 'accounting') || hasPermission(projectId, 'config'));
+      allow write: if notImpersonating() && (!(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
+                      (isAdmin() || hasPermission(projectId, 'accounting') || hasPermission(projectId, 'config')));
     }
 
     // ── Formularios públicos (enlace con id secreto) ─────────────────────
@@ -110,7 +117,7 @@ service firebase.storage {
       }
       // Quien rellena el formulario sube y obtiene la URL mientras está pendiente;
       // después, solo el equipo del proyecto.
-      allow create: if resource == null && isPendingForm() && isDocument();
+      allow create: if notImpersonating() && (resource == null && isPendingForm() && isDocument());
       allow read: if isPendingForm() ||
                      isAdmin() ||
                      (isSignedIn() && hasProjectAccess(form().get('projectId', '')));
@@ -120,13 +127,13 @@ service firebase.storage {
     // ── Guías (públicas) ─────────────────────────────────────────────────
     match /guides/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if notImpersonating() && (isAdmin());
     }
 
     // ── Archivos de usuario ──────────────────────────────────────────────
     match /users/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow write: if notImpersonating() && (isSignedIn() && request.auth.uid == userId);
     }
 
     match /{allPaths=**} {

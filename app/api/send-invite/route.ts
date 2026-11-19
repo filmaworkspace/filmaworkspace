@@ -1,10 +1,8 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 import { requireUser } from "@/lib/require-auth";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
@@ -19,13 +17,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
 
-  const { data, error } = await resend.emails.send({
-    from: process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+  const { data, error } = await sendEmail({
     to: [to],
     subject: `${projectLabel} | Completa tu ficha`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
-    attachments: emailAttachments(),
     tags: [{ name: "type", value: "ficha-invite" }],
   }, { idempotencyKey: `ficha-invite/${memberId}/${Date.now()}` });
 

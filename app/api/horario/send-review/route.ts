@@ -1,11 +1,9 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { db } from "@/lib/firebase-admin";
 import { horarioReviewHtml, horarioReviewText } from "@/lib/emails/horario-review";
 import { requireUser } from "@/lib/require-auth";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
@@ -39,13 +37,11 @@ export async function POST(req: NextRequest) {
     const reviewUrl = `${base}/timesheet-review/${raw}`;
     const subject   = `${projectName} | Resumen de control horario`;
 
-    const { error } = await resend.emails.send({
-      from:    process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+    const { error } = await sendEmail({
       to:      [recipientEmail],
       subject,
       html:    horarioReviewHtml({ recipientName, projectName, reviewUrl }),
       text:    horarioReviewText({ recipientName, projectName, reviewUrl }),
-      attachments:    emailAttachments(),
       tags:    [{ name: "type", value: "horario-review" }],
     });
 

@@ -10,7 +10,7 @@ export type AdminCheckResult =
  * and confirms the caller's Firestore user doc has role "admin".
  * Use at the top of any API route that only admins should be able to call.
  */
-export async function requireAdmin(req: NextRequest): Promise<AdminCheckResult> {
+export async function requireAdmin(req: NextRequest, opts: { recentAuthMinutes?: number } = {}): Promise<AdminCheckResult> {
   const authHeader = req.headers.get("authorization") || "";
   const match = authHeader.match(/^Bearer (.+)$/);
   if (!match) {
@@ -20,8 +20,12 @@ export async function requireAdmin(req: NextRequest): Promise<AdminCheckResult> 
   try {
     const decoded = await adminAuth.verifyIdToken(match[1]);
     const userDoc = await db.collection("users").doc(decoded.uid).get();
-    if (userDoc.data()?.role !== "admin") {
+    if (userDoc.data()?.role !== "admin" || decoded.impersonatedBy) {
       return { ok: false, response: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
+    }
+    // Acciones delicadas: hay que haber confirmado la contraseña hace poco.
+    if (opts.recentAuthMinutes && decoded.auth_time * 1000 < Date.now() - opts.recentAuthMinutes * 60_000) {
+      return { ok: false, response: NextResponse.json({ error: "Confirma tu contraseña para continuar", code: "reauth" }, { status: 401 }) };
     }
     return { ok: true, uid: decoded.uid };
   } catch {

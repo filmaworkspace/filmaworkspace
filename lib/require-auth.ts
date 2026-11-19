@@ -19,6 +19,10 @@ export async function requireUser(req: NextRequest): Promise<AuthCheckResult> {
 
   try {
     const decoded = await adminAuth.verifyIdToken(match[1]);
+    // "Ver como" (admin viendo la app como este usuario): solo lectura.
+    if (decoded.impersonatedBy) {
+      return { ok: false, response: NextResponse.json({ error: "Modo solo lectura (Ver como)" }, { status: 403 }) };
+    }
     return { ok: true, uid: decoded.uid };
   } catch {
     return { ok: false, response: NextResponse.json({ error: "Token inválido" }, { status: 401 }) };

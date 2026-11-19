@@ -2,8 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Sesión "Ver como" (un admin viendo la app como otro usuario, ver
+    // /api/admin/impersonate): solo lectura. Como casi todas las reglas de
+    // escritura pasan por isSignedIn(), basta con cortar aquí las escrituras.
+    function isImpersonating() {
+      return request.auth != null && request.auth.token.get('impersonatedBy', null) != null;
+    }
+
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && (!isImpersonating() || request.method in ['get', 'list']);
+    }
+
+    // Proyecto congelado (o en la papelera): solo lectura salvo para admins.
+    function projectOpen(projectId) {
+      let path = /databases/$(database)/documents/projects/$(projectId);
+      return request.method in ['get', 'list'] ||
+             !exists(path) ||
+             get(path).data.get('frozen', false) != true ||
+             isAdmin();
     }
 
     function isAdmin() {
@@ -105,7 +121,7 @@ service cloud.firestore {
     // si el propio usuario pudiera escribirlos, podría hacerse admin, entrar
     // en una productora o darse acceso a Budgeting.
     function protectedUserFields() {
-      return ["role", "companyId", "budgetingAccess", "supportSpecialty"];
+      return ["role", "companyId", "budgetingAccess", "supportSpecialty", "suspended", "isDemo"];
     }
 
     // Lo único que puede escribir quien rellena un horario desde su enlace.
@@ -259,11 +275,11 @@ service cloud.firestore {
         isProjectMember(projectId) ||
         hasCompanyProjectAccess(projectId)
       );
-      allow create: if isAdmin();
-      allow update: if isAdmin() ||
+      allow create: if projectOpen(projectId) && (isAdmin());
+      allow update: if projectOpen(projectId) && (isAdmin() ||
                        hasUserProjectPermission(projectId, 'config') ||
-                       hasMemberPermission(projectId, 'config');
-      allow delete: if isAdmin();
+                       hasMemberPermission(projectId, 'config'));
+      allow delete: if projectOpen(projectId) && (isAdmin());
 
       match /members/{memberId} {
         allow read: if isSignedIn() && (
@@ -272,20 +288,20 @@ service cloud.firestore {
           isProjectMember(projectId) ||
           hasCompanyProjectAccess(projectId)
         );
-        allow create: if isAdmin() ||
+        allow create: if projectOpen(projectId) && (isAdmin() ||
                          hasUserProjectPermission(projectId, 'config') ||
                          hasMemberPermission(projectId, 'config') ||
                          hasUserProjectPermission(projectId, 'team') ||
-                         hasMemberPermission(projectId, 'team');
+                         hasMemberPermission(projectId, 'team'));
         // Aceptar una invitación lo hace el servidor (/api/accept-invitation):
         // un usuario no puede añadirse a sí mismo a un proyecto.
-        allow update, delete: if isAdmin() ||
+        allow update, delete: if projectOpen(projectId) && (isAdmin() ||
                                   hasUserProjectPermission(projectId, 'config') ||
                                   hasMemberPermission(projectId, 'config') ||
                                   hasUserProjectPermission(projectId, 'team') ||
-                                  hasMemberPermission(projectId, 'team');
+                                  hasMemberPermission(projectId, 'team'));
         // Contabilidad ampliada gestiona solo el acceso a contabilidad.
-        allow update: if isAccExtended(projectId) && onlyAccountingAccessChange();
+        allow update: if projectOpen(projectId) && (isAccExtended(projectId) && onlyAccountingAccessChange());
       }
 
       match /departments/{departmentId} {
@@ -295,9 +311,9 @@ service cloud.firestore {
           isProjectMember(projectId) ||
           hasCompanyProjectAccess(projectId)
         );
-        allow write: if isAdmin() ||
+        allow write: if projectOpen(projectId) && (isAdmin() ||
                         hasUserProjectPermission(projectId, 'config') ||
-                        hasMemberPermission(projectId, 'config');
+                        hasMemberPermission(projectId, 'config'));
       }
 
       match /config/{configId} {
@@ -307,10 +323,10 @@ service cloud.firestore {
           isProjectMember(projectId) ||
           hasCompanyProjectAccess(projectId)
         );
-        allow write: if isAdmin() ||
+        allow write: if projectOpen(projectId) && (isAdmin() ||
                         isEPorPM(projectId) ||
                         (isAccExtended(projectId) && isAccountingConfigDoc(configId)) ||
-                        hasUserProjectPermission(projectId, 'config');
+                        hasUserProjectPermission(projectId, 'config'));
 
         // Subcolecciones (p. ej. company/bankAccounts: cuentas bancarias de la
         // productora): solo contabilidad y quien configura el proyecto.
@@ -320,10 +336,10 @@ service cloud.firestore {
             isBoxUser(projectId) ||
             hasUserProjectPermission(projectId, 'config')
           );
-          allow write: if isAdmin() ||
+          allow write: if projectOpen(projectId) && (isAdmin() ||
                           isEPorPM(projectId) ||
                           (isAccExtended(projectId) && isAccountingConfigDoc(configId)) ||
-                          hasUserProjectPermission(projectId, 'config');
+                          hasUserProjectPermission(projectId, 'config'));
         }
       }
 
@@ -342,36 +358,36 @@ service cloud.firestore {
 
       match /budgetLines/{subAccountId} {
         allow read: if canSeeBudgetFigures(projectId);
-        allow write: if canWriteBudget(projectId);
+        allow write: if projectOpen(projectId) && (canWriteBudget(projectId));
       }
 
       // Numeración correlativa de POs, facturas (contabilidad) y crew (equipo).
       match /counters/{kind} {
         allow read: if counterUser(projectId, kind);
-        allow create: if counterUser(projectId, kind) &&
+        allow create: if projectOpen(projectId) && (counterUser(projectId, kind) &&
                          kind in ['pos', 'invoices', 'crew'] &&
                          request.resource.data.keys().hasOnly(['last']) &&
-                         request.resource.data.last is int;
-        allow update: if counterUser(projectId, kind) &&
+                         request.resource.data.last is int);
+        allow update: if projectOpen(projectId) && (counterUser(projectId, kind) &&
                          request.resource.data.keys().hasOnly(['last']) &&
                          request.resource.data.last is int &&
-                         request.resource.data.last > resource.data.last;
+                         request.resource.data.last > resource.data.last);
       }
 
       match /accounts/{accountId} {
         // Código y descripción: los necesita todo el que codifica POs y facturas.
         allow read: if inAccounting(projectId) || accSeesAll(projectId);
-        allow create, delete: if canWriteBudget(projectId);
-        allow update: if canWriteBudget(projectId);
+        allow create, delete: if projectOpen(projectId) && (canWriteBudget(projectId));
+        allow update: if projectOpen(projectId) && (canWriteBudget(projectId));
 
         match /subaccounts/{subId} {
           allow read: if inAccounting(projectId) || accSeesAll(projectId);
           // El presupuestado nunca se guarda aquí (va en budgetLines).
-          allow create: if canWriteBudget(projectId) &&
-                           !request.resource.data.keys().hasAny(['budgeted']);
+          allow create: if projectOpen(projectId) && (canWriteBudget(projectId) &&
+                           !request.resource.data.keys().hasAny(['budgeted']));
           // Contabilidad ampliada / EP / PM: código, descripción, y quitar el
           // "budgeted" antiguo al trasladarlo. Nunca añadirlo ni cambiarlo.
-          allow update: if (
+          allow update: if projectOpen(projectId) && ((
                             canWriteBudget(projectId) &&
                             !request.resource.data.diff(resource.data).addedKeys().hasAny(['budgeted']) &&
                             !request.resource.data.diff(resource.data).changedKeys().hasAny(['budgeted'])
@@ -379,104 +395,104 @@ service cloud.firestore {
                             // Aprobaciones, facturas y cajas mueven comprometido/realizado/caja.
                             inAccounting(projectId) &&
                             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['committed', 'actual', 'box'])
-                          );
-          allow delete: if canWriteBudget(projectId);
+                          ));
+          allow delete: if projectOpen(projectId) && (canWriteBudget(projectId));
         }
       }
 
       match /suppliers/{supplierId} {
         allow read: if inAccounting(projectId) || accSeesAll(projectId);
-        allow create, update: if accSeesAll(projectId) ||
-                                 (inAccounting(projectId) && accLevel(projectId) != 'visitor');
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow create, update: if projectOpen(projectId) && (accSeesAll(projectId) ||
+                                 (inAccounting(projectId) && accLevel(projectId) != 'visitor'));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       match /pos/{poId} {
         allow read: if canReadAccDoc(projectId);
-        allow create: if accSeesAll(projectId) || (
+        allow create: if projectOpen(projectId) && (accSeesAll(projectId) || (
                            inAccounting(projectId) && accLevel(projectId) != 'visitor' &&
                            request.resource.data.createdBy == request.auth.uid
-                         );
-        allow update: if accSeesAll(projectId) || isApproverRole(projectId) ||
-                         (canTouchAccDoc(projectId) && keepsOwner());
-        allow delete: if isAdmin() || isEPorPM(projectId) || (
+                         ));
+        allow update: if projectOpen(projectId) && (accSeesAll(projectId) || isApproverRole(projectId) ||
+                         (canTouchAccDoc(projectId) && keepsOwner()));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || (
                            inAccounting(projectId) &&
                            resource.data.createdBy == request.auth.uid &&
                            resource.data.status == 'draft'
-                         );
+                         ));
       }
 
       match /invoices/{invoiceId} {
         allow read: if canReadAccDoc(projectId);
-        allow create: if accSeesAll(projectId) || (
+        allow create: if projectOpen(projectId) && (accSeesAll(projectId) || (
                            inAccounting(projectId) && accLevel(projectId) != 'visitor' &&
                            request.resource.data.createdBy == request.auth.uid
-                         );
-        allow update: if accSeesAll(projectId) || isApproverRole(projectId) ||
-                         (canTouchAccDoc(projectId) && keepsOwner());
-        allow delete: if isAdmin() || isEPorPM(projectId);
+                         ));
+        allow update: if projectOpen(projectId) && (accSeesAll(projectId) || isApproverRole(projectId) ||
+                         (canTouchAccDoc(projectId) && keepsOwner()));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId));
       }
 
       match /payments/{paymentId} {
         allow read: if accSeesAll(projectId);
-        allow write: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow write: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       match /paymentForecasts/{forecastId} {
         // El cajero (BOX) pide reposiciones de efectivo a tesorería desde aquí.
-        allow read, create, update: if accSeesAll(projectId) || isBoxUser(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (accSeesAll(projectId) || isBoxUser(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       match /manualEntries/{entryId} {
         allow read: if isAdmin() || isAccountant(projectId) || hasCompanyProjectAccess(projectId);
-        allow write: if isAdmin() || hasCompanyProjectAccess(projectId) || isAccExtended(projectId);
+        allow write: if projectOpen(projectId) && (isAdmin() || hasCompanyProjectAccess(projectId) || isAccExtended(projectId));
       }
 
       // ── BOX: tarjetas y transferencias ──
       match /cards/{boxId} {
         allow read: if canUseBox(projectId);
-        allow create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow create, update: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /cardEnvelopes/{envelopeId} {
-        allow read, create, update: if canUseBox(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /cardExpenses/{expenseId} {
-        allow read, create, update: if canUseBox(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /cardSuppliers/{supplierId} {
         allow read: if canUseBox(projectId);
-        allow create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow create, update: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /transferEnvelopes/{envelopeId} {
-        allow read, create, update: if canUseBox(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /transferExpenses/{expenseId} {
-        allow read, create, update: if canUseBox(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       // ── BOX: efectivo (Petty Cash) ──
       match /cashFloats/{floatId} {
-        allow read, create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
-        allow delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create, update: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       match /cashMovements/{movementId} {
-        allow read, create, update: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
+        allow read, create, update: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
         // Un movimiento contabilizado ya no se puede borrar.
-        allow delete: if (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId)) &&
-                         resource.data.status != 'accounted';
+        allow delete: if projectOpen(projectId) && ((isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId)) &&
+                         resource.data.status != 'accounted');
       }
 
       match /cashCounts/{countId} {
-        allow read, create: if isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId);
-        allow update, delete: if isAdmin() || isEPorPM(projectId) || isAccExtended(projectId);
+        allow read, create: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
+        allow update, delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
 
       match /crew/{crewId} {
@@ -485,10 +501,10 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow create, update: if isAdmin() ||
-                                  hasTeamAccess(projectId);
-        allow delete: if isAdmin() ||
-                         hasTeamAccess(projectId);
+        allow create, update: if projectOpen(projectId) && (isAdmin() ||
+                                  hasTeamAccess(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() ||
+                         hasTeamAccess(projectId));
       }
 
       match /teamConfig/{docId} {
@@ -497,9 +513,9 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow write: if isAdmin() ||
+        allow write: if projectOpen(projectId) && (isAdmin() ||
                         hasTeamAccess(projectId) ||
-                        isEPorPM(projectId);
+                        isEPorPM(projectId));
       }
 
       match /payrollMonths/{monthId} {
@@ -512,7 +528,7 @@ service cloud.firestore {
         // listar sin sesión.
         allow get: if request.auth == null;
 
-        allow write: if (isSignedIn() && (
+        allow write: if projectOpen(projectId) && ((isSignedIn() && (
                         isAdmin() ||
                         hasTeamAccess(projectId)
                       )) ||
@@ -521,7 +537,7 @@ service cloud.firestore {
                         'accessCode' in request.resource.data &&
                         get(/databases/$(database)/documents/access/$(request.resource.data.accessCode)).data.active == true &&
                         get(/databases/$(database)/documents/access/$(request.resource.data.accessCode)).data.projectId == projectId
-                      );
+                      ));
       }
 
       match /dietasForms/{formId} {
@@ -530,8 +546,8 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow write: if isAdmin() ||
-                        hasTeamAccess(projectId);
+        allow write: if projectOpen(projectId) && (isAdmin() ||
+                        hasTeamAccess(projectId));
       }
 
       match /horario/{docId} {
@@ -540,7 +556,7 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow write: if isAdmin() || hasTeamAccess(projectId);
+        allow write: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId));
       }
 
       match /horarioForms/{formId} {
@@ -549,9 +565,9 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow create: if isAdmin() || hasTeamAccess(projectId);
-        allow update: if isAdmin() || hasTeamAccess(projectId) || isHorarioSubmission();
-        allow delete: if isAdmin();
+        allow create: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId));
+        allow update: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId) || isHorarioSubmission());
+        allow delete: if projectOpen(projectId) && (isAdmin());
       }
 
       match /horarioGroups/{groupId} {
@@ -560,13 +576,13 @@ service cloud.firestore {
           hasTeamAccess(projectId) ||
           hasProjectAccess(projectId)
         );
-        allow write: if isAdmin() || hasTeamAccess(projectId);
+        allow write: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId));
       }
 
       match /logs/{logId} {
         allow read: if isAdmin();
-        allow create: if isSignedIn();
-        allow update, delete: if isAdmin();
+        allow create: if projectOpen(projectId) && (isSignedIn());
+        allow update, delete: if projectOpen(projectId) && (isAdmin());
       }
     }
 
@@ -645,6 +661,11 @@ service cloud.firestore {
     match /producers/{producerId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+
+      // Notas internas de la cuenta (CRM ligero del admin).
+      match /notes/{noteId} {
+        allow read, write: if isAdmin();
+      }
     }
 
     match /invitations/{invitationId} {
@@ -846,6 +867,38 @@ service cloud.firestore {
         resource.data.published == true &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
       );
+    }
+
+
+    // ── Admin: registros que escribe el servidor (Admin SDK) ─────────────────
+    match /emailLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /securityEvents/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /appErrors/{errorId} {
+      allow read: if isAdmin();
+      allow delete: if isAdmin();
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resolved', 'resolvedAt', 'resolvedBy']);
+      allow create: if false;
+    }
+    // Configuración privada del admin (resumen diario…). No va en meta/,
+    // que es de lectura pública.
+    match /adminConfig/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Avisos dentro de la app y novedades (admindashboard → Avisos).
+    match /announcements/{announcementId} {
+      allow read: if isAdmin() || (isSignedIn() && (
+        resource.data.audienceAll == true ||
+        request.auth.uid in resource.data.audienceUserIds
+      ));
+      allow write: if isAdmin();
     }
 
   }

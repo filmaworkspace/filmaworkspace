@@ -86,6 +86,10 @@ console.log("guías y otros");
 await t("cualquiera ve la imagen de una guía", true, () => getBytes(ref(anon, `guides/g1/cover.png`)));
 await t("usuario NO sube a guías", false, () => uploadBytes(ref(as("stCrew"), `guides/g1/x.png`), ...png()));
 await t("admin sube a guías", true, () => uploadBytes(ref(as("stAdmin"), `guides/g1/x.png`), ...png()));
+const imp = (uid) => env.authenticatedContext(uid, { impersonatedBy: "stAdmin" }).storage();
+await t("ver como: lee una factura", true, () => getBytes(ref(imp("stAcc"), `projects/${P}/invoices/i1/f.pdf`)));
+await t("ver como: NO sube facturas", false, () => uploadBytes(ref(imp("stAcc"), `projects/${P}/invoices/i2/f.pdf`), new Uint8Array([1]), { contentType: "application/pdf" }));
+await t("ver como: NO sube documentos de crew", false, () => uploadBytes(ref(imp("stTeam"), `projects/${P}/crew/m1/docs/x`), ...png()));
 await t("ruta desconocida denegada", false, () => uploadBytes(ref(as("stAdmin"), `otra/x.png`), ...png()));
 
 console.log(`\n${pass} ok, ${fail} fallos`);

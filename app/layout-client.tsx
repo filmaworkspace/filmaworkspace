@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { UserProvider } from "@/contexts/UserContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
+import ErrorReporter from "@/components/ErrorReporter";
+import AppBanners from "@/components/AppBanners";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -44,6 +46,8 @@ export default function ClientLayout({
 
   return (
     <UserProvider>
+      <ErrorReporter />
+      <AppBanners isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard} />
       <MaintenanceGate isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard}>
         {children}
       </MaintenanceGate>

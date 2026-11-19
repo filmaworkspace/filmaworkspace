@@ -2,7 +2,9 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ProjectSummary } from "@/components/admin/ProjectSummary";
+import { PHASE_DOT } from "@/components/admin/ui";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 
@@ -186,7 +188,10 @@ export default function AdminProjectPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "accounting" | "team" | "logs">("general");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<"summary" | "general" | "accounting" | "team" | "logs">(
+    (["summary", "general", "accounting", "team", "logs"].includes(searchParams.get("tab") || "") ? searchParams.get("tab") : "summary") as "summary"
+  );
   const [logs, setLogs] = useState<Array<{
     id: string;
     type: string;
@@ -1028,16 +1033,16 @@ export default function AdminProjectPage() {
   const filteredUsersForAdd = allUsers.filter(
     (u) =>
       !members.find((m) => m.id === u.id) &&
-      (u.name.toLowerCase().includes(addMemberForm.searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(addMemberForm.searchQuery.toLowerCase()))
+      ((u.name || "").toLowerCase().includes(addMemberForm.searchQuery.toLowerCase()) ||
+        (u.email || "").toLowerCase().includes(addMemberForm.searchQuery.toLowerCase()))
   );
 
   const filteredProjectsForSupplierCopy = allProjects.filter((p) =>
-    p.name.toLowerCase().includes(copySupplierSearch.toLowerCase())
+    (p.name || "").toLowerCase().includes(copySupplierSearch.toLowerCase())
   );
 
   const filteredProjectsForBudgetCopy = allProjects.filter((p) =>
-    p.name.toLowerCase().includes(copyBudgetSearch.toLowerCase())
+    (p.name || "").toLowerCase().includes(copyBudgetSearch.toLowerCase())
   );
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1059,114 +1064,46 @@ export default function AdminProjectPage() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${
-              toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
-            } text-white`}
-          >
-            {toast.type === "success" ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
+        <div role="status" className={`fixed bottom-5 left-5 z-[70] flex h-9 items-center gap-2 rounded-md px-3 text-[13px] font-medium text-white shadow-lg ${toast.type === "success" ? "bg-slate-900" : "bg-red-600"}`}>
+          {toast.message}
         </div>
       )}
 
-      {/* ── Shell: sidebar + content ─────────────────────────────────────── */}
-      <div className="mt-[53px] flex items-stretch" style={{ minHeight: "calc(100vh - 53px)" }}>
-
-        {/* Sidebar */}
-        <aside className="w-60 flex-shrink-0 bg-slate-950 border-r border-slate-800/60 flex flex-col">
-          <div className="px-5 py-5 border-b border-slate-800/60">
-            <Link
-              href="/admindashboard"
-              className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 mb-3 font-mono"
-            >
-              <ArrowLeft size={12} />
-              admin.console
-            </Link>
-            <h1 className="text-white font-bold text-base leading-tight line-clamp-2">{project.name}</h1>
-            <span className={`inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-lg ${phase.bg} ${phase.text}`}>
-              {project.phase}
+      <main className="mx-auto px-6 pb-24 pt-[85px] sm:px-10">
+        <Link href="/admindashboard/projects" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Proyectos</Link>
+        <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+          <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
+            {project.name}
+            <span className="flex items-center gap-1.5 rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: PHASE_DOT[project.phase] || "#94A3B8" }} />{project.phase}
             </span>
-            {project.producerNames && project.producerNames.length > 0 && (
-              <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-2">
-                <Building2 size={11} className="text-slate-600 flex-shrink-0" />
-                <span className="truncate">{project.producerNames.join(", ")}</span>
-              </p>
-            )}
-            <p className="font-mono text-[10px] text-slate-600 mt-2 truncate">id: {projectId}</p>
-          </div>
-
-          <nav className="flex-1 px-2.5 py-4 space-y-0.5 overflow-y-auto">
-            {[
-              { id: "general", label: "General", icon: Settings },
-              { id: "accounting", label: "Accounting", icon: BarChart3 },
-              { id: "team", label: "Team", icon: Users },
-              { id: "logs", label: "Logs", icon: Activity },
-            ].map((tab) => {
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    active ? "bg-slate-800/80 text-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-                  }`}
-                >
-                  {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />}
-                  <tab.icon size={15} className={active ? "text-emerald-400" : "text-slate-500"} />
-                  <span className="flex-1 text-left">{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="px-3 py-4 border-t border-slate-800/60 space-y-1">
-            <button
-              onClick={() => setShowMessageModal(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
-            >
-              <MessageSquare size={13} />
-              Enviar mensaje
+            <span className="font-mono text-[12px] font-normal text-slate-400">{projectId}</span>
+          </h1>
+          <div className="flex items-center gap-2">
+            {project.producerNames && project.producerNames.length > 0 && <span className="mr-2 text-[13px] text-slate-500">{project.producerNames.join(", ")}</span>}
+            <button onClick={handleRefresh} disabled={refreshing} title="Refrescar" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-[#F4F4F5] hover:text-slate-900 disabled:opacity-50">
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             </button>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-              Refrescar datos
-            </button>
-            <Link
-              href={`/project/${projectId}`}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
-            >
-              <ExternalLink size={13} />
-              Ir al proyecto
+            <Link href={`/project/${projectId}`} target="_blank" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#E4E4E7] bg-[#F1F1F3] px-3 text-[13px] font-medium text-slate-900 hover:bg-[#E8E8EB]">
+              <ExternalLink size={13} /> Ir al proyecto
             </Link>
           </div>
-        </aside>
+        </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0 bg-slate-50/60 flex flex-col">
-
-          {/* Stat strip */}
-          <div className="px-8 py-5 bg-white border-b border-slate-200">
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(6, minmax(0,1fr))" }}>
-              <ProjectStatTile icon={Users} label="Miembros" value={members.length} sub={`${departments.length} deptos`} accent="blue" />
-              <ProjectStatTile icon={Layers} label="Cuentas" value={accountingStats.accountCount} sub={`${accountingStats.supplierCount} proveedores`} accent="amber" />
-              <ProjectStatTile icon={ShoppingCart} label="POs" value={accountingStats.poCount} accent="violet" />
-              <ProjectStatTile icon={FileText} label="Facturas" value={accountingStats.invoiceCount} accent="emerald" />
-              <ProjectStatTile icon={UserCheck} label="Formularios" value={teamStats.totalForms} sub={`${teamStats.pendingForms} pendientes`} accent="blue" />
-              <ProjectStatTile icon={Activity} label="Logs" value={logs.length} sub="actividad" accent="slate" />
-            </div>
-          </div>
-
-          <main className="flex-1 px-8 py-6 overflow-x-hidden">
+        <div className="mt-6 mb-6 flex w-fit gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist">
+          {([
+            ["summary", "Resumen"], ["general", "Miembros y ajustes"], ["accounting", "Contabilidad"], ["team", "Equipo"], ["logs", "Registro"],
+          ] as const).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={activeTab === id} onClick={() => setActiveTab(id)}
+              className={`flex h-7 items-center rounded-[5px] px-2.5 text-xs transition-colors ${activeTab === id ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
 
             {/* Closing warning banner */}
             {daysUntilClose !== null && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
@@ -1192,11 +1129,10 @@ export default function AdminProjectPage() {
               </div>
             )}
 
-            {/* Section eyebrow */}
-            <div className="mb-5">
-              <p className="font-mono text-[10px] text-slate-400 tracking-widest uppercase mb-1">// {activeTab}</p>
-              <h2 className="text-xl font-bold text-slate-900 capitalize">{activeTab}</h2>
-            </div>
+
+        {activeTab === "summary" && (
+          <ProjectSummary projectId={projectId} onClone={() => { setActiveTab("general"); setShowCloneModal(true); }} onChanged={() => loadData()} />
+        )}
 
         {/* ══════════════════════════════════ GENERAL TAB ══════════════════════════════════ */}
         {activeTab === "general" && (
@@ -1207,7 +1143,7 @@ export default function AdminProjectPage() {
 
               {/* Users — prominent left column */}
               <div className="col-span-2">
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full">
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden h-full">
                   <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-semibold text-slate-900">Usuarios del proyecto</h2>
@@ -1215,7 +1151,7 @@ export default function AdminProjectPage() {
                     </div>
                     <button
                       onClick={() => setShowAddMemberModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-xs font-medium"
                     >
                       <UserPlus size={12} />
                       Añadir usuario
@@ -1232,7 +1168,7 @@ export default function AdminProjectPage() {
                         <div key={member.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50 group">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 text-sm font-semibold">
-                              {member.name.charAt(0).toUpperCase()}
+                              {(member.name || member.email || "?").charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <p className="text-sm font-medium text-slate-900">{member.name}</p>
@@ -1293,7 +1229,7 @@ export default function AdminProjectPage() {
               <div className="col-span-1 space-y-4">
 
                 {/* Project info — compact */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-slate-900">Proyecto</h2>
                     <button
@@ -1337,7 +1273,7 @@ export default function AdminProjectPage() {
                 </div>
 
                 {/* Departments — editable */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
                     <Layers size={14} className="text-slate-400" />
                     <h2 className="text-sm font-semibold text-slate-900">Departamentos</h2>
@@ -1382,7 +1318,7 @@ export default function AdminProjectPage() {
                       <button
                         onClick={handleAddDepartment}
                         disabled={saving || !newDeptName.trim()}
-                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-40"
+                        className="px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-xs font-medium disabled:opacity-40"
                       >
                         Añadir
                       </button>
@@ -1443,7 +1379,7 @@ export default function AdminProjectPage() {
                 { label: "Facturas", value: accountingStats.invoiceCount, icon: FileText, color: "text-violet-600", bg: "bg-violet-50" },
                 { label: "POs", value: accountingStats.poCount, icon: ShoppingCart, color: "text-amber-600", bg: "bg-amber-50" },
               ].map((stat) => (
-                <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <div key={stat.label} className="bg-white border border-slate-200 rounded-lg p-5">
                   <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
                     <stat.icon size={18} className={stat.color} />
                   </div>
@@ -1454,7 +1390,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* Quick links */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100">
                 <h2 className="text-sm font-semibold text-slate-900">Acceso rápido</h2>
               </div>
@@ -1481,7 +1417,7 @@ export default function AdminProjectPage() {
             {/* Copy operations */}
             <div className="grid grid-cols-2 gap-4">
               {/* Copy suppliers */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="text-sm font-semibold text-slate-900">Copiar proveedores</h2>
                   <p className="text-xs text-slate-500 mt-0.5">Copia los {accountingStats.supplierCount} proveedores de este proyecto a otro</p>
@@ -1494,7 +1430,7 @@ export default function AdminProjectPage() {
                       setShowCopySuppliersModal(true);
                     }}
                     disabled={accountingStats.supplierCount === 0}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed w-full justify-center"
+                    className="flex items-center gap-2 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed w-full justify-center"
                   >
                     <Copy size={14} />
                     Copiar proveedores a otro proyecto
@@ -1503,7 +1439,7 @@ export default function AdminProjectPage() {
               </div>
 
               {/* Copy budget */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h2 className="text-sm font-semibold text-slate-900">Copiar presupuesto</h2>
                   <p className="text-xs text-slate-500 mt-0.5">Copia las {accountingStats.accountCount} cuentas de este proyecto a otro</p>
@@ -1527,7 +1463,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* Danger zone */}
-            <div className="bg-white border border-red-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-red-200 rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-red-100">
                 <h2 className="text-sm font-semibold text-red-700">Zona de peligro</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Acciones irreversibles sobre el presupuesto de este proyecto</p>
@@ -1563,7 +1499,7 @@ export default function AdminProjectPage() {
                 { label: "Completadas", value: teamStats.completedForms, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
                 { label: "Firmadas", value: teamStats.signedForms, icon: Shield, color: "text-violet-600", bg: "bg-violet-50" },
               ].map((stat) => (
-                <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <div key={stat.label} className="bg-white border border-slate-200 rounded-lg p-5">
                   <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
                     <stat.icon size={18} className={stat.color} />
                   </div>
@@ -1574,7 +1510,7 @@ export default function AdminProjectPage() {
             </div>
 
             {/* Fichas list */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                 <FileText size={15} className="text-slate-400" />
                 <h2 className="text-sm font-semibold text-slate-900">Fichas de crew</h2>
@@ -1658,13 +1594,13 @@ export default function AdminProjectPage() {
             </div>
 
             {logs.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+              <div className="bg-white border border-slate-200 rounded-lg p-16 text-center">
                 <Activity size={28} className="text-slate-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-slate-700 mb-1">Sin actividad registrada</p>
                 <p className="text-xs text-slate-400">Los eventos aparecerán aquí a medida que ocurran</p>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {logs.map((log) => {
                     const logConfig: Record<string, { label: string; icon: any; iconBg: string; iconColor: string }> = {
@@ -1725,16 +1661,14 @@ export default function AdminProjectPage() {
             )}
           </div>
         )}
-          </main>
-        </div>
-      </div>
+      </main>
 
       {/* ══════════════════════════════════ MODALS ══════════════════════════════════ */}
 
       {/* Send Message Modal */}
       {showMessageModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Enviar mensaje al equipo</h3>
               <button onClick={() => setShowMessageModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
@@ -1798,7 +1732,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleSendMessage}
                 disabled={saving || !messageForm.title.trim() || !messageForm.content.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50"
               >
                 <Send size={14} />
                 {saving ? "Enviando..." : "Enviar"}
@@ -1811,7 +1745,7 @@ export default function AdminProjectPage() {
       {/* Edit Project Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Editar proyecto</h3>
               <button onClick={() => setShowEditModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
@@ -1879,7 +1813,7 @@ export default function AdminProjectPage() {
                 {producerSearch.length >= 1 && (
                   <div className="mt-1 border border-slate-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto">
                     {allProducers
-                      .filter((p) => p.name.toLowerCase().includes(producerSearch.toLowerCase()) && !editForm.producers.includes(p.id))
+                      .filter((p) => (p.name || "").toLowerCase().includes(producerSearch.toLowerCase()) && !editForm.producers.includes(p.id))
                       .map((prod) => (
                         <button
                           key={prod.id}
@@ -1893,7 +1827,7 @@ export default function AdminProjectPage() {
                           {prod.name}
                         </button>
                       ))}
-                    {allProducers.filter((p) => p.name.toLowerCase().includes(producerSearch.toLowerCase()) && !editForm.producers.includes(p.id)).length === 0 && (
+                    {allProducers.filter((p) => (p.name || "").toLowerCase().includes(producerSearch.toLowerCase()) && !editForm.producers.includes(p.id)).length === 0 && (
                       <p className="px-4 py-3 text-sm text-slate-400 text-center">Sin resultados</p>
                     )}
                   </div>
@@ -1920,7 +1854,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleUpdateProject}
                 disabled={saving || !editForm.name.trim()}
-                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50"
               >
                 {saving ? "Guardando..." : "Guardar"}
               </button>
@@ -1932,7 +1866,7 @@ export default function AdminProjectPage() {
       {/* Close Project Modal */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Programar cierre</h3>
               <button onClick={() => setShowCloseModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
@@ -1997,7 +1931,7 @@ export default function AdminProjectPage() {
         );
         return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Invitar miembro</h3>
@@ -2046,7 +1980,7 @@ export default function AdminProjectPage() {
                 {selectedUser && (
                   <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
                     <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs font-semibold text-slate-600">
-                      {selectedUser.name.charAt(0).toUpperCase()}
+                      {(selectedUser.name || selectedUser.email || "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">{selectedUser.name}</p>
@@ -2100,7 +2034,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleAddMember}
                 disabled={!canSubmit}
-                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Enviando..." : "Enviar invitación"}
               </button>
@@ -2113,7 +2047,7 @@ export default function AdminProjectPage() {
       {/* Edit Member Permissions Modal */}
       {showEditMemberModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Editar permisos</h3>
@@ -2181,7 +2115,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleUpdateMemberPermissions}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50"
               >
                 {saving ? "Guardando..." : "Guardar"}
               </button>
@@ -2193,7 +2127,7 @@ export default function AdminProjectPage() {
       {/* Clone Project Modal */}
       {showCloneModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Clonar proyecto</h3>
               <button onClick={() => setShowCloneModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
@@ -2247,7 +2181,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleCloneProject}
                 disabled={saving || !cloneName.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50"
               >
                 <FolderPlus size={14} />
                 {saving ? "Clonando..." : "Clonar"}
@@ -2260,7 +2194,7 @@ export default function AdminProjectPage() {
       {/* Copy Suppliers Modal */}
       {showCopySuppliersModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Copiar proveedores</h3>
@@ -2309,7 +2243,7 @@ export default function AdminProjectPage() {
               <button
                 onClick={handleCopySuppliers}
                 disabled={saving || !copySupplierTargetId}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50"
               >
                 <Copy size={14} />
                 {saving ? "Copiando..." : "Copiar"}
@@ -2322,7 +2256,7 @@ export default function AdminProjectPage() {
       {/* Copy Budget Modal */}
       {showCopyBudgetModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Copiar presupuesto</h3>
@@ -2391,7 +2325,7 @@ export default function AdminProjectPage() {
       {/* Delete Budget Modal */}
       {showDeleteBudgetModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Eliminar presupuesto</h3>
               <button onClick={() => setShowDeleteBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
@@ -2432,7 +2366,7 @@ export default function AdminProjectPage() {
       {/* Confirm Dialog */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
             <p className="text-sm text-slate-500 mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3">

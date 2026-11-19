@@ -5,6 +5,8 @@ export interface SupportMacro {
   id: string;
   label: string;
   text: string;
+  /** Agrupa las respuestas en el selector (Cuenta, Contabilidad, Ventas…). */
+  category?: string;
 }
 
 export interface AutomatedMessages {

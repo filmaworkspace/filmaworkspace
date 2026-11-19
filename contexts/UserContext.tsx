@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { arrayUnion, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 
 interface UserData {
   uid: string;
@@ -18,6 +18,8 @@ interface UserData {
   /** Acceso al entorno Budgeting (fuera de cualquier proyecto) — concedido desde AdminDashboard. */
   budgetingAccess: boolean;
   isLoading: boolean;
+  /** Sesión de "Ver como" abierta por un admin (solo lectura). */
+  impersonatedBy: string | null;
 }
 
 interface MaintenanceState {
@@ -37,6 +39,19 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const DEFAULT_MAINTENANCE: MaintenanceState = { enabled: false, startAt: null, message: "" };
+
+// Último acceso y meses activos (para el admin: "último acceso", retención por
+// cohortes). Como mucho una escritura por hora y navegador.
+function trackLastSeen(uid: string) {
+  try {
+    const key = `filma:lastSeen:${uid}`;
+    const prev = Number(localStorage.getItem(key) || 0);
+    if (Date.now() - prev < 60 * 60 * 1000) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch { /* sin localStorage: se escribe igual */ }
+  const month = new Date().toISOString().slice(0, 7);
+  updateDoc(doc(db, "users", uid), { lastSeenAt: serverTimestamp(), activeMonths: arrayUnion(month) }).catch(() => {});
+}
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
@@ -63,6 +78,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // Obtener datos adicionales de Firestore
       const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
       const userData = userDoc.data();
+      const claims = (await firebaseUser.getIdTokenResult()).claims;
+      const impersonatedBy = typeof claims.impersonatedBy === "string" ? claims.impersonatedBy : null;
+      if (!impersonatedBy && userDoc.exists()) trackLastSeen(firebaseUser.uid);
 
       setUser({
         uid: firebaseUser.uid,
@@ -72,6 +90,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         companyId: userData?.companyId || null,
         budgetingAccess: userData?.budgetingAccess || false,
         isLoading: false,
+        impersonatedBy,
       });
     } catch (error) {
       console.error("Error loading user data:", error);
@@ -83,6 +102,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         companyId: null,
         budgetingAccess: false,
         isLoading: false,
+        impersonatedBy: null,
       });
     }
   };

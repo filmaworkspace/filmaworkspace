@@ -1,11 +1,9 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 import { requireUser } from "@/lib/require-auth";
 import { db } from "@/lib/firebase-admin";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
@@ -29,13 +27,11 @@ export async function POST(req: NextRequest) {
   const senderName = formData.createdByName || "Filma Workspace";
   const firstName = name || formData.prefilled?.firstName || to;
 
-  const { data, error } = await resend.emails.send({
-    from: process.env.RESEND_FROM ?? "Filma Workspace <noreply@filmaworkspace.com>",
+  const { data, error } = await sendEmail({
     to: [to],
     subject: `${projectLabel} | Recordatorio: completa tu ficha`,
     html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
-    attachments: emailAttachments(),
     tags: [{ name: "type", value: "form-reminder" }],
   });
 

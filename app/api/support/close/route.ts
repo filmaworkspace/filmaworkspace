@@ -59,6 +59,19 @@ export async function POST(req: NextRequest) {
     // Solo se borra cuando el archivo ya está escrito.
     await db.recursiveDelete(chatRef);
 
+    // Pide al usuario que valore la atención (lo enseña el chat de soporte).
+    const chat = chatSnap.data() || {};
+    if (chat.userId && (msgsSnap.size > 1)) {
+      await db.collection("users").doc(chat.userId).set({
+        pendingSupportRating: {
+          archiveId: archiveRef.id,
+          agentName: chat.assignedToName || closer.name || "Soporte",
+          ticketNumber: chat.ticketNumber || null,
+          at: FieldValue.serverTimestamp(),
+        },
+      }, { merge: true }).catch(() => {});
+    }
+
     return NextResponse.json({ ok: true, archiveId: archiveRef.id });
   } catch (err: any) {
     console.error("[support/close]", err?.message);

@@ -1,3 +1,4 @@
+import { logSecurityEvent } from "@/lib/server/securityLog";
 import { NextRequest, NextResponse } from "next/server";
 import { db as adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
 
   if (stored !== code) {
     await snap.ref.update({ attempts: (attempts ?? 0) + 1 });
+    if ((attempts ?? 0) + 1 >= MAX_ATTEMPTS) await logSecurityEvent("pin_failed", { req, target: email, details: "Código de verificación: intentos agotados" });
     return NextResponse.json({ error: "Código incorrecto" }, { status: 400 });
   }
 

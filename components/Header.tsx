@@ -27,6 +27,7 @@ import {
   LogOut,
   Package,
   Receipt,
+  Search,
   Settings,
   Shield,
   User,
@@ -55,6 +56,8 @@ export default function Header() {
   const [envSwitcherOpen, setEnvSwitcherOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
+  // Módulos del plan de la cuenta (false = no incluido; lo fija el admin)
+  const [projectModules, setProjectModules] = useState<{ accounting?: boolean; team?: boolean }>({});
   const [permissions, setPermissions] = useState({
     config: false,
     accounting: false,
@@ -142,6 +145,7 @@ export default function Header() {
         const projectDoc = await getDoc(doc(db, "projects", projectId));
         if (projectDoc.exists()) {
           setProjectName(projectDoc.data().name || "Proyecto");
+          setProjectModules(projectDoc.data().modules || {});
         }
       } catch (error) {
         console.error("Error cargando nombre del proyecto:", error);
@@ -348,11 +352,18 @@ export default function Header() {
             </>
           )}
 
-          {isAdminSection && (
-            <NavLink href="/admindashboard" isActive={true}>
-              <Shield size={14} /> Administración
-            </NavLink>
-          )}
+          {isAdminSection && (() => {
+            // Navegación del panel de administración (los agentes de soporte
+            // solo ven Soporte y Guías).
+            const sub = pathname.replace(/^\/admindashboard\/?/, "").split("/")[0] || "";
+            const active = sub === "project" ? "projects" : sub;
+            const items = isAdmin
+              ? [["", "Inicio"], ["projects", "Proyectos"], ["users", "Usuarios"], ["accounts", "Cuentas"], ["support", "Soporte"], ["emails", "Emails"], ["announcements", "Avisos"], ["system", "Sistema"], ["metrics", "Métricas"]]
+              : [["support", "Soporte"], ["guides", "Guías"]];
+            return items.map(([key, label]) => (
+              <NavLink key={key} href={`/admindashboard${key ? `/${key}` : ""}`} isActive={active === key || (key === "support" && active === "guides" && isAdmin)}>{label}</NavLink>
+            ));
+          })()}
 
           {isConfigSection && projectId && (
             <>
@@ -385,6 +396,15 @@ export default function Header() {
 
         {/* Derecha */}
         <div className="relative flex items-center gap-1.5">
+          {isAdminSection && (
+            <button
+              onClick={() => window.dispatchEvent(new Event("admin:cmdk"))}
+              className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-700"
+              title="Buscar y acciones (⌘K)"
+            >
+              <Search size={13} /> <kbd className="font-mono text-[10px]">⌘K</kbd>
+            </button>
+          )}
           {/* Cajas (BOX) */}
           {isAccountingSection && projectId && accountingAccess.box && (
             <Link href={`/project/${projectId}/accounting/box`} className={iconButton} title="Cajas">
@@ -396,8 +416,8 @@ export default function Header() {
           {isInProjectSection && projectId && (() => {
             const envs = [
               permissions.config     && { key: "config",     icon: Settings, href: `/project/${projectId}/config` },
-              permissions.accounting && { key: "accounting", icon: Receipt,  href: `/project/${projectId}/accounting` },
-              permissions.team       && { key: "team",       icon: Users,    href: `/project/${projectId}/team` },
+              permissions.accounting && projectModules.accounting !== false && { key: "accounting", icon: Receipt,  href: `/project/${projectId}/accounting` },
+              permissions.team && projectModules.team !== false && { key: "team",       icon: Users,    href: `/project/${projectId}/team` },
             ].filter(Boolean) as { key: string; icon: any; href: string }[];
             const otherEnvs = envs.filter((env) => env.key !== currentSection);
             if (envs.length <= 1 || otherEnvs.length === 0) return null;

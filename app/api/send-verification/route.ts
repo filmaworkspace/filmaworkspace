@@ -1,12 +1,10 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { db as adminDb } from "@/lib/firebase-admin";
 import { verifyCodeHtml, verifyCodeText } from "@/lib/emails/verify-code";
 import { Timestamp } from "firebase-admin/firestore";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
 export async function POST(req: NextRequest) {
@@ -31,13 +29,11 @@ export async function POST(req: NextRequest) {
 
   await existingRef.set({ code, name, expiresAt, attempts: 0, lastSentAt: Date.now() });
 
-  const { data, error } = await resend.emails.send({
-    from:    process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+  const { data, error } = await sendEmail({
     to:      [email],
     subject: `Filma Workspace | ${code} es tu código de verificación`,
     html:    verifyCodeHtml({ name, code }),
     text:    verifyCodeText({ name, code }),
-    attachments:    emailAttachments(),
     tags:    [{ name: "type", value: "verify-code" }],
   });
 

@@ -1,318 +1,396 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// "Ver como el usuario": no es un login real como esa persona (eso implicaría
-// un custom token de Firebase Auth y poder escribir en su nombre — demasiado
-// riesgo para un vistazo de soporte). Es una vista de solo lectura de todo lo
-// que esa persona tiene: sus proyectos y rol en cada uno, su historial de
-// soporte y sus borradores de Budgeting, tal cual los vería ella — sin pedirle
-// una captura de pantalla ni tocar Firestore a mano.
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Admin · Ficha 360º de usuario ───────────────────────────────────────────
+// Todo de una persona en una página: sus proyectos y rol en cada uno, último
+// acceso, emails recibidos (con su estado), soporte, eventos de seguridad y
+// borradores de Budgeting. Acciones de cuenta: Ver como (solo lectura),
+// restablecer contraseña, verificar o cambiar email, cerrar sesiones,
+// exportar datos (RGPD), suspender y eliminar.
 
-// ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { inter } from "@/lib/fonts";
-
-// ─── Firebase ────────────────────────────────────────────────────────────────
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { signInWithCustomToken } from "firebase/auth";
+import { collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from "firebase/firestore";
+import { ArrowLeft, Eye, MoreHorizontal, Star } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
-
-// ─── Icons ───────────────────────────────────────────────────────────────────
-import {
-  AlertTriangle, ArrowLeft, Briefcase, Calculator, Crown, Download, Eye, FolderOpen, HeadphonesIcon, Loader2, Shield, Trash2,
-} from "lucide-react";
-
-// ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
+import { Badge, Button, DataList, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Select, useToast } from "@/components/ds";
+import { useAdminData } from "@/components/admin/AdminData";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { RoleModal } from "@/components/admin/RoleModal";
+import { adminFetch, BlockTitle, MiniEmpty, downloadJson, fmtDate, PHASE_DOT, ROLE_LABEL, RowBar, timeAgo } from "@/components/admin/ui";
+import { EMAIL_STATUS } from "@/components/admin/emailStatus";
 
-// ─────────────────────────────────────────────────────────────────────────────
+interface AuthInfo { exists: boolean; emailVerified: boolean; disabled: boolean; lastSignInTime: string | null; creationTime: string | null; providers: string[] }
+interface MailRow { id: string; subject: string; template: string; status: string; createdAt: { toMillis: () => number } | null }
+interface TicketRow { id: string; ticketNumber?: number; lastMessage?: string; closedAt?: { toMillis: () => number } | null; rating?: number; open?: boolean }
+interface SecRow { id: string; type: string; details?: string; createdAt: { toMillis: () => number } | null }
+interface DraftRow { id: string; name: string; status: string; updatedAt: { toMillis: () => number } | null }
 
-interface ViewedUser {
-  name: string; email: string; phone?: string; role: string;
-  isDemo?: boolean; budgetingAccess?: boolean; companyId?: string | null;
-}
-interface ViewedProject { id: string; name: string; role?: string; position?: string; phase?: string }
-interface ViewedDraft { id: string; name: string; status: "draft" | "sent"; sentToProjectName: string | null; updatedAt: any }
-interface ViewedChat { status: "open" | "resolved"; lastMessage: string; ticketNumber?: number; department?: string | null }
+const SEC_LABEL: Record<string, string> = {
+  rate_limited: "Bloqueado por límite", pin_failed: "Código fallido", access_denied: "Acceso denegado",
+  impersonation_start: "Un admin entró con «Ver como»", impersonation_end: "Fin de «Ver como»", account_suspended: "Cuenta suspendida",
+  account_reactivated: "Cuenta reactivada", sessions_revoked: "Sesiones cerradas", email_changed: "Email cambiado", data_exported: "Datos exportados",
+};
 
-const SPECIALTY_LABEL: Record<string, string> = { sales: "Ventas", technical: "Soporte técnico", both: "Ventas + Soporte" };
+type Action = null | "impersonate" | "suspend" | "reactivate" | "revoke" | "delete" | "export";
 
-export default function ViewAsUserPage() {
+function UserInner() {
   const { userId } = useParams() as { userId: string };
   const router = useRouter();
-  const { user: contextUser, isLoading: userLoading } = useUser();
-  const isAdmin = contextUser?.role === "admin";
-
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [viewedUser, setViewedUser] = useState<ViewedUser | null>(null);
-  const [projects, setProjects] = useState<ViewedProject[]>([]);
-  const [drafts, setDrafts] = useState<ViewedDraft[]>([]);
-  const [chat, setChat] = useState<ViewedChat | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const params = useSearchParams();
+  const { user: me } = useUser();
+  const { loading, userById, projectById, producers, producerById, reload } = useAdminData();
+  const u = userById(userId);
+  const [toast, showToast] = useToast();
+  const [info, setInfo] = useState<AuthInfo | null>(null);
+  const [mails, setMails] = useState<MailRow[]>([]);
+  const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [security, setSecurity] = useState<SecRow[]>([]);
+  const [drafts, setDrafts] = useState<DraftRow[]>([]);
+  const [memberships, setMemberships] = useState<Record<string, { role?: string; position?: string; department?: string }>>({});
+  const [action, setAction] = useState<Action>(null);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountId, setAccountId] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
 
   useEffect(() => {
-    if (!userLoading && !isAdmin) router.push("/dashboard");
-  }, [userLoading, isAdmin, router]);
+    const a = params.get("action") as Action;
+    if (params.get("impersonate") === "1") setAction("impersonate");
+    else if (a) setAction(a);
+  }, [params]);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const userSnap = await getDoc(doc(db, "users", userId));
-        if (!userSnap.exists()) { setNotFound(true); setLoading(false); return; }
-        const data = userSnap.data();
-        setViewedUser({
-          name: data.name || data.email, email: data.email, phone: data.phone || "",
-          role: data.role || "user", isDemo: !!data.isDemo, budgetingAccess: !!data.budgetingAccess, companyId: data.companyId || null,
-        });
+  const loadExtra = useCallback(async () => {
+    if (!u) return;
+    adminFetch<AuthInfo>("/api/admin/users", { uid: userId, action: "info" }).then(setInfo).catch(() => {});
+    const [mailSnap, chatSnap, archSnap, secSnap, upSnap, draftSnap] = await Promise.all([
+      u.email ? getDocs(query(collection(db, "emailLog"), where("to", "array-contains", u.email), limit(60))).catch(() => null) : Promise.resolve(null),
+      getDoc(doc(db, "supportChats", userId)).catch(() => null),
+      getDocs(query(collection(db, "supportArchive"), where("userId", "==", userId), limit(50))).catch(() => null),
+      getDocs(query(collection(db, "securityEvents"), where("uid", "==", userId), limit(50))).catch(() => null),
+      getDocs(collection(db, `userProjects/${userId}/projects`)).catch(() => null),
+      getDocs(collection(db, `userBudgetingDrafts/${userId}/drafts`)).catch(() => null),
+    ]);
+    const byTime = <T extends { createdAt?: { toMillis: () => number } | null; closedAt?: { toMillis: () => number } | null }>(a: T, b: T) =>
+      ((b.createdAt || b.closedAt)?.toMillis() ?? 0) - ((a.createdAt || a.closedAt)?.toMillis() ?? 0);
+    setMails((mailSnap?.docs || []).map((d) => ({ id: d.id, ...d.data() } as MailRow)).sort(byTime));
+    const t: TicketRow[] = (archSnap?.docs || []).map((d) => ({ id: d.id, ...d.data() } as TicketRow));
+    if (chatSnap?.exists()) t.unshift({ id: chatSnap.id, ...chatSnap.data(), open: true } as TicketRow);
+    setTickets(t.sort((a, b) => (a.open ? -1 : b.open ? 1 : byTime(a, b))));
+    setSecurity((secSnap?.docs || []).map((d) => ({ id: d.id, ...d.data() } as SecRow)).sort(byTime));
+    setMemberships(Object.fromEntries((upSnap?.docs || []).map((d) => [d.id, d.data()])));
+    setDrafts((draftSnap?.docs || []).map((d) => ({ id: d.id, ...d.data() } as DraftRow)));
+  }, [u, userId]);
 
-        const userProjectsSnap = await getDocs(collection(db, `userProjects/${userId}/projects`));
-        const projectsData = await Promise.all(
-          userProjectsSnap.docs.map(async (upDoc) => {
-            const upData = upDoc.data();
-            const projectDoc = await getDoc(doc(db, "projects", upDoc.id));
-            return {
-              id: upDoc.id,
-              name: projectDoc.exists() ? projectDoc.data().name : "Proyecto eliminado",
-              phase: projectDoc.exists() ? projectDoc.data().phase : undefined,
-              role: upData.role, position: upData.position,
-            };
-          })
-        );
-        setProjects(projectsData);
+  useEffect(() => { loadExtra(); }, [loadExtra]);
 
-        if (data.budgetingAccess) {
-          const draftsSnap = await getDocs(query(collection(db, `userBudgetingDrafts/${userId}/drafts`), orderBy("updatedAt", "desc")));
-          setDrafts(draftsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as ViewedDraft)));
-        }
-
-        const chatSnap = await getDoc(doc(db, "supportChats", userId));
-        if (chatSnap.exists()) {
-          const c = chatSnap.data();
-          setChat({ status: c.status || "resolved", lastMessage: c.lastMessage || "", ticketNumber: c.ticketNumber, department: c.department || null });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [isAdmin, userId]);
-
-  // Todo lo que se ve en esta página, tal cual, en un archivo — para
-  // responder a una petición de baja o de acceso a datos sin tener que
-  // recopilarlo a mano de varias colecciones.
-  const handleExport = () => {
-    if (!viewedUser) return;
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      user: { id: userId, ...viewedUser },
-      projects,
-      budgetingDrafts: drafts,
-      supportChat: chat,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${viewedUser.email.replace(/[^\w.@-]+/g, "_")}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch("/api/delete-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ uid: userId }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Error al eliminar");
-      router.push("/admindashboard");
-    } catch (err: any) {
-      setDeleteError(err.message || "Error al eliminar");
-    } finally {
-      setDeleting(false);
+  const months = useMemo(() => {
+    const out: { key: string; label: string; on: boolean }[] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      out.push({ key, label: d.toLocaleDateString("es-ES", { month: "short" }), on: !!u?.activeMonths.includes(key) });
     }
-  };
+    return out;
+  }, [u]);
 
-  if (userLoading || loading) {
-    return (
-      <div className={"min-h-screen bg-white flex items-center justify-center " + inter.className}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-  }
-  if (!isAdmin) return null;
-  if (notFound || !viewedUser) {
-    return (
-      <div className={"min-h-screen bg-white flex flex-col items-center justify-center gap-4 " + inter.className}>
-        <p className="text-slate-500 text-sm">Usuario no encontrado.</p>
-        <Link href="/admindashboard" className="text-sm font-medium text-slate-900 hover:underline">Volver a admindashboard</Link>
-      </div>
-    );
-  }
+  if (loading) return <PageLoading />;
+  if (!u) return <Page><PageHeader title="Usuario no encontrado" /><div className="mt-6"><Link href="/admindashboard/users" className="text-[13px] text-slate-600 hover:text-slate-900">← Volver a usuarios</Link></div></Page>;
+
+  const isSelf = u.id === me?.uid;
+  const run = async (act: string, extra: Record<string, unknown> = {}, ok = "Hecho") => {
+    await adminFetch("/api/admin/users", { uid: u.id, action: act, ...extra });
+    showToast("success", ok);
+    reload(); loadExtra();
+  };
+  const simple = async (act: string, ok: string) => { try { await run(act, {}, ok); } catch (e) { showToast("error", (e as Error).message); } };
+
+  const toggleBudgeting = async () => {
+    try { await updateDoc(doc(db, "users", u.id), { budgetingAccess: !u.budgetingAccess }); showToast("success", u.budgetingAccess ? "Budgeting retirado" : "Budgeting concedido"); reload(); }
+    catch { showToast("error", "No se pudo cambiar"); }
+  };
+  const saveAccount = async () => {
+    try { await updateDoc(doc(db, "users", u.id), { companyId: accountId || null }); showToast("success", "Cuenta actualizada"); setAccountOpen(false); reload(); }
+    catch { showToast("error", "No se pudo cambiar"); }
+  };
 
   return (
-    <div className={"min-h-screen bg-slate-50 " + inter.className}>
-      {/* Aviso permanente de solo lectura: aunque no haya nada que escribir en
-          esta página, deja claro que esto no es la sesión de la persona. */}
-      <div className="bg-amber-500 text-amber-950 text-xs font-semibold text-center py-1.5 flex items-center justify-center gap-1.5">
-        <Eye size={12} />
-        Viendo como {viewedUser.name} · Solo lectura — nada de lo que hay aquí se guarda en su cuenta
-      </div>
-
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <Link href="/admindashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800">
-            <ArrowLeft size={13} />
-            Volver a admindashboard
-          </Link>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-white"
-          >
-            <Download size={12} />
-            Exportar datos
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl flex items-center justify-center text-slate-600 text-xl font-semibold flex-shrink-0">
-            {viewedUser.name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-slate-900">{viewedUser.name}</h1>
-              {viewedUser.role === "admin" && (
-                <span className="flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-lg text-[11px] font-semibold"><Crown size={10} />Admin</span>
+    <Page>
+      {toast}
+      <Link href="/admindashboard/users" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Usuarios</Link>
+      <PageHeader
+        title={
+          <>
+            {u.name}
+            <span className="ml-1 flex items-center gap-1.5">
+              <Badge>{ROLE_LABEL[u.role]}</Badge>
+              {u.isDemo && <Badge tone="info">Demo</Badge>}
+              {u.suspended && <Badge tone="danger">Suspendido</Badge>}
+              {u.budgetingAccess && <Badge tone="warning">Budgeting</Badge>}
+            </span>
+          </>
+        }
+        actions={
+          <>
+            {u.role === "user" && !u.suspended && <Button onClick={() => setAction("impersonate")}><Eye size={14} /> Ver como</Button>}
+            <Menu trigger={(t) => <IconButton label="Acciones" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
+              {(close) => (
+                <>
+                  {!isSelf && <MenuItem onClick={() => { close(); setRoleOpen(true); }}>Cambiar rol…</MenuItem>}
+                  <MenuItem onClick={() => { close(); toggleBudgeting(); }}>{u.budgetingAccess ? "Quitar Budgeting" : "Dar acceso a Budgeting"}</MenuItem>
+                  <MenuItem onClick={() => { close(); setAccountId(u.companyId || ""); setAccountOpen(true); }}>Asignar a una cuenta…</MenuItem>
+                  <MenuSeparator />
+                  <MenuItem onClick={() => { close(); simple("send-reset", "Email para restablecer la contraseña enviado"); }}>Enviar restablecer contraseña</MenuItem>
+                  {info && !info.emailVerified && <MenuItem onClick={() => { close(); simple("verify-email", "Email marcado como verificado"); }}>Marcar email como verificado</MenuItem>}
+                  <MenuItem onClick={() => { close(); setNewEmail(u.email); setEmailOpen(true); }}>Cambiar email…</MenuItem>
+                  <MenuItem onClick={() => { close(); setAction("revoke"); }}>Cerrar todas sus sesiones…</MenuItem>
+                  <MenuItem onClick={() => { close(); setAction("export"); }}>Exportar sus datos (RGPD)…</MenuItem>
+                  {!isSelf && (
+                    <>
+                      <MenuSeparator />
+                      <MenuItem onClick={() => { close(); setAction(u.suspended ? "reactivate" : "suspend"); }}>{u.suspended ? "Reactivar cuenta…" : "Suspender cuenta…"}</MenuItem>
+                      <MenuItem danger onClick={() => { close(); setAction("delete"); }}>Eliminar usuario…</MenuItem>
+                    </>
+                  )}
+                </>
               )}
-              {viewedUser.isDemo && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">Demo</span>}
-            </div>
-            <p className="text-sm text-slate-500">{viewedUser.email}{viewedUser.phone ? ` · ${viewedUser.phone}` : ""}</p>
-          </div>
-        </div>
+            </Menu>
+          </>
+        }
+      />
 
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #ED8C6E, #E86F4A)", border: "1px solid rgba(255,255,255,0.25)" }}>
-              <Calculator size={15} className="text-white" />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-slate-900">{viewedUser.budgetingAccess ? "Tiene acceso" : "Sin acceso"}</p>
-              <p className="text-[11px] text-slate-500">Budgeting</p>
-            </div>
-          </div>
-          <div className="border border-slate-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
-            <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${chat?.status === "open" ? "bg-amber-50" : "bg-slate-100"}`}>
-              <HeadphonesIcon size={15} className={chat?.status === "open" ? "text-amber-600" : "text-slate-400"} />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-slate-900">{chat ? (chat.status === "open" ? "Ticket abierto" : "Sin tickets abiertos") : "Nunca escribió a soporte"}</p>
-              {chat?.lastMessage && <p className="text-[11px] text-slate-500 truncate max-w-[200px]">"{chat.lastMessage}"</p>}
-            </div>
-          </div>
-        </div>
-
-        <section className="mb-8">
-          <p className="text-sm font-semibold text-slate-700 mb-3">Proyectos ({projects.length})</p>
-          {projects.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-              <FolderOpen size={22} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">Sin proyectos asignados</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {projects.map((p) => (
-                <Link key={p.id} href={`/admindashboard/project/${p.id}`} className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0"><Briefcase size={13} className="text-blue-600" /></div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{p.name}</p>
-                      {p.phase && <p className="text-[11px] text-slate-400">{p.phase}</p>}
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium">{p.role || p.position || "—"}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {viewedUser.budgetingAccess && (
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-10">
           <section>
-            <p className="text-sm font-semibold text-slate-700 mb-3">Borradores de Budgeting ({drafts.length})</p>
-            {drafts.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-                <Calculator size={22} className="text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">Sin borradores todavía</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {drafts.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl">
-                    <p className="text-sm font-medium text-slate-900">{d.name}</p>
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${d.status === "sent" ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500 border border-slate-200"}`}>
-                      {d.status === "sent" ? `Enviado a ${d.sentToProjectName}` : "Borrador"}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <BlockTitle count={u.projectIds.length}>Proyectos</BlockTitle>
+            {u.projectIds.length === 0 ? <MiniEmpty>No está en ningún proyecto</MiniEmpty> : (
+              <table className="tbl w-full table-fixed text-[13px]">
+                <thead><tr className="text-left"><th className="py-2 pl-4 pr-3">Proyecto</th><th className="w-40 px-3">Rol</th><th className="w-36 px-3">Departamento</th><th className="w-36 px-3">Fase</th></tr></thead>
+                <tbody>
+                  {u.projectIds.map((id) => {
+                    const p = projectById(id);
+                    const m = p?.members.find((x) => x.uid === u.id);
+                    const up = memberships[id] || {};
+                    return (
+                      <tr key={id} onClick={() => router.push(`/admindashboard/project/${id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="py-1.5 pl-4 pr-3"><div className="truncate font-medium text-slate-900">{p?.name || id}</div></td>
+                        <td className="px-3 text-slate-600">{m?.role || m?.position || up.role || up.position || "—"}</td>
+                        <td className="px-3 text-slate-600">{m?.department || up.department || "—"}</td>
+                        <td className="px-3"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full" style={{ background: PHASE_DOT[p?.phase || ""] || "#94A3B8" }} />{p?.phase || "—"}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </section>
-        )}
 
-        {/* Zona de riesgo: al fondo, después de haber visto todo lo que tiene
-            la cuenta — con lo de arriba delante, ya no hace falta imaginarse
-            qué se va a llevar por delante el borrado. */}
-        <section className="mt-10 pt-6 border-t border-slate-200">
-          <p className="text-sm font-semibold text-red-700 mb-1">Zona de riesgo</p>
-          <p className="text-xs text-slate-500 mb-3">
-            Elimina la cuenta de Auth y Firestore, la quita de sus {projects.length} proyecto{projects.length !== 1 ? "s" : ""}, y borra su historial de soporte y sus {drafts.length} borrador{drafts.length !== 1 ? "es" : ""} de Budgeting. No se puede deshacer.
-          </p>
-          <button
-            onClick={() => { setShowDeleteConfirm(true); setDeleteError(""); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700"
-          >
-            <Trash2 size={14} />
-            Eliminar cuenta
-          </button>
-        </section>
+          <section>
+            <BlockTitle count={mails.length} action={<Link href={`/admindashboard/emails?q=${encodeURIComponent(u.email)}`} className="text-xs text-slate-500 hover:text-slate-900">Centro de emails →</Link>}>Emails recibidos</BlockTitle>
+            {mails.length === 0 ? <MiniEmpty>Sin emails registrados</MiniEmpty> : (
+              <table className="tbl w-full table-fixed text-[13px]">
+                <tbody>
+                  {mails.slice(0, 12).map((m) => {
+                    const st = EMAIL_STATUS[m.status] || EMAIL_STATUS.sent;
+                    return (
+                      <tr key={m.id} onClick={() => router.push(`/admindashboard/emails?open=${m.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="relative py-1.5 pl-4 pr-3"><RowBar tone={st.tone} /><div className="truncate text-slate-900">{m.subject}</div></td>
+                        <td className="w-32 px-3 text-slate-600">{st.label}</td>
+                        <td className="w-32 px-3 text-slate-500">{timeAgo(m.createdAt?.toMillis())}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+
+          <section>
+            <BlockTitle count={tickets.length}>Soporte</BlockTitle>
+            {tickets.length === 0 ? <MiniEmpty>Nunca ha escrito a soporte</MiniEmpty> : (
+              <table className="tbl w-full table-fixed text-[13px]">
+                <tbody>
+                  {tickets.map((t) => (
+                    <tr key={t.id} onClick={() => router.push("/admindashboard/support")} className="cursor-pointer hover:bg-[#FAFAFA]">
+                      <td className="relative py-1.5 pl-4 pr-3"><RowBar tone={t.open ? "warn" : "none"} /><div className="truncate text-slate-900">{t.ticketNumber ? `#${String(t.ticketNumber).padStart(5, "0")} · ` : ""}{t.lastMessage || "—"}</div></td>
+                      <td className="w-28 px-3">{t.rating ? <span className="flex items-center gap-1 text-amber-700"><Star size={11} className="fill-amber-400 text-amber-400" />{t.rating}/5</span> : <span className="text-slate-300">—</span>}</td>
+                      <td className="w-32 px-3 text-slate-500">{t.open ? "Abierto" : timeAgo(t.closedAt?.toMillis())}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+
+          {(security.length > 0) && (
+            <section>
+              <BlockTitle count={security.length}>Seguridad</BlockTitle>
+              <table className="tbl w-full table-fixed text-[13px]">
+                <tbody>
+                  {security.slice(0, 15).map((s) => (
+                    <tr key={s.id}>
+                      <td className="py-1.5 pl-4 pr-3"><div className="truncate text-slate-900">{SEC_LABEL[s.type] || s.type}{s.details ? <span className="ml-2 text-slate-500">{s.details}</span> : null}</div></td>
+                      <td className="w-32 px-3 text-slate-500">{timeAgo(s.createdAt?.toMillis())}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
+          {u.budgetingAccess && (
+            <section>
+              <BlockTitle count={drafts.length}>Presupuestos de Budgeting</BlockTitle>
+              {drafts.length === 0 ? <MiniEmpty>Sin borradores</MiniEmpty> : (
+                <table className="tbl w-full table-fixed text-[13px]">
+                  <tbody>
+                    {drafts.map((d) => (
+                      <tr key={d.id}>
+                        <td className="py-1.5 pl-4 pr-3"><div className="truncate text-slate-900">{d.name || "Sin nombre"}</div></td>
+                        <td className="w-32 px-3 text-slate-600">{d.status === "sent" ? "Enviado" : "Borrador"}</td>
+                        <td className="w-32 px-3 text-slate-500">{timeAgo(d.updatedAt?.toMillis())}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+          )}
+        </div>
+
+        <aside className="min-w-0 space-y-8">
+          <section>
+            <BlockTitle>Cuenta</BlockTitle>
+            <DataList columns={2} items={[
+              { label: "Email", value: <span title={u.email}>{u.email}</span> },
+              { label: "Teléfono", value: u.phone },
+              { label: "Cuenta", value: u.companyId ? <Link className="hover:underline" href={`/admindashboard/accounts/${u.companyId}`}>{producerById(u.companyId)?.name || u.companyId}</Link> : undefined },
+              { label: "Email verificado", value: info ? (info.emailVerified ? "Sí" : "No") : "…" },
+              { label: "Alta", value: fmtDate(u.createdAt) },
+              { label: "Último acceso", value: u.lastSeenAt ? timeAgo(u.lastSeenAt) : "Sin datos" },
+              { label: "Último inicio de sesión", value: info?.lastSignInTime ? timeAgo(new Date(info.lastSignInTime)) : "—" },
+              { label: "Estado", value: u.suspended || info?.disabled ? <span className="text-red-600">Suspendida</span> : "Activa" },
+            ]} />
+          </section>
+          <section>
+            <BlockTitle>Meses con actividad</BlockTitle>
+            <div className="flex gap-1">
+              {months.map((m) => (
+                <div key={m.key} className="flex flex-1 flex-col items-center gap-1" title={`${m.key}${m.on ? ": activo" : ""}`}>
+                  <span className={`h-6 w-full rounded-sm ${m.on ? "bg-slate-800" : "bg-slate-100"}`} />
+                  <span className="text-[9.5px] text-slate-400">{m.label.slice(0, 1).toUpperCase()}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">Se registra desde la publicación de esta versión.</p>
+          </section>
+        </aside>
       </div>
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={18} className="text-red-600" />
-              </div>
-              <h3 className="text-base font-semibold text-slate-900">Eliminar a {viewedUser.name}</h3>
-            </div>
-            <p className="text-sm text-slate-600 mb-5">
-              Se borrará de Firebase Auth, sus {projects.length} proyecto{projects.length !== 1 ? "s" : ""}, su historial de soporte y sus {drafts.length} borrador{drafts.length !== 1 ? "es" : ""} de Budgeting. Esta acción no se puede deshacer.
-            </p>
-            {deleteError && <p className="text-xs text-red-600 mb-3">{deleteError}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm disabled:opacity-50">
-                Cancelar
-              </button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm disabled:opacity-50">
-                {deleting && <Loader2 size={14} className="animate-spin" />}
-                {deleting ? "Eliminando..." : "Eliminar definitivamente"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Acciones */}
+      <ConfirmModal
+        open={action === "impersonate"}
+        onClose={() => setAction(null)}
+        title={`Ver Filma como ${u.name}`}
+        danger={false}
+        confirmLabel="Entrar en solo lectura"
+        notice={<>Verás exactamente lo que ve {u.name.split(" ")[0]}, sin poder cambiar nada. Queda registrado en la auditoría. Para volver, pulsa «Volver a mi cuenta» en la barra inferior.</>}
+        onConfirm={async () => {
+          const { token } = await adminFetch<{ token: string }>("/api/admin/impersonate", { uid: u.id });
+          await signInWithCustomToken(auth, token);
+          window.location.href = "/dashboard";
+        }}
+      />
+      <ConfirmModal
+        open={action === "suspend"}
+        onClose={() => setAction(null)}
+        title={`Suspender a ${u.name}`}
+        confirmLabel="Suspender cuenta"
+        notice="No podrá iniciar sesión y se cerrarán sus sesiones abiertas. Sus datos y proyectos no se tocan; puedes reactivarla cuando quieras."
+        reason={{ label: "Motivo (queda en la auditoría)", placeholder: "Opcional" }}
+        onConfirm={async (reason) => { await run("suspend", { reason }, "Cuenta suspendida"); }}
+      />
+      <ConfirmModal
+        open={action === "reactivate"}
+        onClose={() => setAction(null)}
+        title={`Reactivar a ${u.name}`}
+        danger={false}
+        password={false}
+        confirmLabel="Reactivar cuenta"
+        onConfirm={async () => { await run("reactivate", {}, "Cuenta reactivada"); }}
+      />
+      <ConfirmModal
+        open={action === "revoke"}
+        onClose={() => setAction(null)}
+        title="Cerrar todas sus sesiones"
+        danger={false}
+        password={false}
+        confirmLabel="Cerrar sesiones"
+        notice="Tendrá que volver a iniciar sesión en todos sus dispositivos (en menos de una hora)."
+        onConfirm={async () => { await run("revoke", {}, "Sesiones cerradas"); }}
+      />
+      <ConfirmModal
+        open={action === "export"}
+        onClose={() => setAction(null)}
+        title="Exportar sus datos"
+        danger={false}
+        confirmLabel="Descargar JSON"
+        notice="Perfil, cuenta, proyectos y permisos, soporte, emails recibidos y borradores de Budgeting, en un archivo. Queda registrado."
+        onConfirm={async () => {
+          const { data } = await adminFetch<{ data: unknown }>("/api/admin/users", { uid: u.id, action: "export" });
+          downloadJson(`datos_${u.email || u.id}_${new Date().toISOString().slice(0, 10)}.json`, data);
+          showToast("success", "Datos exportados");
+        }}
+      />
+      <ConfirmModal
+        open={action === "delete"}
+        onClose={() => setAction(null)}
+        title={`Eliminar a ${u.name}`}
+        confirmLabel="Eliminar usuario"
+        notice="Se borra su cuenta, su perfil, su acceso a los proyectos, sus invitaciones, su historial de soporte y sus borradores de Budgeting. No se puede deshacer. Si solo quieres impedirle el acceso, suspende la cuenta."
+        onConfirm={async () => {
+          await adminFetch("/api/delete-user", { uid: u.id });
+          await reload();
+          router.push("/admindashboard/users");
+        }}
+      />
+
+      <RoleModal user={roleOpen ? u : null} onClose={() => setRoleOpen(false)} onDone={(m) => { showToast("success", m); reload(); }} />
+
+      <Modal open={emailOpen} onClose={() => setEmailOpen(false)} title="Cambiar email"
+        footer={<><Button variant="ghost" onClick={() => setEmailOpen(false)}>Cancelar</Button><Button variant="primary" disabled={!newEmail.trim() || newEmail.trim() === u.email} onClick={() => { setEmailOpen(false); setAction(null); setPendingEmail(newEmail.trim()); }}>Continuar</Button></>}>
+        <Field label="Nuevo email" hint="Con el que iniciará sesión a partir de ahora. Se actualiza también en sus proyectos.">
+          <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} autoFocus />
+        </Field>
+      </Modal>
+      <ConfirmModal
+        open={!!pendingEmail}
+        onClose={() => setPendingEmail("")}
+        title="Confirmar cambio de email"
+        danger={false}
+        confirmLabel="Cambiar email"
+        notice={<>{u.name} pasará de <strong>{u.email}</strong> a <strong>{pendingEmail}</strong>.</>}
+        onConfirm={async () => { await run("change-email", { email: pendingEmail }, "Email cambiado"); }}
+      />
+
+      <Modal open={accountOpen} onClose={() => setAccountOpen(false)} title="Cuenta del usuario"
+        footer={<><Button variant="ghost" onClick={() => setAccountOpen(false)}>Cancelar</Button><Button variant="primary" onClick={saveAccount}>Guardar</Button></>}>
+        <Field label="Cuenta (productora)" hint="Da acceso al panel de la productora con todos sus proyectos.">
+          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Ninguna</option>
+            {producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+        </Field>
+      </Modal>
+    </Page>
   );
+}
+
+export default function UserPage() {
+  return <Suspense fallback={<PageLoading />}><UserInner /></Suspense>;
 }

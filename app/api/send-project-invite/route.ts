@@ -1,10 +1,8 @@
-import { emailAttachments } from "@/lib/emails/headerImage";
+import { sendEmail } from "@/lib/emails/send";
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { projectInviteHtml, projectInviteText } from "@/lib/emails/project-invite";
 import { requireUser } from "@/lib/require-auth";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
@@ -31,13 +29,11 @@ export async function POST(req: NextRequest) {
   const loginUrl    = `${base}/login`;
   const registerUrl = `${base}/register`;
 
-  const { data, error } = await resend.emails.send({
-    from:           process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>",
+  const { data, error } = await sendEmail({
     to:             [invitedEmail],
     subject:        `${projectLabel} | ${invitedByName} te ha invitado`,
     html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
-    attachments:           emailAttachments(),
     tags:           [{ name: "type", value: "project-invite" }],
   }, { idempotencyKey: `project-invite/${projectId}/${invitedEmail}` });
 

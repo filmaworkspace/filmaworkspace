@@ -10,7 +10,8 @@ import {
 } from "firebase/firestore";
 import { useUser } from "@/contexts/UserContext";
 import { fetchAutomatedMessages, fillTemplate } from "@/lib/automatedMessages";
-import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, CheckCheck, ArrowRight, BookOpen, ExternalLink, Star } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 interface Message {
   id:         string;
@@ -45,6 +46,12 @@ export default function SupportChat() {
   // pudieran quedar de una conversación ya cerrada.
   const [chatStartedAt,  setChatStartedAt]  = useState<number | null>(null);
 
+  // Valoración pendiente de la última conversación cerrada (la pide el
+  // servidor al cerrar: users/{uid}.pendingSupportRating).
+  const [pendingRating, setPendingRating] = useState<{ agentName?: string; ticketNumber?: number | null } | null>(null);
+  const [ratingHover, setRatingHover] = useState(0);
+  const [ratingSent, setRatingSent] = useState<number | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -61,6 +68,24 @@ export default function SupportChat() {
     );
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!uid || isAdmin || user?.impersonatedBy) return;
+    return onSnapshot(doc(db, "users", uid), (snap) => setPendingRating(snap.data()?.pendingSupportRating || null), () => {});
+  }, [uid, isAdmin, user?.impersonatedBy]);
+
+  const sendRating = async (score: number | null) => {
+    setRatingSent(score ?? 0);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      await fetch("/api/support/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(score ? { score } : { skip: true }),
+      });
+    } catch { /* nada */ }
+    setTimeout(() => { setPendingRating(null); setRatingSent(null); }, score ? 1800 : 0);
+  };
 
   useEffect(() => {
     if (!uid || isAdmin) return;
@@ -136,7 +161,7 @@ export default function SupportChat() {
   }, [visibleMessages.length]);
 
   // ── After all hooks: guard render ──────────────────────────────────────────
-  if (!user || isAdmin || !chatEnabled) return null;
+  if (!user || isAdmin || user.impersonatedBy || (!chatEnabled && !pendingRating)) return null;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -468,7 +493,31 @@ export default function SupportChat() {
         </div>
       )}
 
+      {/* Valoración de la última conversación */}
+      {pendingRating && !open && (
+        <div className="mb-3 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+          {ratingSent ? (
+            <p className="text-center text-sm font-medium text-slate-800">¡Gracias por tu valoración!</p>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium text-slate-900">¿Qué tal te ha atendido {pendingRating.agentName || "soporte"}?</p>
+                <button onClick={() => sendRating(null)} className="-mr-1 -mt-1 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Ahora no"><X size={14} /></button>
+              </div>
+              <div className="mt-2.5 flex gap-1" onMouseLeave={() => setRatingHover(0)}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onMouseEnter={() => setRatingHover(n)} onClick={() => sendRating(n)} aria-label={`${n} de 5`} className="p-0.5">
+                    <Star size={22} className={n <= ratingHover ? "fill-amber-400 text-amber-400" : "text-slate-300"} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Toggle button */}
+      {chatEnabled && (
       <button
         onClick={() => setOpen((v) => !v)}
         className="rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
@@ -481,6 +530,7 @@ export default function SupportChat() {
           </span>
         )}
       </button>
+      )}
     </div>
   );
 }
