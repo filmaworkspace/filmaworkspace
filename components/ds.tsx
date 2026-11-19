@@ -48,11 +48,15 @@ export function Page({ children, width = "" }: { children: React.ReactNode; widt
   );
 }
 
+/**
+ * Cabecera de página. Altura fija (título y línea siempre en el mismo sitio),
+ * haya botones o no y sean como sean: los botones se centran en esa altura.
+ */
 export function PageHeader({ title, actions }: { title: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="mb-2 flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
-      <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    <div className="mb-2 flex min-h-[61px] flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 pb-4 sm:h-[61px] sm:flex-nowrap">
+      <h1 className="flex h-11 min-w-0 items-center gap-2 text-xl font-semibold leading-7 tracking-tight text-slate-900">{title}</h1>
+      {actions && <div className="flex h-11 flex-shrink-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }

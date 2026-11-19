@@ -2089,7 +2089,7 @@ export default function BoxesPage() {
       {/* Header */}
       <div className="mt-[53px]">
         <div className="px-6 pt-8 sm:px-10">
-          <div className="flex min-h-[44px] items-center justify-between border-b border-slate-200 pb-4">
+          <div className="flex h-[61px] items-center justify-between border-b border-slate-200 pb-4">
             <div className="flex items-center gap-4">
               <h1 className="text-xl font-semibold tracking-tight text-slate-900">Cajas</h1>
               <div className="ml-4 flex items-center gap-1">
