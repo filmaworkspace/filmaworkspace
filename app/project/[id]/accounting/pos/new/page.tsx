@@ -63,7 +63,7 @@ import {
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
-import { commitPO } from "@/lib/budgetOperations";
+import { syncBudget } from "@/lib/ledgerClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -892,19 +892,7 @@ export default function NewPOPage() {
     if (file) handleFileUpload(file);
   }, []);
 
-  const updateSubAccountsCommitted = async (itemsToCommit: POItem[]) => {
-    // Preparar items para commitPO
-    const budgetItems = itemsToCommit
-      .filter(item => item.subAccountId && item.baseAmount > 0)
-      .map(item => ({
-        subAccountId: item.subAccountId,
-        baseAmount: item.baseAmount,
-      }));
-    
-    if (budgetItems.length > 0) {
-      await commitPO(id, budgetItems);
-    }
-  };
+
 
   const savePO = async (status: "draft" | "pending") => {
     if (status === "pending" && !validateForm()) return;
@@ -1016,11 +1004,8 @@ export default function NewPOPage() {
       // La PO ya existe de verdad: el autoguardado local deja de tener sentido.
       clearAutoDraft();
 
-      // Comprometer según la configuración
-      const finalStatus = poData.status;
-      if (shouldCommitPO(finalStatus, costSettings)) {
-        await updateSubAccountsCommitted(items);
-      }
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      if (poData.status !== "draft") await syncBudget(id);
 
       setSuccessMessage(
         poData.status === "approved"

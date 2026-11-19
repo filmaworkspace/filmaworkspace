@@ -2,6 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { syncBudget } from "@/lib/ledgerClient";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -501,19 +502,8 @@ export default function CompanyAccountsPage() {
         accountedByName: contextUser?.name, accountingEntryNumber: entryNumber.trim(),
         status: "submitted", journalLines: lines,
       });
-      // Realizar presupuesto si el trigger es on_account y no estaba ya realizado.
-      const costSettings = await getCostSettings(projectId);
-      const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      const nowRealized = shouldRealizeInvoice("submitted", costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      if (!wasRealized && nowRealized) {
-        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
-        if (budgetItems.length > 0) await realizeInvoice(projectId, budgetItems);
-      }
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      await syncBudget(projectId);
       showToast("success", `Contabilizada — ${entryNumber}`);
       setEntryNumber(""); setEditingLines(false);
       await loadData(); goToNext();
@@ -527,20 +517,7 @@ export default function CompanyAccountsPage() {
     try {
       // Limpiar track de contabilización; el lifecycle permanece "submitted".
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, accountedAt: null, accountedBy: null, accountedByName: null, status: "submitted" });
-      // Si la realización dependía de la contabilización (on_account) y ya no hay
-      // otro track que la mantenga, revertir el presupuesto.
-      const costSettings = await getCostSettings(projectId);
-      const items = selectedInvoice.items.map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount || 0 }));
-      const wasRealized = shouldRealizeInvoice(selectedInvoice.status, costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: selectedInvoice.accountedAt, paidAt: selectedInvoice.paidAt,
-      });
-      const stillRealized = shouldRealizeInvoice("submitted", costSettings, {
-        codedAt: selectedInvoice.codedAt, accountedAt: undefined, paidAt: selectedInvoice.paidAt,
-      });
-      if (wasRealized && !stillRealized) {
-        const budgetItems = items.filter((i: any) => i.subAccountId && i.baseAmount > 0);
-        if (budgetItems.length > 0) await unrealizeInvoice(projectId, budgetItems);
-      }
+      await syncBudget(projectId);
       showToast("success", "Factura desbloqueada"); setEditingLines(false); await loadData();
     } catch (err) { console.error(err); showToast("error", "Error"); }
     finally { setSaving(false); }

@@ -79,9 +79,9 @@ export function isProforma(inv: Record<string, any>) {
 export function invoiceReachedTrigger(inv: Record<string, any>, s: LedgerSettings) {
   if (!invoiceAlive(inv)) return false;
   if (isProforma(inv) && !s.proformaRealizes) return false;
-  return s.invoiceActualTrigger === "on_account"
-    ? !!(inv.accountedAt || inv.accounted || inv.paidAt || inv.status === "paid")
-    : !!(inv.codedAt || inv.accountedAt || inv.accounted || inv.paidAt || inv.status === "paid");
+  // (status "coded"/"accounted"/"paid" son de documentos antiguos)
+  const accounted = !!(inv.accountedAt || inv.accounted || inv.paidAt || ["accounted", "paid"].includes(inv.status));
+  return s.invoiceActualTrigger === "on_account" ? accounted : accounted || !!inv.codedAt || inv.status === "coded";
 }
 
 // ── POs ─────────────────────────────────────────────────────────────────────
@@ -166,14 +166,18 @@ export function computeLedger(input: LedgerInput, s: LedgerSettings): Ledger {
   const linked: Record<string, { invoiced: number[]; realized: number[] }> = {};
   const poById = new Map(input.pos.map((p) => [p.id, p]));
   for (const inv of input.invoices) {
-    if (!inv.poId || !poById.has(inv.poId)) continue;
-    const po = poById.get(inv.poId)!;
-    const poItems: any[] = po.items || [];
-    const l = (linked[inv.poId] ||= { invoiced: poItems.map(() => 0), realized: poItems.map(() => 0) });
     for (const it of inv.items || []) {
+      // Cada línea puede ir a su propia PO (ítem de otra PO); si no, a la de la factura.
+      const poId: string | undefined = it.poId || inv.poId;
+      if (!poId || !poById.has(poId)) continue;
+      const po = poById.get(poId)!;
+      const poItems: any[] = po.items || [];
+      const l = (linked[poId] ||= { invoiced: poItems.map(() => 0), realized: poItems.map(() => 0) });
       const base = num(it.baseAmount);
+      // El ítem se identifica por su índice (metadato), no por el concepto.
       let idx = typeof it.poItemIndex === "number" && it.poItemIndex >= 0 && it.poItemIndex < poItems.length ? it.poItemIndex : -1;
-      if (idx < 0 && it.subAccountCode) idx = poItems.findIndex((p) => p.subAccountCode === it.subAccountCode);
+      if (idx < 0 && it.poItemId) idx = poItems.findIndex((p) => p.id === it.poItemId);
+      if (idx < 0 && it.subAccountCode && !it.poId) idx = poItems.findIndex((p) => p.subAccountCode === it.subAccountCode);
       if (idx < 0) {
         if (base && invoiceCountsAsInvoiced[inv.id]) issues.push({ kind: "unlinked_po_line", docId: inv.id, collection: "invoices", amount: base, detail: `${inv.displayNumber || inv.id}: línea sin partida de la PO` });
         continue;
@@ -187,7 +191,8 @@ export function computeLedger(input: LedgerInput, s: LedgerSettings): Ledger {
     const items: any[] = po.items || [];
     const l = linked[po.id] || { invoiced: items.map(() => 0), realized: items.map(() => 0) };
     // PO aprobada en modificación: sigue contando su versión anterior.
-    const modifying = (po.previousCommittedItems?.length || 0) > 0 && (po.status === "draft" || po.status === "pending");
+    // (también si la modificación se rechaza: la versión aprobada sigue valiendo).
+    const modifying = (po.previousCommittedItems?.length || 0) > 0 && ["draft", "pending", "rejected"].includes(po.status);
     const lines: PoLineLedger[] = items.map((it, i) => {
       const base = num(it.baseAmount);
       const invoiced = l.invoiced[i] || 0, realized = l.realized[i] || 0;
@@ -202,8 +207,10 @@ export function computeLedger(input: LedgerInput, s: LedgerSettings): Ledger {
     });
     if (modifying) {
       (po.previousCommittedItems as any[]).forEach((it, i) => {
-        const c = Math.max(0, num(it.baseAmount) - (l.realized[i] || 0));
-        add(it.subAccountCode, "committed", r2(c));
+        const idx = typeof it.index === "number" ? it.index : i;
+        const c = Math.max(0, num(it.baseAmount) - (l.realized[idx] || 0));
+        const code = it.subAccountCode || items.find((x) => x.subAccountId && x.subAccountId === it.subAccountId)?.subAccountCode;
+        add(code, "committed", r2(c));
       });
     } else {
       for (const ln of lines) add(ln.subAccountCode, "committed", ln.committed);

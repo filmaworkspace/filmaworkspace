@@ -1,40 +1,29 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+import { normalizeSettings, type LedgerSettings } from "@/lib/budgetLedger";
+
+// Ajustes de costes del proyecto. Las reglas de presupuesto viven en
+// lib/budgetLedger (libro único); aquí quedan los ajustes y ayudas antiguas.
 export interface CostSettings {
   poCommitmentTrigger: "on_create" | "on_approve";
   invoiceActualTrigger: "on_code" | "on_account" | "on_create" | "on_approve" | "on_paid";
+  boxActualTrigger?: LedgerSettings["boxActualTrigger"];
+  proformaRealizes?: boolean;
 }
 
-const DEFAULT_SETTINGS: CostSettings = {
-  poCommitmentTrigger: "on_approve",
-  invoiceActualTrigger: "on_account",
-};
-
 /**
- * Obtiene la configuración de costes del proyecto
+ * Obtiene la configuración de costes del proyecto.
+ * Por defecto: compromete al aprobar la PO, realiza al codificar la factura y
+ * al codificar el sobre de caja; las proformas realizan.
  */
-export async function getCostSettings(projectId: string): Promise<CostSettings> {
+export async function getCostSettings(projectId: string): Promise<CostSettings & LedgerSettings> {
   try {
-    const costConfigRef = doc(db, `projects/${projectId}/config/cost`);
-    const costConfigSnap = await getDoc(costConfigRef);
-    
-    if (costConfigSnap.exists()) {
-      const data = costConfigSnap.data();
-      const rawInvoice = data.invoiceActualTrigger || DEFAULT_SETTINGS.invoiceActualTrigger;
-      const migratedInvoice = rawInvoice === "on_paid" ? "on_account"
-        : rawInvoice === "on_approve" ? "on_code"
-        : rawInvoice;
-      return {
-        poCommitmentTrigger: data.poCommitmentTrigger || DEFAULT_SETTINGS.poCommitmentTrigger,
-        invoiceActualTrigger: migratedInvoice as CostSettings["invoiceActualTrigger"],
-      };
-    }
-    
-    return DEFAULT_SETTINGS;
+    const snap = await getDoc(doc(db, `projects/${projectId}/config/cost`));
+    return normalizeSettings(snap.exists() ? snap.data() : null);
   } catch (error) {
     console.error("Error loading cost settings:", error);
-    return DEFAULT_SETTINGS;
+    return normalizeSettings(null);
   }
 }
 

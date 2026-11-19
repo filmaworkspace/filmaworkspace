@@ -77,9 +77,8 @@ import { repairDoc } from "@/lib/approvalActions";
 
 const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { FilmaPDF } from "@/lib/pdfBuilder";
-import { uncommitPO, closePoItem, reopenPoItem } from "@/lib/budgetOperations";
+import { syncBudget } from "@/lib/ledgerClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -464,61 +463,9 @@ export default function PODetailPage() {
     }
   };
 
-  const releaseRemainingCommitted = async (poToClose: PO) => {
-    // Preparar items con el importe restante a liberar por cada uno
-    const itemsToRelease: Array<{ subAccountId: string; baseAmount: number }> = [];
-    
-    for (const item of poToClose.items) {
-      if (item.subAccountId && !item.isClosed) {
-        const itemInvoiced = item.invoicedAmount || 0;
-        const itemCommitted = item.baseAmount || 0;
-        const remainingToRelease = itemCommitted - itemInvoiced;
-        
-        if (remainingToRelease > 0) {
-          itemsToRelease.push({
-            subAccountId: item.subAccountId,
-            baseAmount: remainingToRelease,
-          });
-        }
-      }
-    }
-    
-    // Usar uncommitPO para liberar todo de una vez
-    if (itemsToRelease.length > 0) {
-      await uncommitPO(projectId, itemsToRelease);
-    }
-  };
 
-  const restoreCommittedOnReopen = async (poToReopen: PO) => {
-    // Verificar configuración - solo restaurar si la PO debería estar comprometida
-    const costSettings = await getCostSettings(projectId);
-    if (!shouldCommitPO("approved", costSettings)) return;
-    
-    // Preparar items con el importe restante a restaurar por cada uno
-    const itemsToRestore: Array<{ subAccountId: string; baseAmount: number }> = [];
-    
-    for (const item of poToReopen.items) {
-      if (item.subAccountId && !item.isClosed) {
-        const itemInvoiced = item.invoicedAmount || 0;
-        const itemCommitted = item.baseAmount || 0;
-        const remainingToRestore = itemCommitted - itemInvoiced;
-        
-        if (remainingToRestore > 0) {
-          itemsToRestore.push({
-            subAccountId: item.subAccountId,
-            baseAmount: remainingToRestore,
-          });
-        }
-      }
-    }
-    
-    // Usar commitPO para restaurar (importamos uncommitPO pero usamos la lógica inversa)
-    if (itemsToRestore.length > 0) {
-      // Restaurar = sumar a committed, así que usamos la función de budgetOperations
-      const { commitPO } = await import("@/lib/budgetOperations");
-      await commitPO(projectId, itemsToRestore);
-    }
-  };
+
+
 
   const handleClosePO = async () => {
     if (!po) return;
@@ -526,8 +473,6 @@ export default function PODetailPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      await releaseRemainingCommitted(po);
-
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         status: "closed",
         closedAt: Timestamp.now(),
@@ -535,6 +480,7 @@ export default function PODetailPage() {
         closedByName: permissions.userName,
         remainingAmount: 0,
       });
+      await syncBudget(projectId);
       setShowCloseModal(false);
       resetModals();
       await loadData();
@@ -551,8 +497,6 @@ export default function PODetailPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      await restoreCommittedOnReopen(po);
-
       const baseAmount = po.baseAmount || 0;
       const invoicedAmount = po.invoicedAmount || 0;
 
@@ -563,6 +507,7 @@ export default function PODetailPage() {
         closedByName: null,
         remainingAmount: baseAmount - invoicedAmount,
       });
+      await syncBudget(projectId);
       setShowReopenModal(false);
       resetModals();
       await loadData();
@@ -579,25 +524,6 @@ export default function PODetailPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      // Verificar si la PO estaba comprometida según la configuración
-      const costSettings = await getCostSettings(projectId);
-      const wasCommitted = shouldCommitPO(po.status, costSettings);
-      
-      // Si estaba comprometida, liberar el presupuesto
-      if (wasCommitted) {
-        const itemsToUncommit = po.items
-          .filter(item => item.subAccountId && !item.isClosed)
-          .map(item => ({
-            subAccountId: item.subAccountId,
-            baseAmount: (item.baseAmount || 0) - (item.invoicedAmount || 0),
-          }))
-          .filter(item => item.baseAmount > 0);
-        
-        if (itemsToUncommit.length > 0) {
-          await uncommitPO(projectId, itemsToUncommit);
-        }
-      }
-      
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         status: "cancelled",
         cancelledAt: Timestamp.now(),
@@ -607,6 +533,7 @@ export default function PODetailPage() {
         committedAmount: 0,
         remainingAmount: 0,
       });
+      await syncBudget(projectId);
       setShowCancelModal(false);
       resetModals();
       await loadData();
@@ -628,11 +555,6 @@ export default function PODetailPage() {
       const itemCommitted = item.baseAmount || 0;
       const remainingToRelease = itemCommitted - itemInvoiced;
 
-      // Liberar comprometido pendiente usando budgetOperations
-      if (remainingToRelease > 0 && item.subAccountId) {
-        await closePoItem(projectId, item.subAccountId, remainingToRelease);
-      }
-
       // Actualizar el item como cerrado
       const updatedItems = [...po.items];
       updatedItems[itemIndex] = {
@@ -644,6 +566,7 @@ export default function PODetailPage() {
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         items: updatedItems,
       });
+      await syncBudget(projectId);
 
       setShowCloseItemModal(null);
       resetModals();
@@ -667,11 +590,6 @@ export default function PODetailPage() {
       const itemCommitted = item.baseAmount || 0;
       const remainingToRestore = itemCommitted - itemInvoiced;
 
-      // Restaurar comprometido usando budgetOperations
-      if (remainingToRestore > 0 && item.subAccountId) {
-        await reopenPoItem(projectId, item.subAccountId, remainingToRestore);
-      }
-
       // Actualizar el item como abierto
       const updatedItems = [...po.items];
       updatedItems[itemIndex] = {
@@ -683,6 +601,7 @@ export default function PODetailPage() {
       await updateDoc(doc(db, `projects/${projectId}/pos`, po.id), {
         items: updatedItems,
       });
+      await syncBudget(projectId);
 
       setShowReopenItemModal(null);
       resetModals();
@@ -705,10 +624,11 @@ export default function PODetailPage() {
       // Se incluyen subAccountCode e invoicedAmount para que:
       // 1. La página de presupuesto pueda mostrar el committed anterior mientras está en borrador/pendiente.
       // 2. Al aprobar la nueva versión, se descuente correctamente solo la porción no realizada.
+      // Todas las líneas y en su orden (el índice identifica el ítem).
       const committedItems = po.items
-        .filter(item => item.subAccountId && item.baseAmount > 0)
-        .map(item => ({
-          subAccountId: item.subAccountId,
+        .map((item, index) => ({
+          index,
+          subAccountId: item.subAccountId || "",
           subAccountCode: item.subAccountCode || "",
           baseAmount: item.baseAmount,
           invoicedAmount: item.invoicedAmount || 0,

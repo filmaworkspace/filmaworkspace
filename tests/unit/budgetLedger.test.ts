@@ -149,3 +149,18 @@ describe("cuadre", () => {
     expect(computeLedger({ pos: [], invoices: [inv("i", [["01", 100]], { ...coded, approvalStatus: "rejected" })] }, S()).totals.actual).toBe(0);
   });
 });
+
+describe("ítems como POs dentro de la PO", () => {
+  it("pasarse en un ítem no quita comprometido a otro", () => {
+    const P = po("p", "approved", [["01", 100], ["01", 900]]);
+    const l = computeLedger({ pos: [P], invoices: [inv("i", [["01", 300, 0]], { poId: "p", ...coded })] }, S());
+    expect(l.pos.p.lines.map((x) => x.committed)).toEqual([0, 900]);
+    expect(l.bySub["01"]).toEqual({ committed: 900, actual: 300, box: 0 });
+  });
+  it("una línea puede realizar sobre un ítem de otra PO", () => {
+    const A = po("a", "approved", [["01", 500]]), B = po("b", "approved", [["02", 800]]);
+    const l = computeLedger({ pos: [A, B], invoices: [inv("i", [["01", 100, 0], ["02", 200]], { poId: "a", ...coded })].map((x) => ({ ...x, items: [x.items[0], { ...x.items[1], poId: "b", poItemIndex: 0 }] })) }, S());
+    expect(l.pos.a.lines[0].committed).toBe(400);
+    expect(l.pos.b.lines[0].committed).toBe(600);
+  });
+});

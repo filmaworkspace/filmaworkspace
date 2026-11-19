@@ -39,3 +39,24 @@ export async function syncBudget(projectId: string): Promise<LedgerResponse | nu
   inflight.set(projectId, run);
   try { return await run; } finally { if (inflight.get(projectId) === run) inflight.delete(projectId); }
 }
+
+/**
+ * Cifras del presupuesto por código de subcuenta. Pide el recálculo al
+ * servidor; si no responde, lo calcula aquí con los documentos que se puedan
+ * leer (mismas reglas: lib/budgetLedger).
+ */
+export async function loadLedger(projectId: string): Promise<Pick<LedgerResponse, "bySub" | "totals" | "pos" | "issues" | "settings"> & { bySubId?: LedgerResponse["bySubId"] }> {
+  const remote = await syncBudget(projectId);
+  if (remote) return remote;
+  const { collection, doc, getDoc, getDocs } = await import("firebase/firestore");
+  const { db } = await import("@/lib/firebase");
+  const { computeLedger, normalizeSettings } = await import("@/lib/budgetLedger");
+  const base = `projects/${projectId}`;
+  const read = async (c: string) => { try { return (await getDocs(collection(db, `${base}/${c}`))).docs.map((d) => ({ id: d.id, ...d.data() })); } catch { return []; } };
+  const [cfg, pos, invoices, cardExpenses, transferExpenses, transferEnvelopes, cashMovements] = await Promise.all([
+    getDoc(doc(db, `${base}/config/cost`)).catch(() => null), read("pos"), read("invoices"), read("cardExpenses"), read("transferExpenses"), read("transferEnvelopes"), read("cashMovements"),
+  ]);
+  const settings = normalizeSettings(cfg?.exists() ? cfg.data() : null);
+  const l = computeLedger({ pos, invoices, cardExpenses, transferExpenses, transferEnvelopes, cashMovements }, settings);
+  return { bySub: l.bySub, totals: l.totals, pos: l.pos, issues: l.issues, settings };
+}

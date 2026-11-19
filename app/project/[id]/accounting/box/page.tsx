@@ -2,6 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import CashBox from "@/components/box/CashBox";
+import { syncBudget } from "@/lib/ledgerClient";
 import { Button, EmptyState, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Segmented, buttonClass } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
@@ -596,6 +597,9 @@ export default function BoxesPage() {
 
   // ─── Load Data ───────────────────────────────────────────────────────────────
   const loadData = async () => {
+    // Cada cambio en cajas recarga la página: es el momento de recalcular el
+    // presupuesto desde los documentos (lib/budgetLedger). No bloquea la carga.
+    syncBudget(projectId);
     try {
       setLoading(true);
       const ups = await getDoc(doc(db, `userProjects/${userId}/projects/${projectId}`));

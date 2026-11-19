@@ -2,6 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { syncBudget } from "@/lib/ledgerClient";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -53,7 +54,6 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
-import { realizeInvoice, unrealizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -300,27 +300,8 @@ export default function PaymentPayPage() {
             paymentForecastId: forecastId 
           });
           
-          // Si corresponde realizar según configuración, mover de committed a actual
-          if (!isPartialPayment && shouldRealizeOnStatusChange(oldStatus, newStatus, costSettings)) {
-            const invoiceData = invoiceSnap.data();
-            if (invoiceData?.items) {
-              const budgetItems = invoiceData.items
-                .filter((i: any) => i.subAccountId && i.baseAmount > 0)
-                .map((i: any) => ({
-                  subAccountId: i.subAccountId,
-                  baseAmount: i.baseAmount,
-                }));
-
-              if (budgetItems.length > 0) {
-                await realizeInvoice(id, budgetItems);
-              }
-
-              // Actualizar el seguimiento de la PO (invoicedAmount / remainingAmount)
-              if (invoiceData.poId) {
-                await updatePOItemsInvoiced(id, invoiceData.poId, invoiceData.items, "add");
-              }
-            }
-          }
+          // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+          await syncBudget(id);
         }
       }
       
@@ -442,27 +423,7 @@ export default function PaymentPayPage() {
               });
             }
             
-            // Si la factura estaba realizada (paid) y ahora no lo está, revertir presupuesto
-            const wasRealized = shouldRealizeInvoice(oldStatus, costSettings);
-            const isStillRealized = shouldRealizeInvoice(newStatus, costSettings);
-            
-            if (wasRealized && !isStillRealized && invoiceData.items) {
-              const budgetItems = invoiceData.items
-                .filter((i: any) => i.subAccountId && i.baseAmount > 0)
-                .map((i: any) => ({
-                  subAccountId: i.subAccountId,
-                  baseAmount: i.baseAmount,
-                }));
-
-              if (budgetItems.length > 0) {
-                await unrealizeInvoice(id, budgetItems);
-              }
-
-              // Revertir el seguimiento de la PO
-              if (invoiceData.poId) {
-                await updatePOItemsInvoiced(id, invoiceData.poId, invoiceData.items, "subtract");
-              }
-            }
+            await syncBudget(id);
           }
         } catch (invoiceError) {
           console.warn("Could not update invoice:", invoiceError);

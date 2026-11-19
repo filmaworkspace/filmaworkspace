@@ -69,7 +69,7 @@ import {
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
-import { commitPO } from "@/lib/budgetOperations";
+import { syncBudget } from "@/lib/ledgerClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -275,7 +275,7 @@ export default function EditPOPage() {
   const [itemInvoiceStatus, setItemInvoiceStatus] = useState<Record<number, ItemInvoiceStatus>>({});
   
   // Items originales comprometidos (para mantener comprometido durante edición)
-  const [originalCommittedItems, setOriginalCommittedItems] = useState<{subAccountId: string; baseAmount: number}[] | null>(null);
+  const [originalCommittedItems, setOriginalCommittedItems] = useState<{index?: number; subAccountId: string; subAccountCode?: string; baseAmount: number}[] | null>(null);
   const [wasApprovedBefore, setWasApprovedBefore] = useState(false);
   
   // Items originales con todas sus propiedades (para detectar cambios de cuenta)
@@ -337,10 +337,12 @@ export default function EditPOPage() {
       // Puede estar en draft/rejected después de editar una aprobada
       const hadCommittedItems = poData.previousCommittedItems || (poData.status === "approved" ? poData.items : null);
       if (hadCommittedItems) {
-        setOriginalCommittedItems(hadCommittedItems.map((item: any) => ({
+        setOriginalCommittedItems(hadCommittedItems.map((item: any, i: number) => ({
+          index: item.index ?? i,
           subAccountId: item.subAccountId,
+          subAccountCode: item.subAccountCode || "",
           baseAmount: item.baseAmount || 0,
-        })).filter((item: any) => item.subAccountId && item.baseAmount > 0));
+        })).filter((item: any) => item.baseAmount > 0));
         setWasApprovedBefore(true);
       }
 
@@ -621,19 +623,7 @@ export default function EditPOPage() {
     if (file) handleFileUpload(file);
   }, []);
 
-  const updateSubAccountsCommitted = async (itemsToCommit: POItem[]) => {
-    // Preparar items para commitPO
-    const budgetItems = itemsToCommit
-      .filter(item => item.subAccountId && item.baseAmount > 0)
-      .map(item => ({
-        subAccountId: item.subAccountId,
-        baseAmount: item.baseAmount,
-      }));
-    
-    if (budgetItems.length > 0) {
-      await commitPO(id, budgetItems);
-    }
-  };
+
 
   const savePO = async (sendForApproval: boolean) => {
     if (sendForApproval && !validateForm()) return;
@@ -740,22 +730,8 @@ export default function EditPOPage() {
       // Actualizar facturas vinculadas si cambiaron las cuentas de los items
       await updateLinkedInvoicesAccounts();
 
-      // Comprometer según la configuración
-      const finalStatus = poData.status;
-      
-      // Si se auto-aprueba y había items anteriores, hacer la diferencia
-      if (finalStatus === "approved" && wasApprovedBefore && originalCommittedItems) {
-        // Descomprometer los items anteriores
-        await uncommitPOItems(originalCommittedItems);
-        // Comprometer los nuevos items
-        await updateSubAccountsCommitted(items);
-      } else if (finalStatus === "approved" && !wasApprovedBefore) {
-        // Nueva PO aprobada, comprometer normalmente
-        if (shouldCommitPO(finalStatus, costSettings)) {
-          await updateSubAccountsCommitted(items);
-        }
-      }
-      // Si status es "pending" y había items anteriores, NO tocar el comprometido (se mantiene)
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      await syncBudget(id);
 
       setSuccessMessage(poData.status === "approved" ? "PO aprobada automáticamente" : poData.status === "pending" ? "PO enviada para aprobación" : "Borrador guardado");
       setTimeout(() => router.push(`/project/${id}/accounting/pos`), 1500);
@@ -767,23 +743,7 @@ export default function EditPOPage() {
   };
 
   // Helper para descomprometer items específicos
-  const uncommitPOItems = async (itemsToUncommit: {subAccountId: string; baseAmount: number}[]) => {
-    const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-    for (const item of itemsToUncommit) {
-      if (!item.subAccountId || item.baseAmount <= 0) continue;
-      for (const accountDoc of accountsSnapshot.docs) {
-        const subAccountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`));
-        for (const subDoc of subAccountsSnapshot.docs) {
-          if (subDoc.id === item.subAccountId) {
-            const currentCommitted = subDoc.data().committed || 0;
-            await updateDoc(doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, subDoc.id), {
-              committed: Math.max(0, currentCommitted - item.baseAmount),
-            });
-          }
-        }
-      }
-    }
-  };
+
 
   // Helper para actualizar facturas vinculadas cuando cambian las cuentas de los items de la PO
   const updateLinkedInvoicesAccounts = async () => {

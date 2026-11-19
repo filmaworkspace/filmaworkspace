@@ -1,6 +1,7 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { syncBudget } from "@/lib/ledgerClient";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -325,6 +326,7 @@ export default function ReplaceDocumentPage() {
         codedByName: null,
         accountingEntry: null,
       });
+      await syncBudget(projectId);
 
       closeReplaceModal();
       router.push(`/project/${projectId}/accounting/invoices/${selectedDoc.id}`);

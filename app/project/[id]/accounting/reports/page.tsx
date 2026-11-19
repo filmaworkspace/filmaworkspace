@@ -55,7 +55,8 @@ import {
 import { strToU8, zipSync } from "fflate";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
-import { CostSettings, getCostSettings, shouldCommitPO, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { CostSettings, getCostSettings } from "@/lib/budgetRules";
+import { loadLedger } from "@/lib/ledgerClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -142,11 +143,11 @@ const REPORT_COLUMNS: Record<ReportType, ReportColumn[]> = {
     { id: "accountDescription", label: "Cuenta", enabled: false },
     { id: "subaccountCode", label: "Código subcuenta", enabled: true },
     { id: "subaccountDescription", label: "Subcuenta", enabled: false },
-    { id: "baseCommitted", label: "Base comprometido", enabled: true },
-    { id: "totalCommitted", label: "Total comprometido", enabled: true },
-    { id: "baseInvoiced", label: "Base facturado", enabled: true },
-    { id: "baseAvailable", label: "Base disponible", enabled: true },
-    { id: "totalAvailable", label: "Total disponible", enabled: true },
+    { id: "baseCommitted", label: "Base PO", enabled: true },
+    { id: "totalCommitted", label: "Total PO", enabled: true },
+    { id: "baseInvoiced", label: "Base realizado", enabled: true },
+    { id: "baseAvailable", label: "Base comprometido", enabled: true },
+    { id: "totalAvailable", label: "Total comprometido", enabled: true },
     { id: "poStatus", label: "Estado PO", enabled: true },
     { id: "isOpen", label: "Abierta/Cerrada", enabled: true },
     { id: "itemClosed", label: "Item cerrado", enabled: false },
@@ -775,6 +776,8 @@ export default function ReportsPage() {
       const accountsSnapshot = await getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc")));
       const dataRows: (string | number)[][] = [];
       const figures = await loadBudgetFigures(id as string);
+      // Mismo libro que la página de Presupuesto (lib/budgetLedger): las cifras cuadran siempre.
+      const ledger = await loadLedger(id as string);
       
       for (const accountDoc of accountsSnapshot.docs) {
         const accountData = accountDoc.data();
@@ -785,7 +788,9 @@ export default function ReportsPage() {
         
         subAccountsSnapshot.docs.forEach(subDoc => {
           const subData = subDoc.data();
-          const budgeted = figures[subDoc.id] ?? subData.budgeted ?? 0, committed = subData.committed || 0, actual = subData.actual || 0;
+          const cell = ledger.bySub[subData.code || ""] || { committed: 0, actual: 0, box: 0 };
+          // Realizado incluye caja (tarjetas, transferencias, efectivo), como en Presupuesto.
+          const budgeted = figures[subDoc.id] ?? subData.budgeted ?? 0, committed = cell.committed, actual = cell.actual + cell.box;
           accountBudgeted += budgeted; accountCommitted += committed; accountActual += actual;
           subRows.push({
             code: subData.code, description: subData.description, type: "SUBCUENTA",
@@ -837,41 +842,30 @@ export default function ReportsPage() {
       const posSnapshot = await getDocs(query(collection(db, `projects/${id}/pos`), orderBy("createdAt", "desc")));
       const invoicesSnapshot = await getDocs(collection(db, `projects/${id}/invoices`));
       
-      const invoicedByPOItem: Record<string, Record<number, number>> = {};
-      invoicesSnapshot.docs.forEach(invDoc => {
-        const invData = invDoc.data();
-        if (invData.poId && shouldRealizeInvoice(invData.status || "", costConfig, {
-          codedAt: invData.codedAt, accountedAt: invData.accountedAt || invData.accounted, paidAt: invData.paidAt, approvedAt: invData.approvedAt,
-        })) {
-          if (!invoicedByPOItem[invData.poId]) invoicedByPOItem[invData.poId] = {};
-          (invData.items || []).forEach((invItem: any) => {
-            const itemIndex = invItem.poItemIndex ?? -1;
-            if (itemIndex >= 0)
-              invoicedByPOItem[invData.poId][itemIndex] = (invoicedByPOItem[invData.poId][itemIndex] || 0) + (invItem.baseAmount || 0);
-          });
-        }
-      });
-
+      void invoicesSnapshot;
+      const ledger = await loadLedger(id as string);
       const dataRows: (string | number)[][] = [];
       
       for (const docSnap of posSnapshot.docs) {
         const poData = docSnap.data();
-        if (!shouldCommitPO(poData.status || "", costConfig)) continue;
         const poId = docSnap.id;
         const items = poData.items || [];
-        const poInvoiced = invoicedByPOItem[poId] || {};
+        const pl = ledger.pos[poId];
+        if (!pl || (poData.status === "draft" || poData.status === "rejected")) continue;
         
         items.forEach((item: any, index: number) => {
           const itemIsClosed = item.isClosed || false;
           const rawBaseAmount = item.baseAmount || item.amount || 0;
-          const baseInvoiced = poInvoiced[index] || 0;
+          // Del libro único: realizado y comprometido de ESTE ítem (no se mezclan ítems).
+          const baseInvoiced = pl.lines[index]?.realized || 0;
+          const lineCommitted = pl.lines[index]?.committed || 0;
           const taxRate = item.vatRate || item.taxRate || 21;
           const irpfRate = item.irpfRate || 0;
-          // Comprometido = importe real de la PO (sin restar realizado)
-          const baseCommitted = itemIsClosed ? 0 : rawBaseAmount;
+          // Base PO = importe del ítem; realizado y comprometido salen del libro único.
+          const baseCommitted = rawBaseAmount;
           const totalCommitted = baseCommitted + baseCommitted * (taxRate / 100) - baseCommitted * (irpfRate / 100);
           // Disponible = PO menos lo ya realizado, nunca negativo
-          const baseAvailable = itemIsClosed ? 0 : Math.max(0, rawBaseAmount - baseInvoiced);
+          const baseAvailable = lineCommitted;
           const totalAvailable = baseAvailable + baseAvailable * (taxRate / 100) - baseAvailable * (irpfRate / 100);
           const episodes = item.episodes || [];
           const episodeAssignment = item.episodeAssignment || "general";
@@ -881,9 +875,9 @@ export default function ReportsPage() {
               const rawEpBaseAmount = ep.amount || 0;
               const epPercentage = rawBaseAmount > 0 ? rawEpBaseAmount / rawBaseAmount : 0;
               const epBaseInvoiced = baseInvoiced * epPercentage;
-              const epBaseCommitted = itemIsClosed ? 0 : rawEpBaseAmount;
+              const epBaseCommitted = rawEpBaseAmount;
               const epTotalCommitted = epBaseCommitted + epBaseCommitted * (taxRate / 100) - epBaseCommitted * (irpfRate / 100);
-              const epBaseAvailable = itemIsClosed ? 0 : Math.max(0, rawEpBaseAmount - epBaseInvoiced);
+              const epBaseAvailable = lineCommitted * epPercentage;
               const epTotalAvailable = epBaseAvailable + epBaseAvailable * (taxRate / 100) - epBaseAvailable * (irpfRate / 100);
               dataRows.push(toXlsxRow(columns, {
                 poNumber: poData.number || poData.displayNumber || "", poDescription: poData.generalDescription || poData.description || "",

@@ -562,7 +562,11 @@ export default function POsPage() {
         approvalSteps: null,
         approverIds: [],
         currentApprovalStep: null,
+        // Mientras se modifica, sigue comprometida la versión aprobada.
+        previousCommittedItems: (selectedPO as any).previousCommittedItems?.length ? (selectedPO as any).previousCommittedItems
+          : (selectedPO.items || []).map((it: any, index: number) => ({ index, subAccountId: it.subAccountId || "", subAccountCode: it.subAccountCode || "", baseAmount: it.baseAmount || 0 })),
       });
+      await syncBudget(id);
       setShowModifyModal(false);
       router.push(`/project/${id}/accounting/pos/${selectedPO.id}/edit`);
     } catch (error) {

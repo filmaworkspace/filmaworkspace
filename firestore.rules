@@ -387,15 +387,14 @@ service cloud.firestore {
                            !request.resource.data.keys().hasAny(['budgeted']));
           // Contabilidad ampliada / EP / PM: código, descripción, y quitar el
           // "budgeted" antiguo al trasladarlo. Nunca añadirlo ni cambiarlo.
-          allow update: if projectOpen(projectId) && ((
+          // Comprometido / realizado / caja los calcula y escribe solo el
+          // servidor desde los documentos (lib/budgetLedger): nadie los toca aquí.
+          allow update: if projectOpen(projectId) && (
                             canWriteBudget(projectId) &&
                             !request.resource.data.diff(resource.data).addedKeys().hasAny(['budgeted']) &&
-                            !request.resource.data.diff(resource.data).changedKeys().hasAny(['budgeted'])
-                          ) || (
-                            // Aprobaciones, facturas y cajas mueven comprometido/realizado/caja.
-                            inAccounting(projectId) &&
-                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['committed', 'actual', 'box'])
-                          ));
+                            !request.resource.data.diff(resource.data).changedKeys().hasAny(['budgeted']) &&
+                            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['committed', 'actual', 'box'])
+                          );
           allow delete: if projectOpen(projectId) && (canWriteBudget(projectId));
         }
       }

@@ -5,6 +5,7 @@
 // personas y su justificación, pagos directos con ticket, reposiciones,
 // arqueos por billetes y monedas y vales en PDF para firmar.
 
+import { syncBudget } from "@/lib/ledgerClient";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Plus, Paperclip, X } from "lucide-react";
 import {
@@ -131,6 +132,8 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
       setLoading(false);
     }, () => setLoading(false));
     const u2 = onSnapshot(collection(db, `${base}/cashMovements`), (snap) => {
+      // Un movimiento de efectivo que cambia puede mover la caja del presupuesto.
+      if (!snap.metadata.hasPendingWrites && snap.docChanges().some((c) => c.type !== "added") ) syncBudget(projectId);
       setMovements(snap.docs.map((d) => {
         const x = d.data();
         return { id: d.id, ...x, createdAt: toDate(x.createdAt) } as CashMovement;

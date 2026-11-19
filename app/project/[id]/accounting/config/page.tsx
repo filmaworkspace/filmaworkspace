@@ -1,6 +1,8 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
+import { DEFAULT_LEDGER_SETTINGS, normalizeSettings, type LedgerSettings } from "@/lib/budgetLedger";
+import { syncBudget } from "@/lib/ledgerClient";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -191,11 +193,7 @@ const BOX_TRIGGERS = [
   { value: "on_account", label: "Al contabilizar sobre" },
 ];
 
-interface CostSettings {
-  poCommitmentTrigger: "on_create" | "on_approve";
-  invoiceActualTrigger: "on_code" | "on_account" | "on_create" | "on_approve";
-  boxActualTrigger: "on_create" | "on_account" | "on_approve";
-}
+type CostSettings = LedgerSettings;
 
 // Configuración específica del proyecto para contabilidad
 interface ProjectSettings {
@@ -292,11 +290,7 @@ export default function AccountingConfigPage() {
   useBodyScrollLock(showBankAccountModal || !!confirmDialog);
 
   // Configuración de coste
-  const [costSettings, setCostSettings] = useState<CostSettings>({
-    poCommitmentTrigger: "on_approve",
-    invoiceActualTrigger: "on_account",
-    boxActualTrigger: "on_account",
-  });
+  const [costSettings, setCostSettings] = useState<CostSettings>(DEFAULT_LEDGER_SETTINGS);
   
   // Tab de aprobaciones (PO vs Invoice)
   const [activeTab, setActiveTab] = useState<"po" | "invoice" | "box">("po");
@@ -519,23 +513,7 @@ export default function AccountingConfigPage() {
       // Cargar configuración de coste
       const costConfigRef = doc(db, `projects/${id}/config/cost`);
       const costConfigSnap = await getDoc(costConfigRef);
-      if (costConfigSnap.exists()) {
-        const data = costConfigSnap.data();
-        // Migrar valores obsoletos y ajustar según aprobaciones disponibles
-        let rawInvoice = data.invoiceActualTrigger || "on_account";
-        let rawBox     = data.boxActualTrigger     || "on_account";
-        let rawPO      = data.poCommitmentTrigger  || "on_approve";
-        // Migraciones de valores eliminados
-        if (rawInvoice === "on_paid")    rawInvoice = "on_account";
-        if (rawBox     === "on_paid")    rawBox     = "on_account";
-        if (rawInvoice === "on_approve") rawInvoice = "on_code";
-        if (rawBox     === "on_approve") rawBox     = "on_create";
-        setCostSettings({
-          poCommitmentTrigger: rawPO as any,
-          invoiceActualTrigger: rawInvoice as any,
-          boxActualTrigger: rawBox as any,
-        });
-      }
+      setCostSettings(normalizeSettings(costConfigSnap.exists() ? costConfigSnap.data() : null));
 
       setLoading(false);
     } catch (error: any) {
@@ -849,6 +827,8 @@ export default function AccountingConfigPage() {
         updatedBy: userId,
         updatedByName: currentUserName,
       });
+      // Con otros ajustes cambian comprometido y realizado: se recalcula todo.
+      await syncBudget(String(id));
       
       // Actualizar auditoría local
       setAuditLog({
@@ -1129,8 +1109,12 @@ export default function AccountingConfigPage() {
                 control: <Segmented value={costSettings.invoiceActualTrigger as "on_code" | "on_account"} onChange={(v) => setCostSettings({ ...costSettings, invoiceActualTrigger: v })} options={[{ value: "on_code", label: "Al codificarla" }, { value: "on_account", label: "Al contabilizarla" }]} />,
               },
               {
-                label: "Realizado de las cajas", hint: "Gastos de tarjeta y transferencias.",
-                control: <Segmented value={costSettings.boxActualTrigger as "on_create" | "on_account"} onChange={(v) => setCostSettings({ ...costSettings, boxActualTrigger: v })} options={[{ value: "on_create", label: "Al codificar el sobre" }, { value: "on_account", label: "Al contabilizarlo" }]} />,
+                label: "Proformas", hint: "Si una proforma realiza como una factura o solo cuenta la factura definitiva que la sustituye.",
+                control: <Segmented value={costSettings.proformaRealizes ? "yes" : "no"} onChange={(v) => setCostSettings({ ...costSettings, proformaRealizes: v === "yes" })} options={[{ value: "yes", label: "Realizan" }, { value: "no", label: "Solo la definitiva" }]} />,
+              },
+              {
+                label: "Realizado de las cajas", hint: "Tarjetas, transferencias y efectivo.",
+                control: <Segmented value={costSettings.boxActualTrigger} onChange={(v) => setCostSettings({ ...costSettings, boxActualTrigger: v as CostSettings["boxActualTrigger"] })} options={[{ value: "on_create", label: "Al codificar el sobre" }, { value: "on_account", label: "Al contabilizarlo" }]} />,
               },
             ].map((r) => (
               <div key={r.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0">

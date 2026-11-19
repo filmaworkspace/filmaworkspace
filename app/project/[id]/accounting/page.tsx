@@ -22,7 +22,7 @@ import { Page, PageHeader, PageLoading, buttonClass } from "@/components/ds";
 import { PROJECT_ROLES } from "@/hooks/useAccountingPermissions";
 import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
 import { getCostSettings } from "@/lib/budgetRules";
-import { actualBySubaccount, committedBySubaccount, loadBoxBySubaccount } from "@/lib/budgetTotals";
+import { loadLedger } from "@/lib/ledgerClient";
 import { loadBudgetFigures, migrateBudgetFigures } from "@/lib/budgetFigures";
 import { canSeeBudget } from "@/hooks/useCanSeeBudget";
 
@@ -285,14 +285,11 @@ export default function AccountingPanelPage() {
             query(collection(db, `projects/${id}/accounts`), where("trackingDepartments", "array-contains", mDept)),
           );
           if (!trackedSnap.empty) {
-            const [costCfg, box, allPos, allInv] = await Promise.all([
-              getCostSettings(id),
-              loadBoxBySubaccount(id),
-              getDocs(posRef),
-              getDocs(invRef),
-            ]);
-            const committed = committedBySubaccount(allPos.docs.map((d) => d.data()), costCfg);
-            const actual = actualBySubaccount(allInv.docs.map((d) => d.data()), costCfg);
+            // Libro único calculado en el servidor (el HOD no puede leer todas las POs).
+            const ledger = await loadLedger(id);
+            const committed = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.committed]));
+            const actual = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.actual]));
+            const box = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.box]));
             const list = await Promise.all(
               trackedSnap.docs.map(async (acc) => {
                 const subs = await getDocs(collection(db, `projects/${id}/accounts/${acc.id}/subaccounts`));
@@ -316,13 +313,13 @@ export default function AccountingPanelPage() {
         // Presupuesto: solo con acceso ampliado (igual que la pestaña Presupuesto)
         if (p === "accounting" && mLevel === "accounting_extended") {
           const figures = await loadBudgetFigures(id);
-          const [costCfg, box, accountsSnap] = await Promise.all([
-            getCostSettings(id),
-            loadBoxBySubaccount(id),
+          const [ledger, accountsSnap] = await Promise.all([
+            loadLedger(id),
             getDocs(query(collection(db, `projects/${id}/accounts`), orderBy("code", "asc"))),
           ]);
-          const committed = committedBySubaccount(poDocs.map((d) => d.data), costCfg);
-          const actual = actualBySubaccount(invDocs.map((d) => d.data), costCfg);
+          const committed = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.committed]));
+          const actual = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.actual]));
+          const box = Object.fromEntries(Object.entries(ledger.bySub).map(([k, v]) => [k, v.box]));
 
           const lines: BudgetLine[] = [];
           let tBudgeted = 0, tActual = 0, tCommitted = 0;

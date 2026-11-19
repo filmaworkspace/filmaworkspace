@@ -47,7 +47,7 @@ import {
 // ─── Libraries ───────────────────────────────────────────────────────────────
 import { strToU8, unzipSync, zipSync } from "fflate";
 
-import { committedBySubaccount as computeCommitted, actualBySubaccount as computeActual, loadBoxBySubaccount } from "@/lib/budgetTotals";
+import { loadLedger } from "@/lib/ledgerClient";
 import SearchBar from "@/components/SearchBar";
 import { Badge, Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select, Spinner, buttonClass } from "@/components/ds";
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -204,14 +204,9 @@ export default function BudgetPage() {
       const loadedCostConfig = await getCostSettings(id);
       setCostConfig(loadedCostConfig);
 
-      // Comprometido, realizado y caja por subcuenta (lib/budgetTotals)
-      const [posSnapshot, invoicesSnapshot, boxBySubaccount] = await Promise.all([
-        getDocs(collection(db, `projects/${id}/pos`)),
-        getDocs(collection(db, `projects/${id}/invoices`)),
-        loadBoxBySubaccount(id),
-      ]);
-      const committedBySubaccount = computeCommitted(posSnapshot.docs.map((d) => d.data()), loadedCostConfig);
-      const actualBySubaccount = computeActual(invoicesSnapshot.docs.map((d) => d.data()), loadedCostConfig);
+      // Comprometido, realizado y caja: libro único calculado desde los documentos (lib/budgetLedger).
+      const ledger = await loadLedger(id);
+      const cell = (code: string) => ledger.bySub[code] || { committed: 0, actual: 0, box: 0 };
 
       // Cifras de presupuesto: colección protegida (lib/budgetFigures). Antes se
       // trasladan las que aún queden en subcuentas antiguas.
@@ -236,9 +231,9 @@ export default function BudgetPage() {
               code: subCode,
               description: subData.description || "",
               budgeted: figures[subDoc.id] ?? subData.budgeted ?? 0,
-              committed: committedBySubaccount[subCode] || 0,
-              actual: actualBySubaccount[subCode] || 0,
-              box: boxBySubaccount[subCode] || 0,
+              committed: cell(subCode).committed,
+              actual: cell(subCode).actual,
+              box: cell(subCode).box,
               accountId: accountDoc.id,
               createdAt: subData.createdAt?.toDate() || new Date(),
             };

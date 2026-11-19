@@ -858,12 +858,9 @@ export default function AdminProjectPage() {
             await setDoc(doc(db, `projects/${newId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
               code: subData.code,
               description: subData.description,
-              committed: 0,
-              actual: 0,
-              box: 0,
               accountId: accDoc.id,
               createdAt: serverTimestamp(),
-            });
+            }, { merge: true });
           }
         }
       }
@@ -978,12 +975,9 @@ export default function AdminProjectPage() {
           await setDoc(doc(db, `projects/${copyBudgetTargetId}/accounts/${accDoc.id}/subaccounts`, subDoc.id), {
             code: subData.code,
             description: subData.description,
-            committed: 0,
-            actual: 0,
-            box: 0,
             accountId: accDoc.id,
             createdAt: serverTimestamp(),
-          });
+          }, { merge: true });
         }
       }
       setShowCopyBudgetModal(false);

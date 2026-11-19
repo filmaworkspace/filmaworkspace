@@ -9,8 +9,7 @@ import {
   approverIdsOf, buildFlow, rebuildFlow, repairFlow, stepComplete, stripUndefined,
   type ApprovalStepConfig, type ApprovalStepState, type FlowMember,
 } from "@/lib/approvalFlow";
-import { handleInvoiceStatusChange, handlePOStatusChange, realizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
-import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
+import { syncBudget } from "@/lib/ledgerClient";
 
 export type FlowDocType = "po" | "invoice";
 export const FLOW_COLLECTION: Record<FlowDocType, string> = { po: "pos", invoice: "invoices" };
@@ -50,26 +49,9 @@ function completionFields(type: FlowDocType, d: AnyDoc, at: Timestamp, actor: Fl
   return f;
 }
 
-/** Efectos de presupuesto al quedar aprobado (lo mismo que hace la bandeja de aprobaciones). */
-export async function afterApprovalComplete(projectId: string, type: FlowDocType, before: AnyDoc, at: Timestamp) {
-  const oldStatus = before.status || "pending";
-  if (type === "po") {
-    const items = (before.items || []).filter((it: AnyDoc) => it.subAccountId).map((it: AnyDoc) => ({ subAccountId: it.subAccountId, baseAmount: itemBase(it) }));
-    let prev = before.previousCommittedItems || null;
-    if (prev?.length) {
-      const inv: Record<string, number> = {};
-      for (const it of before.items || []) if (it.subAccountId) inv[it.subAccountId] = (inv[it.subAccountId] || 0) + (it.invoicedAmount || 0);
-      prev = prev.map((it: AnyDoc) => ({ ...it, invoicedAmount: inv[it.subAccountId] || 0 }));
-    }
-    await handlePOStatusChange(projectId, oldStatus, "approved", items, prev);
-    return;
-  }
-  const items = (before.items || []).filter((it: AnyDoc) => it.subAccountId).map((it: AnyDoc) => ({ subAccountId: it.subAccountId, baseAmount: itemBase(it), poItemIndex: it.poItemIndex }));
-  const cs = await getCostSettings(projectId);
-  if (shouldRealizeInvoice("submitted", cs, { approvedAt: at }) && !shouldRealizeInvoice(oldStatus, cs) && items.length) {
-    await realizeInvoice(projectId, items.map((b: AnyDoc) => ({ subAccountId: b.subAccountId, baseAmount: b.baseAmount })));
-    if (before.poId) await updatePOItemsInvoiced(projectId, before.poId, items, "add");
-  }
+/** Al quedar aprobado: el presupuesto se recalcula desde los documentos (lib/budgetLedger). */
+export async function afterApprovalComplete(projectId: string, _type?: FlowDocType, _before?: AnyDoc, _at?: Timestamp) {
+  await syncBudget(projectId);
 }
 
 export interface FlowChange {
@@ -123,12 +105,7 @@ export async function updateFlow(
     tx.update(ref, upd);
     return { complete: complete && (wasAwaiting || wasRejected), resumed, changed: true, before: d };
   });
-  if (res.complete) await afterApprovalComplete(projectId, type, res.before, at);
-  else if (res.resumed) {
-    const items = (res.before.items || []).filter((it: AnyDoc) => it.subAccountId).map((it: AnyDoc) => ({ subAccountId: it.subAccountId, baseAmount: itemBase(it) }));
-    if (type === "po") await handlePOStatusChange(projectId, "rejected", "pending", items);
-    else await handleInvoiceStatusChange(projectId, "rejected", "submitted", items);
-  }
+  if (res.changed) await syncBudget(projectId);
   return { complete: res.complete, resumed: res.resumed, changed: res.changed };
 }
 
