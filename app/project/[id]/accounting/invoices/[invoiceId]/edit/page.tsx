@@ -17,6 +17,8 @@ import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
 import { syncBudget } from "@/lib/ledgerClient";
+import { useFormAutosave } from "@/hooks/useFormAutosave";
+import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
@@ -238,6 +240,7 @@ export default function EditInvoicePage() {
 
   // Estados básicos
   const [loading, setLoading] = useState(true);
+  const [docUpdatedAt, setDocUpdatedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -305,6 +308,17 @@ export default function EditInvoicePage() {
   const [originalItems, setOriginalItems] = useState<InvoiceItem[]>([]);
   const [wasApproved, setWasApproved] = useState(false);
 
+  // ─── Autoguardado de la edición (hooks/useFormAutosave) ──────────────────
+  // Solo se recupera si es posterior a la última versión guardada del documento.
+  const autosave = useFormAutosave({
+    key: id && invoiceId && permissions.userId ? `autosave:inv:${invoiceId}:${permissions.userId}` : null,
+    value: { formData, items, multipleDueDates, dueDates },
+    ready: !loading && !!docUpdatedAt,
+    newerThan: docUpdatedAt,
+    isEmpty: () => false,
+    onRestore: (v) => { setFormData(v.formData); setItems(v.items); setMultipleDueDates(!!v.multipleDueDates); setDueDates(v.dueDates || []); },
+  });
+
   useEffect(() => {
     if (id && invoiceId && !permissionsLoading) loadData();
   }, [id, invoiceId, permissionsLoading]);
@@ -352,6 +366,7 @@ export default function EditInvoicePage() {
       const wasRealizedBefore = ["pending", "approved", "paid"].includes(data.status);
       setWasApproved(wasRealizedBefore);
 
+      setDocUpdatedAt(data.updatedAt?.toDate?.() || data.createdAt?.toDate?.() || null);
       setFormData({
         supplier: data.supplierId || "",
         supplierName: data.supplier || "",
@@ -770,6 +785,7 @@ export default function EditInvoicePage() {
       }
 
       await updateDoc(doc(db, `projects/${id}/invoices`, invoiceId), updateData);
+      autosave.clear();
 
       // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
       await syncBudget(id);
@@ -900,6 +916,7 @@ export default function EditInvoicePage() {
 
       {/* Main Content */}
       <main className="px-6 sm:px-10 py-8">
+        <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => { autosave.discard(); window.location.reload(); }} />
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />

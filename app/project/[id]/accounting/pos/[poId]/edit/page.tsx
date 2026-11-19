@@ -70,6 +70,8 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { syncBudget } from "@/lib/ledgerClient";
+import { useFormAutosave } from "@/hooks/useFormAutosave";
+import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -211,6 +213,7 @@ export default function EditPOPage() {
 
   const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [docUpdatedAt, setDocUpdatedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -281,6 +284,17 @@ export default function EditPOPage() {
   // Items originales con todas sus propiedades (para detectar cambios de cuenta)
   const [originalItems, setOriginalItems] = useState<{subAccountId: string; subAccountCode: string; subAccountDescription: string}[]>([]);
 
+  // ─── Autoguardado de la edición (hooks/useFormAutosave) ──────────────────
+  // Solo se recupera si es posterior a la última versión guardada del documento.
+  const autosave = useFormAutosave({
+    key: id && poId && permissions.userId ? `autosave:po:${poId}:${permissions.userId}` : null,
+    value: { formData, items, noSupplier },
+    ready: !loading && !!docUpdatedAt,
+    newerThan: docUpdatedAt,
+    isEmpty: () => false,
+    onRestore: (v) => { setFormData(v.formData); setItems(v.items); setNoSupplier(!!v.noSupplier); },
+  });
+
   useEffect(() => {
     if (!permissionsLoading && permissions.userId && id && poId) loadData();
   }, [permissionsLoading, permissions.userId, id, poId]);
@@ -346,6 +360,7 @@ export default function EditPOPage() {
         setWasApprovedBefore(true);
       }
 
+      setDocUpdatedAt(poData.updatedAt?.toDate?.() || poData.createdAt?.toDate?.() || null);
       setFormData({
         supplier: poData.supplierId || "", supplierName: poData.supplier || "",
         department: poData.department || "", poType: poData.poType || "service",
@@ -726,6 +741,7 @@ export default function EditPOPage() {
       }
 
       await updateDoc(doc(db, `projects/${id}/pos`, poId), poData);
+      autosave.clear();
 
       // Actualizar facturas vinculadas si cambiaron las cuentas de los items
       await updateLinkedInvoicesAccounts();
@@ -866,6 +882,7 @@ export default function EditPOPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 flex-wrap justify-center">
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900">Editar orden de compra</h1>
+                <AutosaveStatus savedAt={autosave.savedAt} />
                 <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[13px] font-mono font-medium">
                   PO-{poNumber}
                 </span>
@@ -907,6 +924,7 @@ export default function EditPOPage() {
       </div>
 
       <main className="px-6 sm:px-10 py-8">
+        <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => { autosave.discard(); window.location.reload(); }} />
         {successMessage && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
             <CheckCircle size={18} className="text-emerald-600" />

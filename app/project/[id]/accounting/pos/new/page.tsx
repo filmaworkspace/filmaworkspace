@@ -64,6 +64,8 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { syncBudget } from "@/lib/ledgerClient";
+import { useFormAutosave } from "@/hooks/useFormAutosave";
+import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -236,10 +238,6 @@ export default function NewPOPage() {
   }
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
-  // Una vez la PO se crea de verdad (o se descarta a propósito), el
-  // autoguardado deja de tener sentido: esta ref lo corta sin esperar al
-  // debounce, para no resucitar un borrador fantasma de una PO que ya existe.
-  const stopAutoSaveRef = useRef(false);
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -429,56 +427,18 @@ export default function NewPOPage() {
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
   };
 
-  // ─── Autoguardado ────────────────────────────────────────────────────────
-  // Mantiene un borrador especial ("autosave", uno solo, se sobrescribe en
-  // vez de acumularse) al día mientras se escribe, en vez de depender de
-  // detectar el cierre del navegador o el cambio de página — Next.js (App
-  // Router) no tiene forma fiable de interceptar toda navegación dentro de
-  // la app (un Link del header, un botón "Volver"...), así que la única
-  // manera robusta de no perder el trabajo es no depender de detectar la
-  // salida en absoluto: guardar solo local (localStorage), con un pequeño
-  // debounce para no escribir en cada tecla. `beforeunload` es un cinturón
-  // extra para el cierre real del navegador/pestaña (ahí si hace falta ser
-  // síncrono, por si el debounce no llegó a completarse a tiempo).
-  const AUTO_DRAFT_ID = "autosave";
-  const buildAutoDraft = (): Draft => ({
-    id: AUTO_DRAFT_ID,
-    name: formData.supplierName || formData.generalDescription || "Autoguardado",
-    savedAt: new Date().toISOString(),
-    formData,
-    items,
-    noSupplier,
-    auto: true,
+  // ─── Autoguardado (hooks/useFormAutosave) ────────────────────────────────
+  // Guarda mientras se escribe y lo recupera solo al volver a la página.
+  const initialForm = useRef({ formData, items, noSupplier });
+  const autosave = useFormAutosave({
+    key: id && permissions.userId ? `autosave:po:new:${permissions.userId}:${id}` : null,
+    value: { formData, items, noSupplier },
+    ready: !loading && !permissionsLoading,
+    isEmpty: (v) => !(v.formData.supplier || v.formData.supplierName || v.noSupplier || v.formData.generalDescription.trim() ||
+      v.items.some((it: POItem) => it.description.trim() || it.unitPrice > 0)),
+    onRestore: (v) => { setFormData(v.formData); setItems(v.items); setNoSupplier(!!v.noSupplier); },
   });
-  const persistAutoDraft = () => {
-    if (stopAutoSaveRef.current || !id) return;
-    setDrafts((prev) => {
-      const withoutAuto = prev.filter((d) => d.id !== AUTO_DRAFT_ID);
-      const next = hasDraftableContent() ? [...withoutAuto, buildAutoDraft()] : withoutAuto;
-      localStorage.setItem(`po_drafts_${id}`, JSON.stringify(next));
-      return next;
-    });
-  };
-  const clearAutoDraft = () => {
-    stopAutoSaveRef.current = true;
-    if (!id) return;
-    setDrafts((prev) => {
-      const next = prev.filter((d) => d.id !== AUTO_DRAFT_ID);
-      localStorage.setItem(`po_drafts_${id}`, JSON.stringify(next));
-      return next;
-    });
-  };
-  useEffect(() => {
-    const timer = setTimeout(persistAutoDraft, 1500);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, items, noSupplier, id]);
-  useEffect(() => {
-    const handleBeforeUnload = () => persistAutoDraft();
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, items, noSupplier, id]);
+  const clearAutoDraft = autosave.clear;
 
   useEffect(() => {
     if (Object.keys(touched).length > 0) {
@@ -1116,6 +1076,7 @@ export default function NewPOPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900">Nueva orden de compra</h1>
+                <AutosaveStatus savedAt={autosave.savedAt} />
                 {permissions.fixedDepartment && (
                   <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
                     {permissions.fixedDepartment}
@@ -1225,6 +1186,10 @@ export default function NewPOPage() {
       </div>
 
       <main className="px-6 sm:px-10 py-8">
+        <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => {
+          autosave.discard();
+          setFormData(initialForm.current.formData); setItems(initialForm.current.items); setNoSupplier(initialForm.current.noSupplier);
+        }} />
         <div className="grid grid-cols-3 gap-8">
           {/* Main Form */}
           <div className="col-span-2 space-y-6">

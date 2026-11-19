@@ -2,7 +2,7 @@
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
@@ -18,6 +18,8 @@ import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
 import { syncBudget } from "@/lib/ledgerClient";
+import { useFormAutosave } from "@/hooks/useFormAutosave";
+import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
@@ -412,6 +414,24 @@ export default function NewInvoicePage() {
     if (nextNumber === "NUEVO") return currentDocType.code + "-NUEVO";
     return currentDocType.code + "-" + nextNumber;
   };
+
+
+  // ─── Autoguardado (hooks/useFormAutosave) ────────────────────────────────
+  // Guarda mientras se escribe y lo recupera solo al volver (el archivo
+  // adjunto no se puede guardar en el navegador: hay que volver a subirlo).
+  const initialForm = useRef<{ formData: typeof formData; items: InvoiceItem[] } | null>(null);
+  if (!initialForm.current) initialForm.current = { formData, items };
+  const autosave = useFormAutosave({
+    key: id && permissions.userId && !replaceMode ? `autosave:inv:new:${permissions.userId}:${id}` : null,
+    value: { formData, items, documentType, poId: selectedPO?.id || null, multipleDueDates, dueDates, delegateToAccounting },
+    ready: !loading && !permissionsLoading,
+    isEmpty: (v) => !(v.poId || v.formData.supplier || v.formData.description?.trim() || v.items.length),
+    onRestore: (v) => {
+      setFormData(v.formData); setItems(v.items); setDocumentType(v.documentType in DOCUMENT_TYPES ? v.documentType : "invoice");
+      setMultipleDueDates(!!v.multipleDueDates); setDueDates(v.dueDates || []); setDelegateToAccounting(!!v.delegateToAccounting);
+      if (v.poId) { const po = pos.find((p) => p.id === v.poId); if (po) setSelectedPO(po); }
+    },
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1383,6 +1403,7 @@ export default function NewInvoicePage() {
 
       // Guardar factura
       const docRef = await addDoc(collection(db, "projects/" + id + "/invoices"), invoiceData);
+      autosave.clear();
 
       // Actualizar documento reemplazado
       if (linkedDocumentId || (replaceMode && selectedPendingDoc)) {
@@ -1506,6 +1527,7 @@ export default function NewInvoicePage() {
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900">
                   {replaceMode ? "Factura definitiva" : "Subir " + currentDocType.label.toLowerCase()}
                 </h1>
+                <AutosaveStatus savedAt={autosave.savedAt} />
                 {replaceMode && (
                   <span className="px-2.5 py-1 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium flex items-center gap-1.5">
                     <RefreshCw size={12} />
@@ -1628,6 +1650,11 @@ export default function NewInvoicePage() {
 
       {/* Main Content */}
       <main className="px-6 sm:px-10 py-8">
+        <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => {
+          autosave.discard();
+          setFormData(initialForm.current!.formData); setItems([]); setSelectedPO(null); setDocumentType("invoice");
+          setMultipleDueDates(false); setDueDates([]); setDelegateToAccounting(false);
+        }} />
 
         {/* Replace Mode Banner */}
         {replaceMode && selectedPendingDoc && (
