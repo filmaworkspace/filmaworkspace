@@ -72,14 +72,13 @@ import {
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { syncBudget } from "@/lib/ledgerClient";
 import { PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
 import { stepLabel } from "@/lib/approvalFlow";
 import { repairDoc } from "@/lib/approvalActions";
 
 const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
-import { unrealizeInvoice, updatePOItemsInvoiced, realizeInvoice } from "@/lib/budgetOperations";
 import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { IBANField } from "@/components/IBANField";
 
@@ -574,11 +573,6 @@ export default function InvoiceDetailPage() {
         return { ...item, baseAmount: t.base, vatAmount: t.vat, irpfAmount: t.irpf, totalAmount: t.total };
       });
 
-      const costSettings = await getCostSettings(projectId);
-
-      // Con on_code: la codificación realiza el presupuesto independientemente de las aprobaciones.
-      // El status de aprobación sigue su propio flujo (pending_approval → pending al aprobar).
-      const isFirstCoding = costSettings.invoiceActualTrigger === "on_code" && !invoice.codedAt;
       // El lifecycle nunca codifica directamente: un draft pasa a "submitted",
       // el resto conserva su status. El track codedAt registra la codificación.
       const newStatus = invoice.status === "draft" ? "submitted" : invoice.status;
@@ -595,27 +589,8 @@ export default function InvoiceDetailPage() {
         codedAt: Timestamp.now(), codedBy: permissions.userId, codedByName: permissions.userName,
       });
 
-      if (isFirstCoding) {
-        // Primera codificación: realizar presupuesto con los ítems finales del equipo de conta
-        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
-        if (invoice.poId) await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-      } else if (invoice.codedAt) {
-        // Re-codificación: ajustar ítems de presupuesto y PO
-        const oldBudgetItems = (invoice.items || [])
-          .filter((i: any) => i.subAccountId && i.baseAmount > 0)
-          .map((i: any) => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        const newBudgetItems = items.filter(i => i.subAccountId && i.baseAmount > 0)
-          .map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-        if (oldBudgetItems.length > 0) await unrealizeInvoice(projectId, oldBudgetItems);
-        if (newBudgetItems.length > 0) await realizeInvoice(projectId, newBudgetItems);
-        if (invoice.poId) {
-          if (invoice.items && invoice.items.length > 0)
-            await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
-          await updatePOItemsInvoiced(projectId, invoice.poId, items, "add");
-        }
-      }
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      await syncBudget(projectId);
 
       showToast("success", "Factura codificada correctamente");
       setCodingMode(false);
@@ -638,37 +613,6 @@ export default function InvoiceDetailPage() {
     if (!(await verifyPassword())) return;
     setProcessing(true);
     try {
-      // Verificar si la factura estaba realizada según la configuración
-      const costSettings = await getCostSettings(projectId);
-      // La realización depende de los tracks, no del status. Pasamos los tracks a
-      // shouldRealizeInvoice para que evalúe correctamente con el nuevo modelo.
-      const wasRealized = costSettings.invoiceActualTrigger === "on_code"
-        ? !!(invoice.codedAt)
-        : costSettings.invoiceActualTrigger === "on_account"
-          ? !!(invoice.accountedAt || invoice.accounted)
-          : shouldRealizeInvoice(invoice.status, costSettings, {
-              codedAt: invoice.codedAt, accountedAt: invoice.accountedAt || invoice.accounted, paidAt: invoice.paidAt, approvedAt: invoice.approvedAt,
-            });
-      
-      // Si estaba realizada, revertir el presupuesto
-      if (wasRealized) {
-        const budgetItems = invoice.items
-          .filter(item => item.subAccountId && item.baseAmount > 0)
-          .map(item => ({
-            subAccountId: item.subAccountId,
-            baseAmount: item.baseAmount,
-          }));
-        
-        if (budgetItems.length > 0) {
-          await unrealizeInvoice(projectId, budgetItems);
-        }
-        
-        // Actualizar PO si existe - restar de cada item individual
-        if (invoice.poId) {
-          await updatePOItemsInvoiced(projectId, invoice.poId, invoice.items, "subtract");
-        }
-      }
-      
       await updateDoc(doc(db, `projects/${projectId}/invoices`, invoice.id), {
         status: "cancelled", 
         cancelledAt: Timestamp.now(), 
@@ -676,6 +620,8 @@ export default function InvoiceDetailPage() {
         cancelledByName: permissions.userName, 
         cancellationReason: cancellationReason.trim(),
       });
+      // Presupuesto: deja de contar y, si iba a una PO, vuelve a su comprometido.
+      await syncBudget(projectId);
       setShowCancelModal(false); 
       setPasswordInput(""); 
       setCancellationReason("");

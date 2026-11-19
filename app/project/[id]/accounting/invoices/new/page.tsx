@@ -16,6 +16,7 @@ import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { syncBudget } from "@/lib/ledgerClient";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
@@ -72,7 +73,6 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { getCostSettings, shouldRealizeInvoice } from "@/lib/budgetRules";
 import { realizeInvoice, updatePOItemsInvoiced } from "@/lib/budgetOperations";
 
 
@@ -1299,30 +1299,7 @@ export default function NewInvoicePage() {
   };
 
   // Funciones de actualización de presupuesto
-  const updateSubAccountsBudget = async (invoiceItems: InvoiceItem[], hasPO: boolean) => {
-    // Preparar items para realizeInvoice
-    const budgetItems = invoiceItems
-      .filter(item => item.subAccountId && item.baseAmount > 0)
-      .map(item => ({
-        subAccountId: item.subAccountId,
-        baseAmount: item.baseAmount,
-      }));
-    
-    if (budgetItems.length > 0) {
-      // realizeInvoice mueve de committed -> actual si hay PO
-      // o simplemente suma a actual si no hay PO
-      await realizeInvoice(id, budgetItems);
-    }
-  };
 
-  const updatePOInvoicedAmount = async (poId: string, invoiceItems: typeof items) => {
-    try {
-      // Usar la función centralizada que actualiza items individuales
-      await updatePOItemsInvoiced(id, poId, invoiceItems, "add");
-    } catch (err) {
-      console.error("Error updating PO:", err);
-    }
-  };
 
   // Submit
   const handleSubmit = async () => {
@@ -1454,20 +1431,6 @@ export default function NewInvoicePage() {
       // Guardar factura
       const docRef = await addDoc(collection(db, "projects/" + id + "/invoices"), invoiceData);
 
-      // Obtener configuración de costes
-      const costSettings = await getCostSettings(id);
-      const finalStatus = invoiceData.status;
-      
-      // Actualizar presupuesto y tracking de PO solo si la factura ya debe realizarse
-      // según la configuración (on_create). Si es on_approve/on_account/on_paid,
-      // estas actualizaciones ocurren en el momento de aprobación/contabilización/pago.
-      if (shouldRealizeInvoice(finalStatus, costSettings, { approvedAt: invoiceData.approvedAt })) {
-        await updateSubAccountsBudget(items, !!selectedPO);
-        if (selectedPO) {
-          await updatePOInvoicedAmount(selectedPO.id, items);
-        }
-      }
-
       // Actualizar documento reemplazado
       if (linkedDocumentId || (replaceMode && selectedPendingDoc)) {
         const docToUpdate = linkedDocumentId || selectedPendingDoc?.id;
@@ -1478,6 +1441,9 @@ export default function NewInvoicePage() {
           });
         }
       }
+
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      await syncBudget(id);
 
       setSuccessMessage(invoiceData.autoApproved ? currentDocType.label + " creada" : currentDocType.label + " enviada para aprobación");
 

@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
+import { syncBudget } from "@/lib/ledgerClient";
 import { pendingTooltip } from "@/components/accounting/ApprovalFlow";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
@@ -393,42 +394,8 @@ export default function InvoicesPage() {
         paymentDate: Timestamp.now(),
       });
 
-      if (invoice.items?.length > 0) {
-        const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-        const hasPO = !!invoice.poId;
-
-        for (const item of invoice.items) {
-          if (item.subAccountId && item.baseAmount > 0) {
-            for (const accountDoc of accountsSnapshot.docs) {
-              try {
-                const subAccountRef = doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-                const subAccountSnap = await getDoc(subAccountRef);
-
-                if (subAccountSnap.exists()) {
-                  const currentActual = subAccountSnap.data().actual || 0;
-                  const currentCommitted = subAccountSnap.data().committed || 0;
-
-                  const updates: { actual: number; committed?: number } = {
-                    actual: currentActual + item.baseAmount,
-                  };
-
-                  if (hasPO) {
-                    updates.committed = Math.max(0, currentCommitted - item.baseAmount);
-                  }
-
-                  await updateDoc(subAccountRef, updates);
-                  break;
-                }
-              } catch (e) {
-                console.error(`Error updating subaccount ${item.subAccountId}:`, e);
-              }
-            }
-          }
-        }
-
-        // El tracking de PO (invoicedAmount/remainingAmount) se actualiza
-        // al crear la factura en invoices/new/page.tsx, no al pagarla.
-      }
+      // Presupuesto: se recalcula desde los documentos (el pago no duplica nada).
+      await syncBudget(id);
 
       loadData();
     } catch (error) {
@@ -445,78 +412,13 @@ export default function InvoicesPage() {
     if (!reason) return;
 
     try {
-      if ((invoice.paidAt || invoice.accountedAt || invoice.codedAt || invoice.status === "paid") && invoice.items?.length > 0) {
-        const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-        const hasPO = !!invoice.poId;
-
-        let poIsOpen = false;
-        if (hasPO && invoice.poId) {
-          try {
-            const poSnap = await getDoc(doc(db, `projects/${id}/pos`, invoice.poId));
-            if (poSnap.exists()) {
-              poIsOpen = poSnap.data().status === "approved";
-            }
-          } catch (e) {
-            console.error("Error checking PO status:", e);
-          }
-        }
-
-        for (const item of invoice.items) {
-          if (item.subAccountId && item.baseAmount > 0) {
-            for (const accountDoc of accountsSnapshot.docs) {
-              try {
-                const subAccountRef = doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-                const subAccountSnap = await getDoc(subAccountRef);
-
-                if (subAccountSnap.exists()) {
-                  const currentActual = subAccountSnap.data().actual || 0;
-                  const currentCommitted = subAccountSnap.data().committed || 0;
-
-                  const updates: { actual: number; committed?: number } = {
-                    actual: Math.max(0, currentActual - item.baseAmount),
-                  };
-
-                  if (hasPO && poIsOpen) {
-                    updates.committed = currentCommitted + item.baseAmount;
-                  }
-
-                  await updateDoc(subAccountRef, updates);
-                  break;
-                }
-              } catch (e) {
-                console.error(`Error reverting subaccount ${item.subAccountId}:`, e);
-              }
-            }
-          }
-        }
-
-        if (invoice.poId) {
-          try {
-            const poRef = doc(db, `projects/${id}/pos`, invoice.poId);
-            const poSnap = await getDoc(poRef);
-
-            if (poSnap.exists()) {
-              const currentInvoiced = poSnap.data().invoicedAmount || 0;
-              const poBaseAmount = poSnap.data().baseAmount || poSnap.data().totalAmount || 0;
-              const newInvoiced = Math.max(0, currentInvoiced - invoice.baseAmount);
-
-              await updateDoc(poRef, {
-                invoicedAmount: newInvoiced,
-                remainingAmount: poBaseAmount - newInvoiced,
-              });
-            }
-          } catch (e) {
-            console.error("Error reverting PO invoiced amount:", e);
-          }
-        }
-      }
-
       await updateDoc(doc(db, `projects/${id}/invoices`, invoiceId), {
         status: "cancelled",
         cancelledAt: Timestamp.now(),
         cancelledBy: permissions.userId,
         cancellationReason: reason,
       });
+      await syncBudget(id);
 
       loadData();
     } catch (error) {

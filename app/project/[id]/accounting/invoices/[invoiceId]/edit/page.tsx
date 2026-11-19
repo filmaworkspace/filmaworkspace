@@ -15,6 +15,7 @@ import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
+import { syncBudget } from "@/lib/ledgerClient";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import {
@@ -809,26 +810,8 @@ export default function EditInvoicePage() {
 
       await updateDoc(doc(db, `projects/${id}/invoices`, invoiceId), updateData);
 
-      // Manejar presupuesto
-      if (!isAdminCorrection && sendForApproval) {
-        const finalStatus = updateData.status;
-        
-        if (finalStatus === "pending" && wasApproved && originalItems.length > 0) {
-          // Desrealizar items anteriores
-          const itemsToUnrealize = originalItems.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-          if (itemsToUnrealize.length > 0) await unrealizeInvoice(id, itemsToUnrealize);
-          // Realizar nuevos items
-          if (shouldRealizeInvoice(finalStatus, costSettings)) {
-            const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-            if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
-          }
-        } else if (finalStatus === "pending" && !wasApproved) {
-          if (shouldRealizeInvoice(finalStatus, costSettings)) {
-            const itemsToRealize = items.filter(i => i.subAccountId && i.baseAmount > 0).map(i => ({ subAccountId: i.subAccountId, baseAmount: i.baseAmount }));
-            if (itemsToRealize.length > 0) await realizeInvoice(id, itemsToRealize);
-          }
-        }
-      }
+      // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
+      await syncBudget(id);
 
       setSuccessMessage(isAdminCorrection ? "Corrección guardada" : sendForApproval ? "Factura enviada para aprobación" : "Borrador guardado");
       setTimeout(() => router.push(`/project/${id}/accounting/invoices/${invoiceId}`), 1500);

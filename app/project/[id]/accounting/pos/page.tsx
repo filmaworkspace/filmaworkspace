@@ -61,6 +61,7 @@ import {
 import jsPDF from "jspdf";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
+import { syncBudget } from "@/lib/ledgerClient";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
@@ -428,41 +429,7 @@ export default function POsPage() {
     setShowCloseModal(true);
   };
 
-  const releaseRemainingCommitted = async (po: PO) => {
-    const baseAmount = po.baseAmount || po.totalAmount || 0;
-    const invoicedAmount = po.invoicedAmount || 0;
-    const remainingToRelease = baseAmount - invoicedAmount;
 
-    if (remainingToRelease <= 0) return;
-
-    const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-
-    for (const item of po.items) {
-      if (item.subAccountId) {
-        const itemBaseAmount = item.baseAmount || item.quantity * item.unitPrice || 0;
-        const itemProportion = baseAmount > 0 ? itemBaseAmount / baseAmount : 0;
-        const itemRemainingToRelease = remainingToRelease * itemProportion;
-
-        if (itemRemainingToRelease > 0) {
-          for (const accountDoc of accountsSnapshot.docs) {
-            try {
-              const subAccountRef = doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-              const subAccountSnap = await getDoc(subAccountRef);
-              if (subAccountSnap.exists()) {
-                const currentCommitted = subAccountSnap.data().committed || 0;
-                await updateDoc(subAccountRef, {
-                  committed: Math.max(0, currentCommitted - itemRemainingToRelease),
-                });
-                break;
-              }
-            } catch (e) {
-              console.error(`Error releasing committed for subaccount ${item.subAccountId}:`, e);
-            }
-          }
-        }
-      }
-    }
-  };
 
   const confirmClosePO = async () => {
     if (!selectedPO) return;
@@ -470,8 +437,6 @@ export default function POsPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      await releaseRemainingCommitted(selectedPO);
-
       await updateDoc(doc(db, `projects/${id}/pos`, selectedPO.id), {
         status: "closed",
         closedAt: Timestamp.now(),
@@ -479,6 +444,7 @@ export default function POsPage() {
         closedByName: permissions.userName,
         remainingAmount: 0,
       });
+      await syncBudget(id);
       setShowCloseModal(false);
       resetModalState();
       await loadData();
@@ -498,41 +464,7 @@ export default function POsPage() {
     setShowReopenModal(true);
   };
 
-  const restoreCommittedOnReopen = async (po: PO) => {
-    const baseAmount = po.baseAmount || po.totalAmount || 0;
-    const invoicedAmount = po.invoicedAmount || 0;
-    const remainingToRestore = baseAmount - invoicedAmount;
 
-    if (remainingToRestore <= 0) return;
-
-    const accountsSnapshot = await getDocs(collection(db, `projects/${id}/accounts`));
-
-    for (const item of po.items) {
-      if (item.subAccountId) {
-        const itemBaseAmount = item.baseAmount || item.quantity * item.unitPrice || 0;
-        const itemProportion = baseAmount > 0 ? itemBaseAmount / baseAmount : 0;
-        const itemRemainingToRestore = remainingToRestore * itemProportion;
-
-        if (itemRemainingToRestore > 0) {
-          for (const accountDoc of accountsSnapshot.docs) {
-            try {
-              const subAccountRef = doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-              const subAccountSnap = await getDoc(subAccountRef);
-              if (subAccountSnap.exists()) {
-                const currentCommitted = subAccountSnap.data().committed || 0;
-                await updateDoc(subAccountRef, {
-                  committed: currentCommitted + itemRemainingToRestore,
-                });
-                break;
-              }
-            } catch (e) {
-              console.error(`Error restoring committed for subaccount ${item.subAccountId}:`, e);
-            }
-          }
-        }
-      }
-    }
-  };
 
   const confirmReopenPO = async () => {
     if (!selectedPO) return;
@@ -540,8 +472,6 @@ export default function POsPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      await restoreCommittedOnReopen(selectedPO);
-
       const baseAmount = selectedPO.baseAmount || selectedPO.totalAmount || 0;
       const invoicedAmount = selectedPO.invoicedAmount || 0;
 
@@ -552,6 +482,7 @@ export default function POsPage() {
         closedByName: null,
         remainingAmount: baseAmount - invoicedAmount,
       });
+      await syncBudget(id);
       setShowReopenModal(false);
       resetModalState();
       await loadData();
@@ -578,26 +509,6 @@ export default function POsPage() {
     if (!verified) return;
     setProcessing(true);
     try {
-      if (selectedPO.status === "approved") {
-        for (const item of selectedPO.items) {
-          if (item.subAccountId) {
-            const itemBaseAmount = item.baseAmount || item.quantity * item.unitPrice || 0;
-            const accountsSnap = await getDocs(collection(db, `projects/${id}/accounts`));
-            for (const accountDoc of accountsSnap.docs) {
-              try {
-                const subAccountRef = doc(db, `projects/${id}/accounts/${accountDoc.id}/subaccounts`, item.subAccountId);
-                const subAccountSnap = await getDoc(subAccountRef);
-                if (subAccountSnap.exists()) {
-                  await updateDoc(subAccountRef, { committed: Math.max(0, (subAccountSnap.data().committed || 0) - itemBaseAmount) });
-                  break;
-                }
-              } catch (e) {
-                continue;
-              }
-            }
-          }
-        }
-      }
       await updateDoc(doc(db, `projects/${id}/pos`, selectedPO.id), {
         status: "cancelled",
         cancelledAt: Timestamp.now(),
@@ -607,6 +518,7 @@ export default function POsPage() {
         committedAmount: 0,
         remainingAmount: 0,
       });
+      await syncBudget(id);
       setShowCancelModal(false);
       resetModalState();
       await loadData();
