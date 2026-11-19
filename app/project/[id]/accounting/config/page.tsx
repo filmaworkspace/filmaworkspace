@@ -1035,9 +1035,9 @@ export default function AccountingConfigPage() {
             <p className="mb-3 text-xs text-slate-500">Aparecen en las POs y en los ficheros de remesa.</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
               <Field label="Razón social" className="sm:col-span-4"><Input value={companyForm.fiscalName} onChange={(e) => setCompanyForm({ ...companyForm, fiscalName: e.target.value })} /></Field>
-              <Field label="NIF" className="sm:col-span-2"><Input value={companyForm.taxId} onChange={(e) => setCompanyForm({ ...companyForm, taxId: e.target.value.toUpperCase() })} className="font-mono" /></Field>
+              <Field label="NIF" className="sm:col-span-2"><Input value={companyForm.taxId} onChange={(e) => setCompanyForm({ ...companyForm, taxId: e.target.value.toUpperCase() })} className="tabular-nums" /></Field>
               <Field label="Dirección" className="sm:col-span-4"><Input value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} /></Field>
-              <Field label="Código postal" className="sm:col-span-2"><Input value={companyForm.postalCode} onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })} className="font-mono" /></Field>
+              <Field label="Código postal" className="sm:col-span-2"><Input value={companyForm.postalCode} onChange={(e) => setCompanyForm({ ...companyForm, postalCode: e.target.value })} className="tabular-nums" /></Field>
               <Field label="Ciudad" className="sm:col-span-2"><Input value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} /></Field>
               <Field label="Provincia" className="sm:col-span-2"><Input value={companyForm.province} onChange={(e) => setCompanyForm({ ...companyForm, province: e.target.value })} /></Field>
               <Field label="País" className="sm:col-span-2"><Input value={companyForm.country} onChange={(e) => setCompanyForm({ ...companyForm, country: e.target.value })} /></Field>
@@ -1176,7 +1176,7 @@ export default function AccountingConfigPage() {
                 <tbody>
                   {stepsOf(flow).map((s, i, list) => (
                     <tr key={s.id} onClick={() => setEditingStep({ flow, id: s.id })} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
-                      <td className="px-4 py-1.5 font-mono text-xs text-slate-500">{i + 1}</td>
+                      <td className="px-4 py-1.5 tabular-nums text-xs text-slate-500">{i + 1}</td>
                       <td className="px-3 py-1.5">
                         <span className="text-slate-900">{approverText(s)}</span>
                         <span className="ml-2 text-xs text-slate-400">{APPROVER_TYPE_LABELS[s.approverType]}</span>
@@ -1293,11 +1293,11 @@ export default function AccountingConfigPage() {
                       </Select>
                     </Field>
                     <Field label={s.amountCondition === "between" ? "Desde (€)" : "Importe (€)"}>
-                      <Input type="number" min="0" value={s.amountThreshold ?? ""} onChange={(e) => updateStep(k, s.id, "amountThreshold", e.target.value ? Number(e.target.value) : undefined)} className="text-right font-mono" />
+                      <Input type="number" min="0" value={s.amountThreshold ?? ""} onChange={(e) => updateStep(k, s.id, "amountThreshold", e.target.value ? Number(e.target.value) : undefined)} className="text-right tabular-nums" />
                     </Field>
                     {s.amountCondition === "between" && (
                       <Field label="Hasta (€)">
-                        <Input type="number" min="0" value={s.amountThresholdMax ?? ""} onChange={(e) => updateStep(k, s.id, "amountThresholdMax", e.target.value ? Number(e.target.value) : undefined)} className="text-right font-mono" />
+                        <Input type="number" min="0" value={s.amountThresholdMax ?? ""} onChange={(e) => updateStep(k, s.id, "amountThresholdMax", e.target.value ? Number(e.target.value) : undefined)} className="text-right tabular-nums" />
                       </Field>
                     )}
                   </div>
@@ -1333,7 +1333,7 @@ export default function AccountingConfigPage() {
             <Input value={bankAccountForm.iban} onChange={(e) => handleBankAccountIbanChange(e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" className="font-mono" />
           </Field>
           <Field label="BIC / SWIFT (opcional)">
-            <Input value={bankAccountForm.bic || ""} onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} maxLength={11} className="font-mono uppercase" />
+            <Input value={bankAccountForm.bic || ""} onChange={(e) => setBankAccountForm({ ...bankAccountForm, bic: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) })} maxLength={11} className="tabular-nums uppercase" />
           </Field>
           <Checkbox
             checked={bankAccountForm.isDefault || false}

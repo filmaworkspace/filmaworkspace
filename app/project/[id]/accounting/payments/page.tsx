@@ -732,7 +732,7 @@ export default function PaymentsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="truncate font-mono text-xs font-medium">{invoice.displayNumber || `FRA-${invoice.number}`}</span>
-                          <span className="font-mono text-xs">{formatCurrency(invoice.totalAmount)}</span>
+                          <span className="tabular-nums text-xs">{formatCurrency(invoice.totalAmount)}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
                           <span className="truncate">{invoice.supplier || "—"}</span>
@@ -1012,14 +1012,14 @@ export default function PaymentsPage() {
           )}
           {newPayment.type === "partial" && newPayment.invoiceId && (
             <Field label={`Importe parcial (de ${formatCurrency(newPayment.amount)} €)`}>
-              <Input type="number" step="0.01" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" />
+              <Input type="number" step="0.01" value={newPayment.partialAmount || ""} onChange={(e) => setNewPayment({ ...newPayment, partialAmount: parseFloat(e.target.value) || 0 })} className="text-right tabular-nums" />
             </Field>
           )}
           {newPayment.type !== "invoice" && newPayment.type !== "partial" && (
             <>
               <Field label="Proveedor o beneficiario"><Input value={newPayment.supplier} onChange={(e) => setNewPayment({ ...newPayment, supplier: e.target.value })} /></Field>
               <Field label="Concepto"><Input value={newPayment.description} onChange={(e) => setNewPayment({ ...newPayment, description: e.target.value })} /></Field>
-              <Field label="Importe (€)"><Input type="number" step="0.01" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" /></Field>
+              <Field label="Importe (€)"><Input type="number" step="0.01" value={newPayment.amount || ""} onChange={(e) => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) || 0 })} className="text-right tabular-nums" /></Field>
             </>
           )}
         </div>
@@ -1052,8 +1052,8 @@ export default function PaymentsPage() {
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-slate-600">
                   <span className={cx("inline-flex items-center gap-1.5 text-xs font-medium", st.text)}>{st.label}</span>
                   <span>Pago el <b className="font-medium text-slate-900">{formatDate(fc.paymentDate)}</b></span>
-                  <span>Total <b className="font-mono font-medium text-slate-900">{formatCurrency(fc.totalAmount)} €</b></span>
-                  <span>Pagados <b className="font-mono font-medium text-slate-900">{prog.completed}/{prog.total}</b></span>
+                  <span>Total <b className="tabular-nums font-medium text-slate-900">{formatCurrency(fc.totalAmount)} €</b></span>
+                  <span>Pagados <b className="tabular-nums font-medium text-slate-900">{prog.completed}/{prog.total}</b></span>
                   <span className="text-xs text-slate-400">Creada por {fc.createdByName} · {formatDate(fc.createdAt)}</span>
                 </div>
                 {fc.items.length === 0 ? (
@@ -1078,7 +1078,7 @@ export default function PaymentsPage() {
                               <span className="ml-2 text-xs text-slate-400">{PAYMENT_TYPES[item.type]?.label}</span>
                             </td>
                             <td className="px-3 py-1.5">{item.supplier}</td>
-                            <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(item.partialAmount || item.amount)}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(item.partialAmount || item.amount)}</td>
                             <td className="px-3 py-1.5">
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
                                 <span className={cx("h-1.5 w-1.5 rounded-full", item.status === "completed" ? "bg-emerald-500" : "bg-amber-500")} />
@@ -1119,7 +1119,7 @@ export default function PaymentsPage() {
             <dl className="grid grid-cols-[110px_1fr] gap-y-1.5 rounded-md border border-slate-200 px-3 py-2.5">
               <dt className="text-slate-500">Factura</dt><dd className="font-mono text-xs font-medium">{invoiceStatusResult.invoice?.invoiceNumber || invoiceStatusResult.invoice?.displayNumber || invoiceStatusResult.invoice?.number}</dd>
               <dt className="text-slate-500">Proveedor</dt><dd>{invoiceStatusResult.invoice?.supplier}</dd>
-              <dt className="text-slate-500">Importe</dt><dd className="font-mono">{formatCurrency(invoiceStatusResult.invoice?.totalAmount || invoiceStatusResult.invoice?.amount || 0)} €</dd>
+              <dt className="text-slate-500">Importe</dt><dd className="tabular-nums">{formatCurrency(invoiceStatusResult.invoice?.totalAmount || invoiceStatusResult.invoice?.amount || 0)} €</dd>
               <dt className="text-slate-500">Estado</dt>
               <dd className="font-medium">{invoiceStatusResult.status === "paid" ? "Pagada" : invoiceStatusResult.status === "scheduled" ? "Programada para pago" : "Sin asignar a ninguna previsión"}</dd>
               {invoiceStatusResult.forecast && (<><dt className="text-slate-500">Previsión</dt><dd>{invoiceStatusResult.forecast.name} · {formatDate(invoiceStatusResult.forecast.paymentDate)}</dd></>)}

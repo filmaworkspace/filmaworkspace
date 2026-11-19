@@ -764,7 +764,7 @@ export default function ApprovalsPage() {
           filteredApprovals.length > 0 ? (
             <span className="hidden items-center gap-3 text-[11px] text-slate-500 lg:flex">
               {[["J", "siguiente"], ["K", "anterior"], ["A", "aprobar"], ["R", "rechazar"]].map(([k, l]) => (
-                <span key={k} className="inline-flex items-center gap-1"><kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 font-mono text-[10px] text-slate-600">{k}</kbd>{l}</span>
+                <span key={k} className="inline-flex items-center gap-1"><kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 tabular-nums text-[10px] text-slate-600">{k}</kbd>{l}</span>
               ))}
             </span>
           ) : undefined
@@ -811,7 +811,7 @@ export default function ApprovalsPage() {
                         {approval.displayNumber}
                         {approval.isUrgent && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Urgente" />}
                       </span>
-                      <span className="font-mono text-xs">{formatCurrency(approval.amount, approval.currency)}</span>
+                      <span className="tabular-nums text-xs">{formatCurrency(approval.amount, approval.currency)}</span>
                     </span>
                     <span className="flex items-center justify-between gap-2 text-xs text-slate-500">
                       <span className="truncate">{approval.supplier}</span>
@@ -901,8 +901,8 @@ export default function ApprovalsPage() {
                                 <tr key={index} className="border-b border-slate-100 last:border-0">
                                   <td className="px-3 py-1.5">{item.description}{item.episodeAssignment === "specific" && item.episodes?.length ? <span className="ml-1.5 text-xs text-slate-500">cap. {item.episodes.map((e: any) => e.episode).join(", ")}</span> : null}</td>
                                   <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{item.subAccountCode || "—"}</td>
-                                  <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</td>
-                                  <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(item.baseAmount ?? ((item.quantity || 0) * (item.unitPrice || 0)))}</td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(item.baseAmount ?? ((item.quantity || 0) * (item.unitPrice || 0)))}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -924,8 +924,8 @@ export default function ApprovalsPage() {
                                     {currentApproval.boxType === "transfer" && <td className="px-3 py-1.5">{exp.personName || "—"}</td>}
                                     <td className="max-w-[180px] truncate px-3 py-1.5">{exp.supplier}</td>
                                     <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(exp.baseAmount)}</td>
-                                    <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(exp.totalAmount)}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{formatCurrency(exp.baseAmount)}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(exp.totalAmount)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1108,7 +1108,7 @@ export default function ApprovalsPage() {
       >
         {selectedApproval && (
           <p className="text-[13px] text-slate-700">
-            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="font-mono">{formatCurrency(selectedApproval.amount, selectedApproval.currency)}</span>
+            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="tabular-nums">{formatCurrency(selectedApproval.amount, selectedApproval.currency)}</span>
           </p>
         )}
       </Modal>

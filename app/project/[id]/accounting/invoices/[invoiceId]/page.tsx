@@ -973,7 +973,7 @@ export default function InvoiceDetailPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
-                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none font-mono" />
+                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none tabular-nums" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
@@ -1046,7 +1046,7 @@ export default function InvoiceDetailPage() {
                       >
                         <span className="font-medium text-slate-900">#{idx + 1}</span>
                         <span className="text-slate-600 truncate max-w-[150px]">{poItem.description || "Sin descripción"}</span>
-                        <span className="font-mono text-slate-500">{formatCurrency(poItem.unitPrice || 0)}€</span>
+                        <span className="tabular-nums text-slate-500">{formatCurrency(poItem.unitPrice || 0)}€</span>
                       </button>
                     ))}
                   </div>
@@ -1228,20 +1228,20 @@ export default function InvoiceDetailPage() {
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
-                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right font-mono" />
+                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right tabular-nums" />
                       </div>
 
                       <div className="col-span-3">
                         <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
                         <div className="relative">
-                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right font-mono" />
+                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right tabular-nums" />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
                         </div>
                       </div>
 
                       <div className="col-span-3">
                         <label className="text-xs text-slate-500 block mb-1">Total línea</label>
-                        <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] text-right font-mono font-semibold text-slate-900">
+                        <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] text-right tabular-nums font-semibold text-slate-900">
                           {formatCurrency(calculateItemTotals(item).total)} €
                         </div>
                       </div>
@@ -2112,12 +2112,12 @@ export default function InvoiceDetailPage() {
         <div className="flex flex-col gap-4">
           <p className="-mt-1 text-[13px] text-slate-500">{invoice.displayNumber} · {invoice.supplier}</p>
           <dl className="grid grid-cols-3 gap-3 rounded-md border border-slate-200 px-3 py-2.5 text-[13px]">
-            <div><dt className="text-xs text-slate-500">Fianza</dt><dd className="font-mono">{formatCurrency(invoice.totalAmount)} €</dd></div>
-            <div><dt className="text-xs text-slate-500">Devuelto</dt><dd className="font-mono">{formatCurrency(invoice.totalReturned || 0)} €</dd></div>
-            <div><dt className="text-xs text-slate-500">Pendiente</dt><dd className="font-mono font-semibold">{formatCurrency(getRemainingGuarantee())} €</dd></div>
+            <div><dt className="text-xs text-slate-500">Fianza</dt><dd className="tabular-nums">{formatCurrency(invoice.totalAmount)} €</dd></div>
+            <div><dt className="text-xs text-slate-500">Devuelto</dt><dd className="tabular-nums">{formatCurrency(invoice.totalReturned || 0)} €</dd></div>
+            <div><dt className="text-xs text-slate-500">Pendiente</dt><dd className="tabular-nums font-semibold">{formatCurrency(getRemainingGuarantee())} €</dd></div>
           </dl>
           <Field label="Importe devuelto (€)">
-            <Input type="number" step="0.01" value={returnForm.amount || ""} onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })} className="text-right font-mono" />
+            <Input type="number" step="0.01" value={returnForm.amount || ""} onChange={(e) => setReturnForm({ ...returnForm, amount: parseFloat(e.target.value) || 0 })} className="text-right tabular-nums" />
             <span className="mt-1.5 flex gap-3 text-xs">
               <button type="button" onClick={() => setReturnForm({ ...returnForm, amount: getRemainingGuarantee() })} className="text-slate-600 hover:text-slate-900 hover:underline">Todo lo pendiente</button>
               <button type="button" onClick={() => setReturnForm({ ...returnForm, amount: Math.round(getRemainingGuarantee() * 50) / 100 })} className="text-slate-600 hover:text-slate-900 hover:underline">50 %</button>

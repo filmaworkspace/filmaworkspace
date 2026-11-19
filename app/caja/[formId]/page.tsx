@@ -136,7 +136,7 @@ export default function CashSettlementForm() {
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-slate-600">PIN</span>
-          <Input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" autoFocus className="h-11 text-center font-mono text-lg tracking-[0.4em]" maxLength={6} />
+          <Input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" autoFocus className="h-11 text-center tabular-nums text-lg tracking-[0.4em]" maxLength={6} />
         </label>
         {pinError && <p className="text-xs text-red-700">{pinError}</p>}
         <Button variant="primary" type="submit">Entrar</Button>
@@ -151,7 +151,7 @@ export default function CashSettlementForm() {
         <p className="text-[13px] text-slate-500">{form.projectName} · {form.personName}</p>
         <p className="mt-2 flex items-baseline justify-between rounded-md border border-slate-200 px-3 py-2 text-[13px]">
           <span className="text-slate-600">Recibiste</span>
-          <span className="font-mono font-semibold">{money(advance)} €</span>
+          <span className="tabular-nums font-semibold">{money(advance)} €</span>
         </p>
       </div>
 
@@ -179,7 +179,7 @@ export default function CashSettlementForm() {
             {t.error && <p className="text-xs text-red-700">{t.error}</p>}
             <div className="grid grid-cols-[1fr_120px] gap-2">
               <Input value={t.supplier} onChange={(e) => update(t.localId, { supplier: e.target.value })} placeholder="Establecimiento" className="h-10" />
-              <Input value={t.amount} onChange={(e) => update(t.localId, { amount: e.target.value })} placeholder="Importe €" inputMode="decimal" className="h-10 text-right font-mono" />
+              <Input value={t.amount} onChange={(e) => update(t.localId, { amount: e.target.value })} placeholder="Importe €" inputMode="decimal" className="h-10 text-right tabular-nums" />
             </div>
             <div className="grid grid-cols-[1fr_140px] gap-2">
               <Input value={t.description} onChange={(e) => update(t.localId, { description: e.target.value })} placeholder="¿Qué compraste?" className="h-10" />
@@ -191,7 +191,7 @@ export default function CashSettlementForm() {
       </div>
 
       <div className="flex flex-col gap-2 rounded-md bg-[#F7F7F8] px-3.5 py-3 text-[13px]">
-        <div className="flex justify-between"><span className="text-slate-600">Total tickets</span><span className="font-mono font-semibold">{money(total)} €</span></div>
+        <div className="flex justify-between"><span className="text-slate-600">Total tickets</span><span className="tabular-nums font-semibold">{money(total)} €</span></div>
         {total > 0 && (
           <p className={`text-xs ${diff < 0 ? "text-amber-900" : "text-slate-600"}`}>
             {Math.abs(diff) < 0.005 ? "Justificas exactamente el anticipo." : diff > 0 ? `Te sobran ${money(diff)} €: devuélveselos al cajero.` : `Has gastado ${money(-diff)} € más: el cajero te los reembolsará.`}

@@ -1278,7 +1278,7 @@ export default function ReportsPage() {
                       <tr className="border-b border-slate-100 hover:bg-[#FAFAFA]">
                         <td className="px-4 py-1.5 font-medium text-slate-900">{info.title}</td>
                         <td className="px-3 py-1.5 text-slate-600">{section.title}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs">{getReportCount(type)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums text-xs">{getReportCount(type)}</td>
                         <td className="px-3 py-1.5">
                           {rp.length > 0 ? (
                             <button onClick={() => setExpandedReport(open ? null : type)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" aria-expanded={open}>

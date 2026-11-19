@@ -1191,11 +1191,11 @@ export default function BudgetPage() {
                             )}
                           </span>
                         </td>
-                        <td className="px-3 py-1 text-right font-mono text-xs font-semibold">{num(t.budgeted)}</td>
-                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.committed)}</td>
-                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.actual)}</td>
-                        <td className="px-3 py-1 text-right font-mono text-xs">{num(t.box)}</td>
-                        <td className={`px-3 py-1 text-right font-mono text-xs font-semibold ${availableClass(t.available, t.budgeted)}`}>{num(t.available)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-xs font-semibold">{num(t.budgeted)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-xs">{num(t.committed)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-xs">{num(t.actual)}</td>
+                        <td className="px-3 py-1 text-right tabular-nums text-xs">{num(t.box)}</td>
+                        <td className={`px-3 py-1 text-right tabular-nums text-xs font-semibold ${availableClass(t.available, t.budgeted)}`}>{num(t.available)}</td>
                         <td className="px-3 py-1 text-xs"><ExecCell executed={t.executed} budgeted={t.budgeted} strong /></td>
                         <td className="py-1 pr-3 text-right">
                           <Menu trigger={(toggle) => <IconButton label="Acciones de la cuenta" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
@@ -1220,11 +1220,11 @@ export default function BudgetPage() {
                             <td className="py-1 pl-3" />
                             <td className="py-1 pl-5 pr-2 font-mono text-xs text-slate-500"><Hl text={sub.code} field="code" /></td>
                             <td className="px-2 py-1 text-slate-700"><Hl text={sub.description} field="description" /></td>
-                            <td className="px-3 py-1 text-right font-mono text-xs">{num(sub.budgeted)}</td>
-                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.committed)}</td>
-                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.actual)}</td>
-                            <td className="px-3 py-1 text-right font-mono text-xs text-slate-600">{num(sub.box)}</td>
-                            <td className={`px-3 py-1 text-right font-mono text-xs ${availableClass(available, sub.budgeted)}`}>{num(available)}</td>
+                            <td className="px-3 py-1 text-right tabular-nums text-xs">{num(sub.budgeted)}</td>
+                            <td className="px-3 py-1 text-right tabular-nums text-xs text-slate-600">{num(sub.committed)}</td>
+                            <td className="px-3 py-1 text-right tabular-nums text-xs text-slate-600">{num(sub.actual)}</td>
+                            <td className="px-3 py-1 text-right tabular-nums text-xs text-slate-600">{num(sub.box)}</td>
+                            <td className={`px-3 py-1 text-right tabular-nums text-xs ${availableClass(available, sub.budgeted)}`}>{num(available)}</td>
                             <td className="px-3 py-1 text-xs"><ExecCell executed={executed} budgeted={sub.budgeted} /></td>
                             <td className="py-1 pr-3 text-right">
                               <Menu trigger={(toggle) => <IconButton label="Acciones de la subcuenta" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
@@ -1249,11 +1249,11 @@ export default function BudgetPage() {
                   <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                     <td className="py-2.5 pl-3" />
                     <td className="px-2 py-2.5 font-semibold" colSpan={2}>Total</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold">{num(summary.totalBudgeted)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold">{num(summary.totalCommitted)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold">{num(summary.totalActual)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold">{num(summary.totalBox)}</td>
-                    <td className={`px-3 py-2.5 text-right font-mono font-semibold ${availableClass(summary.totalAvailable, summary.totalBudgeted)}`}>{num(summary.totalAvailable)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{num(summary.totalBudgeted)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{num(summary.totalCommitted)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{num(summary.totalActual)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{num(summary.totalBox)}</td>
+                    <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${availableClass(summary.totalAvailable, summary.totalBudgeted)}`}>{num(summary.totalAvailable)}</td>
                     <td className="px-3 py-2.5"><ExecCell executed={totalExecuted} budgeted={summary.totalBudgeted} strong /></td>
                     <td className="py-2.5 pr-3" />
                   </tr>
@@ -1284,7 +1284,7 @@ export default function BudgetPage() {
           )}
           <div className="grid grid-cols-[120px_1fr] gap-3">
             <Field label="Código">
-              <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="font-mono" autoFocus />
+              <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="tabular-nums" autoFocus />
             </Field>
             <Field label="Descripción">
               <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
@@ -1292,7 +1292,7 @@ export default function BudgetPage() {
           </div>
           {modalMode === "subaccount" && (
             <Field label="Presupuesto (€)">
-              <Input type="number" min="0" step="0.01" value={formData.budgeted} onChange={(e) => setFormData({ ...formData, budgeted: parseFloat(e.target.value) || 0 })} className="text-right font-mono" />
+              <Input type="number" min="0" step="0.01" value={formData.budgeted} onChange={(e) => setFormData({ ...formData, budgeted: parseFloat(e.target.value) || 0 })} className="text-right tabular-nums" />
             </Field>
           )}
         </div>
@@ -1352,7 +1352,7 @@ export default function BudgetPage() {
                   <span className="text-xs font-medium text-slate-500">Formato</span>
                   <button onClick={downloadTemplate} className="text-xs font-medium text-slate-900 hover:underline">Descargar plantilla</button>
                 </div>
-                <div className="overflow-x-auto rounded-md border border-slate-200 font-mono text-xs">
+                <div className="overflow-x-auto rounded-md border border-slate-200 tabular-nums text-xs">
                   <div className="grid min-w-[480px] grid-cols-[80px_120px_1fr_100px] gap-2 border-b border-slate-200 bg-[#FAFAFA] px-3 py-1.5 text-[11px] text-slate-500">
                     <span>CUENTA</span><span>SUBCUENTA</span><span>DESCRIPCIÓN</span><span className="text-right">PRESUPUESTO</span>
                   </div>
@@ -1400,13 +1400,13 @@ export default function BudgetPage() {
                         <span className="w-12 flex-shrink-0 font-mono text-xs font-semibold">{acc.code}</span>
                         <span className="flex-1 truncate text-[13px] font-medium">{acc.description}</span>
                         <span className="text-[11px] text-slate-500">{subs.length}</span>
-                        <span className="w-28 text-right font-mono text-xs">{total > 0 ? num(total) : ""}</span>
+                        <span className="w-28 text-right tabular-nums text-xs">{total > 0 ? num(total) : ""}</span>
                       </button>
                       {open && subs.map((s) => (
                         <div key={s.code} className="flex items-center gap-2 py-1.5 pl-9 pr-3">
                           <span className="w-28 flex-shrink-0 font-mono text-xs text-slate-500">{s.code}</span>
                           <span className="flex-1 truncate text-xs text-slate-700">{s.description}</span>
-                          <span className="w-28 text-right font-mono text-xs text-slate-600">{s.budgeted > 0 ? num(s.budgeted) : ""}</span>
+                          <span className="w-28 text-right tabular-nums text-xs text-slate-600">{s.budgeted > 0 ? num(s.budgeted) : ""}</span>
                         </div>
                       ))}
                     </div>
@@ -1419,7 +1419,7 @@ export default function BudgetPage() {
           {importStep === "importing" && (
             <div className="flex flex-col items-center gap-3 py-10">
               <Spinner className="h-6 w-6" />
-              <span className="font-mono text-xs text-slate-600">{importProgress} %</span>
+              <span className="tabular-nums text-xs text-slate-600">{importProgress} %</span>
             </div>
           )}
 

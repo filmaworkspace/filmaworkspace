@@ -2776,7 +2776,7 @@ export default function NewInvoicePage() {
                       {pd.poNumber && <span className="ml-2 font-mono text-[11px] text-slate-400">PO-{pd.poNumber}</span>}
                     </td>
                     <td className="px-3 py-1.5 text-xs text-slate-600">{formatDate(pd.paidAt)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(pd.totalAmount)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(pd.totalAmount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2810,8 +2810,8 @@ export default function NewInvoicePage() {
                     <tr key={po.id} onClick={() => selectPO(po)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#F4F4F5]">
                       <td className="px-3 py-1.5 font-mono text-xs font-medium">PO-{po.number}</td>
                       <td className="px-3 py-1.5">{po.supplier}{po.department && <span className="ml-2 text-xs text-slate-400">{po.department}</span>}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-xs">{po.items.length}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(po.totalAmount)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-xs">{po.items.length}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(po.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>

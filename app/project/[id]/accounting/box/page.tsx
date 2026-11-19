@@ -2105,7 +2105,7 @@ export default function BoxesPage() {
                                   {pendingCount > 0 ? <span className="text-amber-800">{pendingCount} pendientes</span> : <span className="text-slate-400">—</span>}
                                   {conflictCount > 0 && <span className="text-red-700"> · {conflictCount} con incidencia</span>}
                                 </td>
-                                <td className="px-3 py-1.5 text-right font-mono text-xs font-medium">{fmt(envelope.totalAmount)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-xs font-medium">{fmt(envelope.totalAmount)}</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-slate-500">{fmtDate(envelope.createdAt)}</td>
                                 <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
                                   {canDeleteEnvelope(envelope) && envelope.status !== "closed" && (
@@ -2232,9 +2232,9 @@ export default function BoxesPage() {
                                       <td className="whitespace-nowrap px-3 py-1.5 font-mono text-xs">
                                         <span className={missing ? "text-red-700" : "text-slate-600"} title={missing ? "La cuenta no existe en el presupuesto" : undefined}>{expense.subAccountCode || "—"}</span>
                                       </td>
-                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(expense.baseAmount)}</td>
-                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(expense.vatAmount)}</td>
-                                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{fmt(expense.baseAmount)}</td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{fmt(expense.vatAmount)}</td>
+                                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">
                                         {fmt(expense.totalAmount)}
                                         {hasConflict && expense.pleoAmount && Math.abs(expense.pleoAmount - expense.totalAmount) > 0.02 && <span className="block text-[11px] font-normal text-red-700">tarjeta {fmt(expense.pleoAmount)}</span>}
                                       </td>
@@ -2265,9 +2265,9 @@ export default function BoxesPage() {
                               <tfoot>
                                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                                   <td className="px-4 py-2 font-semibold" colSpan={3}>Total{visible.length !== envelopeExpenses.length ? " filtrado" : ""}</td>
-                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.base)}</td>
-                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.vat)}</td>
-                                  <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(tot.total)}</td>
+                                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(tot.base)}</td>
+                                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(tot.vat)}</td>
+                                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(tot.total)}</td>
                                   <td colSpan={2} />
                                 </tr>
                               </tfoot>
@@ -2337,7 +2337,7 @@ export default function BoxesPage() {
                     <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200">
                       <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
                         <span className="text-[11px] uppercase tracking-wide text-slate-500">Anticipado</span>
-                        <span className="font-mono text-lg font-semibold">{fmt(totalAdvance)} €</span>
+                        <span className="tabular-nums text-lg font-semibold">{fmt(totalAdvance)} €</span>
                         {env.advances.length > 0 && (
                           <span className="flex flex-wrap gap-x-2 text-xs text-slate-500">
                             {env.advances.map((a) => (
@@ -2348,19 +2348,19 @@ export default function BoxesPage() {
                       </div>
                       <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
                         <span className="text-[11px] uppercase tracking-wide text-slate-500">Gastado</span>
-                        <span className="font-mono text-lg font-semibold">{fmt(env.totalAmount)} €</span>
+                        <span className="tabular-nums text-lg font-semibold">{fmt(env.totalAmount)} €</span>
                         <span className="text-xs text-slate-500">{env.expenseCount} gastos</span>
                       </div>
                       <div className="flex flex-col gap-0.5 px-4 py-3">
                         <span className="text-[11px] uppercase tracking-wide text-slate-500">{draft ? "Liquidación prevista" : "Liquidación"}</span>
                         {draft ? (
                           <>
-                            <span className="font-mono text-lg font-semibold">{preview.direction === "none" ? "0,00" : fmt(preview.diff)} €</span>
+                            <span className="tabular-nums text-lg font-semibold">{preview.direction === "none" ? "0,00" : fmt(preview.diff)} €</span>
                             <span className="text-xs text-slate-500">{preview.label}</span>
                           </>
                         ) : (
                           <>
-                            <span className="font-mono text-lg font-semibold">{fmt(env.settlementAmount || 0)} €</span>
+                            <span className="tabular-nums text-lg font-semibold">{fmt(env.settlementAmount || 0)} €</span>
                             <span className="text-xs text-slate-500">
                               {env.settlementDirection === "none" ? "Sin movimiento" : env.settlementDirection === "production_to_person" ? `Productora → ${env.personName}` : `${env.personName} → productora`}
                               {" · "}{env.settledByName} {fmtDate(env.settledAt)}
@@ -2417,9 +2417,9 @@ export default function BoxesPage() {
                                       <span className="block text-[11px] text-slate-500">{exp.type === "invoice" ? "Factura" : "Ticket"}{exp.supplierTaxId && <> · <span className="font-mono">{exp.supplierTaxId}</span></>}</span>
                                     </td>
                                     <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{items.map((i: any) => i.subAccountCode).filter(Boolean).join(", ") || "—"}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(exp.baseAmount)}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{fmt(exp.vatAmount)}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{fmt(exp.totalAmount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{fmt(exp.baseAmount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{fmt(exp.vatAmount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{fmt(exp.totalAmount)}</td>
                                     <td className="py-1.5 pr-3">
                                       <div className="flex items-center justify-end gap-0.5">
                                         {exp.attachmentUrl ? (
@@ -2435,9 +2435,9 @@ export default function BoxesPage() {
                             <tfoot>
                               <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                                 <td className="px-4 py-2 font-semibold" colSpan={3}>Total</td>
-                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalBase)}</td>
-                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalVat)}</td>
-                                <td className="px-3 py-2 text-right font-mono font-semibold">{fmt(env.totalAmount)}</td>
+                                <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(env.totalBase)}</td>
+                                <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(env.totalVat)}</td>
+                                <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmt(env.totalAmount)}</td>
                                 <td />
                               </tr>
                             </tfoot>
@@ -2573,7 +2573,7 @@ export default function BoxesPage() {
                     <div className={`mx-5 ${hasConflict ? "mt-3" : "mt-4"}`}>
                       <div className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${amountDiff && Math.abs(amountDiff) > 0.02 ? "bg-amber-50 border border-amber-100" : "bg-slate-50"}`}>
                         <span className="text-slate-500">Cargo real en Pleo</span>
-                        <span className={`font-mono font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
+                        <span className={`tabular-nums font-semibold ${amountDiff && Math.abs(amountDiff) > 0.02 ? "text-amber-700" : "text-slate-700"}`}>
                           {fmt(drawerExpense.pleoAmount)} €
                           {amountDiff && Math.abs(amountDiff) > 0.02 && (
                             <span className="ml-2 text-amber-500">({amountDiff > 0 ? "+" : ""}{fmt(amountDiff)} vs factura)</span>
@@ -2591,13 +2591,13 @@ export default function BoxesPage() {
                             {drawerExpense.linkedCharges.map((charge, ci) => (
                               <div key={ci} className="flex items-center justify-between px-3 py-2">
                                 <span className="text-xs text-slate-500">{charge.date || "—"}</span>
-                                <span className="text-xs font-mono font-medium text-slate-800">{fmt(charge.amount)} €</span>
+                                <span className="text-xs tabular-nums font-medium text-slate-800">{fmt(charge.amount)} €</span>
                               </div>
                             ))}
                           </div>
                           <div className="bg-[#F7F7F8] px-3 py-1.5 flex items-center justify-between border-t border-slate-200">
                             <span className="text-xs font-medium text-slate-700">Total cargos</span>
-                            <span className="text-xs font-mono font-semibold text-slate-900">
+                            <span className="text-xs tabular-nums font-semibold text-slate-900">
                               {fmt(drawerExpense.linkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
                             </span>
                           </div>
@@ -2621,7 +2621,7 @@ export default function BoxesPage() {
                         <label className="block text-xs font-medium text-slate-600 mb-1">CIF / NIF</label>
                         <input type="text" value={drawerForm.supplierTaxId}
                           onChange={e => setDrawerForm(f => ({ ...f, supplierTaxId: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] tabular-nums focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                       </div>
                     </div>
 
@@ -2718,17 +2718,17 @@ export default function BoxesPage() {
                                 <label className="block text-xs text-slate-500 mb-1">Base *</label>
                                 <input type="number" step="0.01" value={item.baseAmount || ""}
                                   onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, baseAmount: parseFloat(e.target.value) || 0 } : it))}
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div>
                                 <label className="block text-xs text-slate-500 mb-1">IVA %</label>
                                 <input type="number" step="1" value={item.vatRate}
                                   onChange={e => setDrawerItems(prev => prev.map((it, i) => i === idx ? { ...it, vatRate: parseFloat(e.target.value) || 0 } : it))}
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div>
                                 <label className="block text-xs text-slate-500 mb-1">Cuota IVA</label>
-                                <div className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-mono text-slate-500">
+                                <div className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs tabular-nums text-slate-500">
                                   {fmt(Math.round((item.baseAmount || 0) * (item.vatRate || 0) / 100 * 100) / 100)} €
                                 </div>
                               </div>
@@ -2741,11 +2741,11 @@ export default function BoxesPage() {
                           <label className="text-xs text-slate-500">IRPF %</label>
                           <input type="number" step="1" value={drawerForm.irpfRate}
                             onChange={e => setDrawerForm(f => ({ ...f, irpfRate: e.target.value }))}
-                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
+                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900 bg-white" />
                         </div>
                         <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs">
                           <span className="text-slate-400">Total:</span>
-                          <span className="ml-1.5 font-mono font-semibold">
+                          <span className="ml-1.5 tabular-nums font-semibold">
                             {fmt(Math.round((
                               drawerItems.reduce((s, it) => s + (it.baseAmount || 0), 0) +
                               drawerItems.reduce((s, it) => s + Math.round((it.baseAmount || 0) * (it.vatRate || 0) / 100 * 100) / 100, 0) -
@@ -2828,7 +2828,7 @@ export default function BoxesPage() {
                                     value={charge.amount || ""}
                                     onChange={e => setDrawerLinkedCharges(prev => prev.map((c, i) => i === ci ? { ...c, amount: parseFloat(e.target.value) || 0 } : c))}
                                     placeholder="0.00"
-                                    className="w-full text-xs font-mono border-0 focus:outline-none bg-transparent text-right text-slate-900 placeholder-slate-300"
+                                    className="w-full text-xs tabular-nums border-0 focus:outline-none bg-transparent text-right text-slate-900 placeholder-slate-300"
                                   />
                                   <span className="text-xs text-slate-400">€</span>
                                 </div>
@@ -2844,7 +2844,7 @@ export default function BoxesPage() {
                         {drawerLinkedCharges.length > 0 && (
                           <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200">
                             <span className="text-xs text-slate-500">Total cargos</span>
-                            <span className="text-xs font-mono font-semibold text-slate-900">
+                            <span className="text-xs tabular-nums font-semibold text-slate-900">
                               {fmt(drawerLinkedCharges.reduce((s, c) => s + (c.amount || 0), 0))} €
                             </span>
                           </div>
@@ -2970,7 +2970,7 @@ export default function BoxesPage() {
                       <input type="text" value={boxForm.code}
                         onChange={e => setBoxForm({ ...boxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         placeholder="LG" maxLength={3}
-                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 tabular-nums uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3037,7 +3037,7 @@ export default function BoxesPage() {
                       <input type="text" value={editBoxForm.code}
                         onChange={e => setEditBoxForm({ ...editBoxForm, code: e.target.value.toUpperCase().slice(0, 3) })}
                         maxLength={3}
-                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 font-mono uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
+                        className={`w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 tabular-nums uppercase transition-colors ${isDuplicate ? "border-red-400 bg-red-50 focus:ring-red-400" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"} text-[13px]`} />
                       {isDuplicate && (
                         <p className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-medium">
                           <AlertCircle size={12} />
@@ -3124,7 +3124,7 @@ export default function BoxesPage() {
         width="max-w-5xl"
         footer={(showManualExpenseModal && selectedEnvelope) ? <>
 <p className="text-[13px] text-slate-500">
-                {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 font-mono">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
+                {cardExpensesList.length > 0 && <>Total: <strong className="text-slate-900 tabular-nums">{fmt(cardExpensesList.reduce((s, e) => s + computeExpenseTotal(e).totalAmount, 0))} €</strong></>}
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setShowManualExpenseModal(false)} className="px-4 py-2 text-slate-600 rounded-md text-[13px] font-medium hover:bg-slate-100">Cancelar</button>
@@ -3209,7 +3209,7 @@ export default function BoxesPage() {
                         <div className="col-span-1">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
                           <input type="number" value={exp.irpfRate} onChange={e => updateCardExpense(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
-                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] tabular-nums focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                         </div>
                         <div className="col-span-12">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Descripción del gasto</label>
@@ -3252,12 +3252,12 @@ export default function BoxesPage() {
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""} onChange={e => updateCardItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs tabular-nums focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
                                 <input type="number" value={item.vatRate} onChange={e => updateCardItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs tabular-nums focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900" />
                               </div>
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && (
@@ -3271,7 +3271,7 @@ export default function BoxesPage() {
                       <div className="flex justify-end">
                         <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[13px]">
                           <span className="text-slate-400">Total gasto:</span>
-                          <span className="ml-2 font-mono font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
+                          <span className="ml-2 tabular-nums font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
                         </div>
                       </div>
                     </div>
@@ -3385,8 +3385,8 @@ export default function BoxesPage() {
                                     </div>
                                   ))}
                                 </td>
-                                <td className={`px-3 py-2.5 text-right font-mono ${isDup ? "text-slate-400" : "text-slate-700"}`}>{fmt(exp.baseAmount)}</td>
-                                <td className={`px-3 py-2.5 text-right font-mono font-semibold ${isDup ? "text-slate-400" : "text-slate-900"}`}>{fmt(exp.totalAmount)} €</td>
+                                <td className={`px-3 py-2.5 text-right tabular-nums ${isDup ? "text-slate-400" : "text-slate-700"}`}>{fmt(exp.baseAmount)}</td>
+                                <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${isDup ? "text-slate-400" : "text-slate-900"}`}>{fmt(exp.totalAmount)} €</td>
                               </tr>
                             );
                           })}
@@ -3394,8 +3394,8 @@ export default function BoxesPage() {
                         <tfoot className="bg-slate-50 border-t border-slate-200">
                           <tr>
                             <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-slate-500">TOTAL</td>
-                            <td className="px-3 py-2 text-right font-mono font-semibold text-slate-700">{fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))}</td>
-                            <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-700">{fmt(importPreview.reduce((s: number, e: any) => s + e.baseAmount, 0))}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-bold text-slate-900">{fmt(importPreview.reduce((s: number, e: any) => s + e.totalAmount, 0))} €</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -3466,7 +3466,7 @@ export default function BoxesPage() {
                             {exp ? <Check size={13} className="text-emerald-500" /> : <AlertTriangle size={13} className="text-amber-400" />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-mono text-slate-700 truncate">{file.name}</p>
+                            <p className="text-xs tabular-nums text-slate-700 truncate">{file.name}</p>
                             {exp ? <p className="text-xs text-emerald-600 mt-0.5">{exp.displayNumber} · {exp.supplier}</p>
                               : <p className="text-xs text-amber-500 mt-0.5">No se encontró ningún gasto con este ID</p>}
                           </div>
@@ -3570,7 +3570,7 @@ export default function BoxesPage() {
         width="max-w-5xl"
         footer={(showAddExpenseModal && selectedTransferEnvelope) ? <>
 <div className="text-[13px] text-slate-500">
-                Total: <strong className="text-slate-900 font-mono">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
+                Total: <strong className="text-slate-900 tabular-nums">{fmt(expensesList.reduce((sum, exp) => sum + computeExpenseTotal(exp).totalAmount, 0))} €</strong>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowAddExpenseModal(false)} className={buttonClass("ghost")}>Cancelar</button>
@@ -3634,7 +3634,7 @@ export default function BoxesPage() {
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">IRPF %</label>
                           <input type="number" value={exp.irpfRate} onChange={e => updateExpenseInList(idx, "irpfRate", parseFloat(e.target.value) || 0)} step="1"
-                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
+                            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums" />
                         </div>
                         <div className="col-span-3">
                           <label className="block text-xs font-medium text-slate-600 mb-1">Documento</label>
@@ -3714,12 +3714,12 @@ export default function BoxesPage() {
                               <div className="col-span-3">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">Base *</label>}
                                 <input type="number" value={item.baseAmount || ""} onChange={e => updateExpenseItem(idx, itemIdx, "baseAmount", parseFloat(e.target.value) || 0)} step="0.01"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums" />
                               </div>
                               <div className="col-span-2">
                                 {itemIdx === 0 && <label className="block text-xs font-medium text-slate-500 mb-1">IVA %</label>}
                                 <input type="number" value={item.vatRate} onChange={e => updateExpenseItem(idx, itemIdx, "vatRate", parseFloat(e.target.value) || 0)} step="1"
-                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono" />
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums" />
                               </div>
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && <button onClick={() => removeItemFromExpense(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>}
@@ -3731,7 +3731,7 @@ export default function BoxesPage() {
                       <div className="flex justify-end">
                         <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[13px]">
                           <span className="text-slate-400">Total gasto:</span>
-                          <span className="ml-2 font-mono font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
+                          <span className="ml-2 tabular-nums font-semibold">{fmt(computeExpenseTotal(exp).totalAmount)} €</span>
                         </div>
                       </div>
                     </div>
@@ -3756,12 +3756,12 @@ export default function BoxesPage() {
 </>}>
 <div className="space-y-4">
                 <div className="p-4 bg-slate-50 rounded-md space-y-1.5 text-[13px]">
-                  <div className="flex justify-between"><span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}</span><span className="font-mono text-slate-900">{fmt(getTotalAdvance(selectedTransferEnvelope))} €</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="font-mono text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Anticipo{selectedTransferEnvelope.advances.length > 1 ? "s" : ""}</span><span className="tabular-nums text-slate-900">{fmt(getTotalAdvance(selectedTransferEnvelope))} €</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Total gastos</span><span className="tabular-nums text-slate-900">{fmt(selectedTransferEnvelope.totalAmount)} €</span></div>
                   <div className="border-t border-slate-200 my-1.5" />
                   <div className="flex justify-between">
                     <span className="text-slate-700 font-medium">{preview.direction === "none" ? "Resultado" : preview.label}</span>
-                    <span className={`font-mono font-bold ${preview.direction === "none" ? "text-slate-500" : "text-slate-900"}`}>
+                    <span className={`tabular-nums font-bold ${preview.direction === "none" ? "text-slate-500" : "text-slate-900"}`}>
                       {preview.direction === "none" ? "0,00 €" : `${fmt(preview.diff)} €`}
                     </span>
                   </div>
@@ -3779,7 +3779,7 @@ export default function BoxesPage() {
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-slate-600">Referencia (opcional)</label>
                       <input type="text" value={settleForm.reference} onChange={e => setSettleForm({ ...settleForm, reference: e.target.value })} placeholder="2024-PC-001"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums text-[13px]" />
                     </div>
                   </>
                 )}
@@ -3815,7 +3815,7 @@ export default function BoxesPage() {
                 <input type="number" min="0" step="0.01" value={advanceForm.amount}
                   onChange={e => setAdvanceForm({ ...advanceForm, amount: e.target.value, method: "bank" })}
                   placeholder="500,00"
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 font-mono text-[13px]" />
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums text-[13px]" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha</label>

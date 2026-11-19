@@ -89,7 +89,7 @@ export function ProjectFormModal({ open, onClose, project, producers, onSaved }:
         </div>
         {!editing && (
           <Field label="ID del proyecto" hint="Opcional. Si lo dejas vacío se genera uno de 6 caracteres.">
-            <Input value={f.customId} onChange={(e) => setF({ ...f, customId: e.target.value })} placeholder="p. ej. ULTIMALUZ" className="font-mono" />
+            <Input value={f.customId} onChange={(e) => setF({ ...f, customId: e.target.value })} placeholder="p. ej. ULTIMALUZ" className="tabular-nums" />
           </Field>
         )}
         <Field label="Productoras">

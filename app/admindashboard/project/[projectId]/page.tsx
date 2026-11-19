@@ -172,9 +172,9 @@ function ProjectStatTile({
       <span className={`inline-flex w-7 h-7 rounded-lg items-center justify-center mb-2 ${STAT_ACCENTS[accent]}`}>
         <Icon size={14} />
       </span>
-      <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-none">{value}</p>
+      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
       <p className="text-[11px] text-slate-500 mt-1.5">{label}</p>
-      {sub && <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{sub}</p>}
+      {sub && <p className="text-[10px] text-slate-400 tabular-nums mt-0.5 truncate">{sub}</p>}
     </div>
   );
 }

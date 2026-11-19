@@ -169,7 +169,7 @@ function SystemInner() {
               <tbody>
                 {shownErrors.map((e) => (
                   <tr key={e.id} onClick={() => setErrOpen(e)} className="cursor-pointer hover:bg-[#FAFAFA]">
-                    <td className="relative py-1.5 pl-4 pr-3"><RowBar tone={e.resolved ? "none" : e.count > 10 ? "bad" : "warn"} /><div className="truncate font-mono text-[12px] text-slate-900">{e.message}</div><div className="truncate text-xs text-slate-500">{e.lastUrl}</div></td>
+                    <td className="relative py-1.5 pl-4 pr-3"><RowBar tone={e.resolved ? "none" : e.count > 10 ? "bad" : "warn"} /><div className="truncate tabular-nums text-[12px] text-slate-900">{e.message}</div><div className="truncate text-xs text-slate-500">{e.lastUrl}</div></td>
                     <td className="px-3 text-right tabular-nums">{e.count}</td>
                     <td className="px-3 text-right tabular-nums">{e.uids?.length || 0}</td>
                     <td className="px-3 text-slate-500">{timeAgo(e.lastSeenAt)}</td>
@@ -338,7 +338,7 @@ function SystemInner() {
             </div>
           )}
           <p className="mt-6 rounded-md border border-slate-200 bg-[#F7F7F8] px-3 py-2 text-xs leading-relaxed text-slate-600">
-            Se envía cuando se llama a <code className="font-mono">/api/cron/admin-digest</code> con la cabecera <code className="font-mono">Authorization: Bearer CRON_SECRET</code>. Prográmalo una vez al día, igual que el envío automático de horarios.
+            Se envía cuando se llama a <code className="tabular-nums">/api/cron/admin-digest</code> con la cabecera <code className="tabular-nums">Authorization: Bearer CRON_SECRET</code>. Prográmalo una vez al día, igual que el envío automático de horarios.
           </p>
         </div>
       )}
@@ -350,7 +350,7 @@ function SystemInner() {
           : <Button variant="primary" onClick={() => resolveError(errOpen, true)}><Check size={13} /> Marcar como revisado</Button>}</>}>
         {errOpen && (
           <div className="flex flex-col gap-4 text-[13px]">
-            <p className="font-mono text-[12px] text-slate-900">{errOpen.message}</p>
+            <p className="tabular-nums text-[12px] text-slate-900">{errOpen.message}</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-slate-600 sm:grid-cols-4">
               <span>Veces: <strong className="text-slate-900">{errOpen.count}</strong></span>
               <span>Usuarios: <strong className="text-slate-900">{errOpen.uids?.length || 0}</strong></span>
@@ -360,7 +360,7 @@ function SystemInner() {
             {errOpen.lastEmail && <p className="text-xs text-slate-600">Último usuario: {errOpen.lastEmail}</p>}
             {errOpen.urls && <p className="text-xs text-slate-600">Páginas: <span className="font-mono">{errOpen.urls.slice(0, 8).join(" · ")}</span></p>}
             {errOpen.lastUserAgent && <p className="truncate text-xs text-slate-400">{errOpen.lastUserAgent}</p>}
-            {errOpen.stack && <pre className="max-h-72 overflow-auto rounded-md bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-slate-200">{errOpen.stack}</pre>}
+            {errOpen.stack && <pre className="max-h-72 overflow-auto rounded-md bg-slate-950 p-3 tabular-nums text-[11px] leading-relaxed text-slate-200">{errOpen.stack}</pre>}
           </div>
         )}
       </Modal>

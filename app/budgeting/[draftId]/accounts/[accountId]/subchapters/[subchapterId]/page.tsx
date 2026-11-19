@@ -117,7 +117,7 @@ function PhantomLineRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 bg-white" style={{ gridTemplateColumns: template }} onContextMenu={onContextMenu}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleCodeKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
+        className={`${CELL_INPUT} tabular-nums text-xs !border-l-0`} />
       <div ref={descWrapRef} className="relative h-full">
         <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={commit} onKeyDown={handleDescriptionKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />
@@ -186,7 +186,7 @@ function SubchapterFringeRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
+        className={`${CELL_INPUT} tabular-nums text-xs !border-l-0`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span />
@@ -236,7 +236,7 @@ function ReceivedTotalRow({
     <div className="grid gap-0 divide-x divide-slate-200 px-4 hover:bg-slate-50 group" style={{ gridTemplateColumns: template }}>
       <span />
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
+        className={`${CELL_INPUT} tabular-nums text-xs !border-l-0`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span />
@@ -612,7 +612,7 @@ function LineFieldsGrid({
     <div className="grid gap-0 divide-x divide-slate-200 px-4" style={{ gridTemplateColumns: template }}>
       <BudgetingDragHandle onMouseDown={onHandleMouseDown} />
       <input autoFocus={autoFocus} value={fields.code} onChange={(e) => onChange({ code: e.target.value })} onBlur={onBlurAny} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs !border-l-0`} />
+        className={`${CELL_INPUT} tabular-nums text-xs !border-l-0`} />
       <div ref={descWrapRef} className="relative h-full">
         <input value={fields.description} onChange={(e) => onChange({ description: e.target.value })} onBlur={handleDescriptionBlur} onKeyDown={handleDescriptionKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />

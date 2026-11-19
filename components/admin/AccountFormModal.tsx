@@ -103,7 +103,7 @@ export function AccountFormModal({ open, onClose, account, projects, producers, 
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Contacto"><Input value={f.contactName} onChange={(e) => setF({ ...f, contactName: e.target.value })} /></Field>
-          <Field label="NIF / CIF"><Input value={f.taxId} onChange={(e) => setF({ ...f, taxId: e.target.value })} className="font-mono" /></Field>
+          <Field label="NIF / CIF"><Input value={f.taxId} onChange={(e) => setF({ ...f, taxId: e.target.value })} className="tabular-nums" /></Field>
           <Field label="Email de contacto"><Input value={f.contactEmail} onChange={(e) => setF({ ...f, contactEmail: e.target.value })} /></Field>
           <Field label="Teléfono"><Input value={f.contactPhone} onChange={(e) => setF({ ...f, contactPhone: e.target.value })} /></Field>
         </div>

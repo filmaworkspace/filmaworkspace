@@ -273,7 +273,7 @@ export default function ChartOfAccountsPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Código *</label>
                 <input value={fCode} onChange={e => setFCode(e.target.value)} placeholder="631.06"
-                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:ring-1 focus:ring-slate-400 outline-none" />
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:ring-1 focus:ring-slate-400 outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
@@ -320,7 +320,7 @@ export default function ChartOfAccountsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-bold text-slate-900">Plan General Contable</h1>
-            <p className="font-mono text-xs text-slate-500 mt-0.5">PGC 2007 · {plan.length} cuentas · Editable</p>
+            <p className="tabular-nums text-xs text-slate-500 mt-0.5">PGC 2007 · {plan.length} cuentas · Editable</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
@@ -344,8 +344,8 @@ export default function ChartOfAccountsPage() {
             { l: "Ret. practicadas",  v: totalRet,     bg: "bg-pink-50",    border: "border-pink-200",   col: "text-pink-800"    },
           ].map(s => (
             <div key={s.l} className={`${s.bg} border ${s.border} rounded-lg px-4 py-3`}>
-              <p className={`text-[9px] font-mono uppercase tracking-widest ${s.col} opacity-60 mb-1`}>{s.l}</p>
-              <p className={`font-mono text-xl font-bold ${s.col}`}>{fmt(s.v)} €</p>
+              <p className={`text-[9px] tabular-nums uppercase tracking-widest ${s.col} opacity-60 mb-1`}>{s.l}</p>
+              <p className={`tabular-nums text-xl font-bold ${s.col}`}>{fmt(s.v)} €</p>
             </div>
           ))}
         </div>
@@ -363,7 +363,7 @@ export default function ChartOfAccountsPage() {
                 <span className="font-mono text-sm font-bold">Grupo {group}</span>
                 <span className="text-slate-400 text-sm">—</span>
                 <span className="text-slate-300 text-sm">{GROUP_NAMES[group]}</span>
-                <span className="ml-auto font-mono text-[10px] text-slate-500">{groupAccounts.filter(c => !c.parent).length} cuentas principales</span>
+                <span className="ml-auto tabular-nums text-[10px] text-slate-500">{groupAccounts.filter(c => !c.parent).length} cuentas principales</span>
               </button>
 
               {isOpen && (
@@ -381,14 +381,14 @@ export default function ChartOfAccountsPage() {
 
                         {live ? (
                           <div className="text-right min-w-[160px]">
-                            <p className="font-mono text-[9px] text-slate-400 mb-0.5">D {fmt(live.totalDebe)} · H {fmt(live.totalHaber)}</p>
-                            <p className={`font-mono text-sm font-bold ${live.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                            <p className="tabular-nums text-[9px] text-slate-400 mb-0.5">D {fmt(live.totalDebe)} · H {fmt(live.totalHaber)}</p>
+                            <p className={`tabular-nums text-sm font-bold ${live.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
                               {live.saldo >= 0 ? "D " : "A "}{fmt(Math.abs(live.saldo))} €
                             </p>
                           </div>
                         ) : (
                           <div className="text-right min-w-[160px]">
-                            <span className="font-mono text-xs text-slate-300">Sin movimientos</span>
+                            <span className="tabular-nums text-xs text-slate-300">Sin movimientos</span>
                           </div>
                         )}
 

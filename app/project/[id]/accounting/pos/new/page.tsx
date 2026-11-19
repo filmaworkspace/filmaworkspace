@@ -1462,7 +1462,7 @@ export default function NewPOPage() {
                       <div className="flex items-center justify-between gap-3 pt-1">
                         <div className="flex-1 min-w-0">
                           {titlePreview ? (
-                            <p className="text-xs font-mono font-semibold text-slate-800 truncate bg-white border border-slate-200 px-3 py-2 rounded-lg">
+                            <p className="text-xs tabular-nums font-semibold text-slate-800 truncate bg-white border border-slate-200 px-3 py-2 rounded-lg">
                               {titlePreview}
                             </p>
                           ) : (

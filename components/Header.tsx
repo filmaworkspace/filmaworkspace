@@ -402,7 +402,7 @@ export default function Header() {
               className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-700"
               title="Buscar y acciones (⌘K)"
             >
-              <Search size={13} /> <kbd className="font-mono text-[10px]">⌘K</kbd>
+              <Search size={13} /> <kbd className="tabular-nums text-[10px]">⌘K</kbd>
             </button>
           )}
           {/* Cajas (BOX) */}

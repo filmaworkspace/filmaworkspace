@@ -85,7 +85,7 @@ export function HealthMeter({ value, tone }: { value?: number; tone: Tone }) {
       <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
         <span className={`block h-full ${TONE[tone]}`} style={{ width: `${value ?? 0}%` }} />
       </span>
-      <span className="w-7 text-right font-mono text-[11px] tabular-nums text-slate-500">{value ?? "—"}</span>
+      <span className="w-7 text-right text-[11px] tabular-nums text-slate-500">{value ?? "—"}</span>
     </span>
   );
 }
@@ -132,7 +132,7 @@ export function Bars({ data, height = 64, tone = "#334155", highlightLast = true
         })}
       </svg>
       {labels && (
-        <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-400">
+        <div className="mt-1 flex justify-between tabular-nums text-[10px] text-slate-400">
           <span>{labels[0]}</span><span>{labels[labels.length - 1]}</span>
         </div>
       )}

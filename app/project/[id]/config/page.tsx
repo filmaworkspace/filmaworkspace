@@ -331,7 +331,7 @@ export default function ConfigGeneral() {
           items={[
             { label: "Nombre", value: project?.name },
             { label: "Fase", value: project?.phase },
-            { label: "ID", value: <span className="font-mono text-xs text-slate-600">{String(id).slice(0, 12)}</span> },
+            { label: "ID", value: <span className="tabular-nums text-xs text-slate-600">{String(id).slice(0, 12)}</span> },
           ]}
         />
         {project?.description && (

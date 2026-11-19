@@ -764,7 +764,7 @@ export default function POsPage() {
                         <div className="truncate text-xs text-slate-500">{po.generalDescription || po.description || <span className="text-slate-300">Sin concepto</span>}</div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{po.department || "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(base)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{formatCurrency(base)}</td>
                       <td className="px-3 py-1.5">
                         {po.status === "approved" || po.status === "closed" ? (
                           <span className="flex items-center gap-2">
@@ -800,8 +800,8 @@ export default function POsPage() {
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                   <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
-                  <td className="px-3 py-2 font-mono text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.base)}</td>
+                  <td className="px-3 py-2 tabular-nums text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
                   <td />
                 </tr>
               </tfoot>
@@ -829,10 +829,10 @@ export default function POsPage() {
                 {(previewPO.generalDescription || previewPO.description) && <p className="mt-1 text-slate-600">{previewPO.generalDescription || previewPO.description}</p>}
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                <dt className="text-slate-500">Base</dt><dd className="text-right font-mono">{formatCurrency(base)} €</dd>
-                <dt className="text-slate-500">Total con IVA</dt><dd className="text-right font-mono">{formatCurrency(previewPO.totalAmount)} €</dd>
-                {previewPO.status === "approved" && (<><dt className="text-slate-500">Facturado</dt><dd className="text-right font-mono">{formatCurrency(previewPO.invoicedAmount || 0)} € · {pct.toFixed(0)} %</dd></>)}
-                <dt className="text-slate-500">Líneas</dt><dd className="text-right font-mono">{previewPO.items?.length || 0}</dd>
+                <dt className="text-slate-500">Base</dt><dd className="text-right tabular-nums">{formatCurrency(base)} €</dd>
+                <dt className="text-slate-500">Total con IVA</dt><dd className="text-right tabular-nums">{formatCurrency(previewPO.totalAmount)} €</dd>
+                {previewPO.status === "approved" && (<><dt className="text-slate-500">Facturado</dt><dd className="text-right tabular-nums">{formatCurrency(previewPO.invoicedAmount || 0)} € · {pct.toFixed(0)} %</dd></>)}
+                <dt className="text-slate-500">Líneas</dt><dd className="text-right tabular-nums">{previewPO.items?.length || 0}</dd>
                 <dt className="text-slate-500">Fecha</dt><dd className="text-right">{formatDate(previewPO.createdAt)}</dd>
                 <dt className="text-slate-500">Creada por</dt><dd className="text-right">{previewPO.createdByName}</dd>
                 {previewPO.department && (<><dt className="text-slate-500">Departamento</dt><dd className="text-right">{previewPO.department}</dd></>)}

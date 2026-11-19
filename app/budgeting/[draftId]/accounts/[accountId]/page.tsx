@@ -145,7 +145,7 @@ function SubRow({
         <ChevronRight size={13} className="text-slate-300 group-hover:text-[#E86F4A] group-hover:translate-x-0.5 transition-all" />
       </Link>
       <input autoFocus={autoFocus} value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
+        className={`${CELL_INPUT} tabular-nums text-xs pl-2`} />
       <div ref={descWrapRef} className="relative h-full">
         <input value={description} onChange={(e) => setDescription(e.target.value)} onBlur={handleDescriptionBlur} onKeyDown={handleDescriptionKeyDown}
           className={`${CELL_INPUT} text-xs pl-2`} />

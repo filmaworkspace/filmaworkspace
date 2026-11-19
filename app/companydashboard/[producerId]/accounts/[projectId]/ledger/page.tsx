@@ -154,7 +154,7 @@ function MonthlyChart({ movimientos }: { movimientos: Movement[] }) {
 
   return (
     <div className="px-5 py-4 border-b border-slate-100">
-      <p className="text-[9px] font-mono font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><BarChart2 size={10} />Actividad mensual (últimos 12 meses)</p>
+      <p className="text-[9px] tabular-nums font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><BarChart2 size={10} />Actividad mensual (últimos 12 meses)</p>
       <div className="flex items-end gap-0.5" style={{ height: barH + 20 }}>
         {months.map(([key, v]) => {
           const dh = (v.debe  / maxVal) * barH;
@@ -167,7 +167,7 @@ function MonthlyChart({ movimientos }: { movimientos: Movement[] }) {
                 <div className="flex-1 bg-slate-800 rounded-t-sm opacity-80" style={{ height: dh }} title={`Debe: ${fmt(v.debe)} €`} />
                 <div className="flex-1 bg-red-400 rounded-t-sm opacity-70" style={{ height: hh }} title={`Haber: ${fmt(v.haber)} €`} />
               </div>
-              <span className="text-[8px] font-mono text-slate-400">{mLabel}</span>
+              <span className="text-[8px] tabular-nums text-slate-400">{mLabel}</span>
             </div>
           );
         })}
@@ -549,7 +549,7 @@ export default function LedgerPage() {
           <div className="flex-shrink-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center gap-2 flex-wrap">
             <div>
               <h1 className="text-base font-bold text-slate-900">Libro Mayor</h1>
-              <p className="font-mono text-[10px] text-slate-400">
+              <p className="tabular-nums text-[10px] text-slate-400">
                 {filtered.length} cuentas · {filtered.reduce((s, c) => s + c.movimientos.length, 0)} movimientos
                 {(filterFrom || filterTo) && <span className="text-amber-600"> · Fechas filtradas</span>}
               </p>
@@ -589,13 +589,13 @@ export default function LedgerPage() {
                   <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl p-4 z-50 w-72">
                     <p className="text-xs font-semibold text-slate-700 mb-3">Filtrar por período</p>
                     <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div><label className="block text-[10px] font-medium text-slate-500 mb-1">Desde</label><input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none font-mono" /></div>
-                      <div><label className="block text-[10px] font-medium text-slate-500 mb-1">Hasta</label><input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none font-mono" /></div>
+                      <div><label className="block text-[10px] font-medium text-slate-500 mb-1">Desde</label><input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none tabular-nums" /></div>
+                      <div><label className="block text-[10px] font-medium text-slate-500 mb-1">Hasta</label><input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none tabular-nums" /></div>
                     </div>
                     <div className="flex gap-1.5 flex-wrap mb-2">
                       {[{ l: "T1", f: `${currentYear}-01-01`, t: `${currentYear}-03-31` }, { l: "T2", f: `${currentYear}-04-01`, t: `${currentYear}-06-30` }, { l: "T3", f: `${currentYear}-07-01`, t: `${currentYear}-09-30` }, { l: "T4", f: `${currentYear}-10-01`, t: `${currentYear}-12-31` }, { l: `${currentYear}`, f: `${currentYear}-01-01`, t: `${currentYear}-12-31` }, { l: `${currentYear-1}`, f: `${currentYear-1}-01-01`, t: `${currentYear-1}-12-31` }].map(p => (
                         <button key={p.l} onClick={() => { setFilterFrom(p.f); setFilterTo(p.t); }}
-                          className={`px-2 py-1 text-[10px] font-mono font-semibold border rounded ${filterFrom === p.f && filterTo === p.t ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{p.l}</button>
+                          className={`px-2 py-1 text-[10px] tabular-nums font-semibold border rounded ${filterFrom === p.f && filterTo === p.t ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{p.l}</button>
                       ))}
                     </div>
                     {(filterFrom || filterTo) && <button onClick={() => { setFilterFrom(""); setFilterTo(""); }} className="w-full text-xs text-red-600 hover:text-red-800 py-1">Limpiar período</button>}
@@ -625,12 +625,12 @@ export default function LedgerPage() {
                 <table className="tbl w-full text-xs">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-wider">Cuenta</th>
-                      <th className="px-4 py-2.5 text-left text-[10px] font-mono uppercase tracking-wider">Nombre</th>
-                      <th className="px-4 py-2.5 text-right text-[10px] font-mono uppercase tracking-wider">Σ Debe</th>
-                      <th className="px-4 py-2.5 text-right text-[10px] font-mono uppercase tracking-wider">Σ Haber</th>
-                      <th className="px-4 py-2.5 text-right text-[10px] font-mono uppercase tracking-wider">Saldo</th>
-                      <th className="px-4 py-2.5 text-center text-[10px] font-mono uppercase tracking-wider w-8">Movs.</th>
+                      <th className="px-4 py-2.5 text-left text-[10px] tabular-nums uppercase tracking-wider">Cuenta</th>
+                      <th className="px-4 py-2.5 text-left text-[10px] tabular-nums uppercase tracking-wider">Nombre</th>
+                      <th className="px-4 py-2.5 text-right text-[10px] tabular-nums uppercase tracking-wider">Σ Debe</th>
+                      <th className="px-4 py-2.5 text-right text-[10px] tabular-nums uppercase tracking-wider">Σ Haber</th>
+                      <th className="px-4 py-2.5 text-right text-[10px] tabular-nums uppercase tracking-wider">Saldo</th>
+                      <th className="px-4 py-2.5 text-center text-[10px] tabular-nums uppercase tracking-wider w-8">Movs.</th>
                       <th className="px-4 py-2.5 w-20" />
                     </tr>
                   </thead>
@@ -640,14 +640,14 @@ export default function LedgerPage() {
                         className={`cursor-pointer hover:bg-slate-50 transition-colors ${selected?.code === c.code ? "bg-slate-50 ring-1 ring-inset ring-slate-300" : i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
                         <td className="px-4 py-2.5"><span className="font-mono font-bold text-slate-900">{c.code}</span></td>
                         <td className="px-4 py-2.5 text-slate-700 max-w-[200px] truncate">{c.name}</td>
-                        <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-700">{fmt(c.totalDebe)}</td>
-                        <td className="px-4 py-2.5 text-right font-mono font-semibold text-red-600">{fmt(c.totalHaber)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-700">{fmt(c.totalDebe)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-red-600">{fmt(c.totalHaber)}</td>
                         <td className="px-4 py-2.5 text-right">
-                          <span className={`font-mono font-bold text-sm ${c.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                          <span className={`tabular-nums font-bold text-sm ${c.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}`}>
                             {c.saldoFinal >= 0 ? "D " : "A "}{fmt(Math.abs(c.saldoFinal))}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-center"><span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{c.movimientos.length}</span></td>
+                        <td className="px-4 py-2.5 text-center"><span className="tabular-nums text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{c.movimientos.length}</span></td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                             <button onClick={() => handleExportXLSX(c)} title="Exportar Excel" className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"><FileSpreadsheet size={13} /></button>
@@ -674,20 +674,20 @@ export default function LedgerPage() {
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         <span className={`font-mono text-sm font-black min-w-[60px] ${isSel ? "text-white" : "text-slate-900"}`}>{cuenta.code}</span>
                         <span className={`text-sm font-medium truncate ${isSel ? "text-slate-300" : "text-slate-700"}`}>{cuenta.name}</span>
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 ${isSel ? "bg-white/10 text-white/60" : "bg-slate-200 text-slate-500"}`}>Gr.{cuenta.group}</span>
+                        <span className={`text-[9px] tabular-nums px-1.5 py-0.5 rounded flex-shrink-0 ${isSel ? "bg-white/10 text-white/60" : "bg-slate-200 text-slate-500"}`}>Gr.{cuenta.group}</span>
                       </div>
                       <div className="flex items-center gap-6 flex-shrink-0">
                         <div className="text-right">
-                          <p className={`text-[9px] font-mono uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Suma Debe</p>
-                          <p className={`font-mono text-xs font-semibold ${isSel ? "text-white" : "text-slate-700"}`}>{fmt(cuenta.totalDebe)}</p>
+                          <p className={`text-[9px] tabular-nums uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Suma Debe</p>
+                          <p className={`tabular-nums text-xs font-semibold ${isSel ? "text-white" : "text-slate-700"}`}>{fmt(cuenta.totalDebe)}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`text-[9px] font-mono uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Suma Haber</p>
-                          <p className={`font-mono text-xs font-semibold ${isSel ? "text-red-400" : "text-red-600"}`}>{fmt(cuenta.totalHaber)}</p>
+                          <p className={`text-[9px] tabular-nums uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Suma Haber</p>
+                          <p className={`tabular-nums text-xs font-semibold ${isSel ? "text-red-400" : "text-red-600"}`}>{fmt(cuenta.totalHaber)}</p>
                         </div>
                         <div className="text-right min-w-[110px]">
-                          <p className={`text-[9px] font-mono uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Saldo</p>
-                          <p className={`font-mono text-base font-black ${isSel ? "text-white" : cuenta.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                          <p className={`text-[9px] tabular-nums uppercase tracking-widest mb-0.5 ${isSel ? "text-slate-500" : "text-slate-400"}`}>Saldo</p>
+                          <p className={`tabular-nums text-base font-black ${isSel ? "text-white" : cuenta.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}`}>
                             {cuenta.saldoFinal >= 0 ? <TrendingUp size={12} className="inline mr-0.5 mb-0.5" /> : <TrendingDown size={12} className="inline mr-0.5 mb-0.5" />}
                             {cuenta.saldoFinal >= 0 ? "D " : "A "}{fmt(Math.abs(cuenta.saldoFinal))}
                           </p>
@@ -705,34 +705,34 @@ export default function LedgerPage() {
                       <table className="tbl w-full text-xs" style={{ minWidth: 640 }}>
                         <thead className="border-b border-slate-100">
                           <tr className="bg-slate-50">
-                            <th className="px-4 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-24">Fecha</th>
+                            <th className="px-4 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase w-24">Fecha</th>
                             <th className="px-4 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-28">Nº Asiento</th>
-                            <th className="px-4 py-2 text-left text-[10px] font-mono text-slate-400 uppercase">Concepto</th>
-                            <th className="px-4 py-2 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Debe</th>
-                            <th className="px-4 py-2 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Haber</th>
-                            <th className="px-4 py-2 text-right text-[10px] font-mono text-slate-400 uppercase w-32">Saldo progresivo</th>
+                            <th className="px-4 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase">Concepto</th>
+                            <th className="px-4 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase w-24">Debe</th>
+                            <th className="px-4 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase w-24">Haber</th>
+                            <th className="px-4 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase w-32">Saldo progresivo</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {cuenta.movimientos.map((m, i) => (
                             <tr key={i} className={`${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-blue-50/30 transition-colors`}>
-                              <td className="px-4 py-1.5 font-mono text-[10px] text-slate-500 whitespace-nowrap">{m.fecha}</td>
+                              <td className="px-4 py-1.5 tabular-nums text-[10px] text-slate-500 whitespace-nowrap">{m.fecha}</td>
                               <td className="px-4 py-1.5">
-                                <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{m.entry}</span>
+                                <span className="tabular-nums text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{m.entry}</span>
                               </td>
                               <td className="px-4 py-1.5 text-slate-600 max-w-[280px] truncate" title={m.concepto}>{m.concepto}</td>
                               <td className="px-4 py-1.5 text-right">
                                 {m.debe > 0
-                                  ? <span className="font-mono font-semibold text-slate-900">{fmt(m.debe)}</span>
-                                  : <span className="text-slate-200 font-mono text-[10px]">—</span>}
+                                  ? <span className="tabular-nums font-semibold text-slate-900">{fmt(m.debe)}</span>
+                                  : <span className="text-slate-200 tabular-nums text-[10px]">—</span>}
                               </td>
                               <td className="px-4 py-1.5 text-right">
                                 {m.haber > 0
-                                  ? <span className="font-mono font-semibold text-red-600">{fmt(m.haber)}</span>
-                                  : <span className="text-slate-200 font-mono text-[10px]">—</span>}
+                                  ? <span className="tabular-nums font-semibold text-red-600">{fmt(m.haber)}</span>
+                                  : <span className="text-slate-200 tabular-nums text-[10px]">—</span>}
                               </td>
                               <td className="px-4 py-1.5 text-right">
-                                <span className={`font-mono font-bold text-sm ${m.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                                <span className={`tabular-nums font-bold text-sm ${m.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
                                   {m.saldo >= 0 ? "D " : "A "}{fmt(Math.abs(m.saldo))}
                                 </span>
                               </td>
@@ -742,9 +742,9 @@ export default function LedgerPage() {
                         <tfoot className="border-t-2 border-slate-300">
                           <tr className="bg-slate-100">
                             <td colSpan={3} className="px-4 py-2 font-mono text-[10px] font-bold text-slate-600 uppercase tracking-wider">Totales {cuenta.code}</td>
-                            <td className="px-4 py-2 text-right font-mono text-sm font-black text-slate-900">{fmt(cuenta.totalDebe)}</td>
-                            <td className="px-4 py-2 text-right font-mono text-sm font-black text-red-600">{fmt(cuenta.totalHaber)}</td>
-                            <td className="px-4 py-2 text-right font-mono text-sm font-black"><span className={cuenta.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}>{cuenta.saldoFinal >= 0 ? "D " : "A "}{fmt(Math.abs(cuenta.saldoFinal))}</span></td>
+                            <td className="px-4 py-2 text-right tabular-nums text-sm font-black text-slate-900">{fmt(cuenta.totalDebe)}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-sm font-black text-red-600">{fmt(cuenta.totalHaber)}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-sm font-black"><span className={cuenta.saldoFinal >= 0 ? "text-slate-900" : "text-red-600"}>{cuenta.saldoFinal >= 0 ? "D " : "A "}{fmt(Math.abs(cuenta.saldoFinal))}</span></td>
                           </tr>
                         </tfoot>
                       </table>
@@ -780,8 +780,8 @@ export default function LedgerPage() {
                   { l: "Saldo final", v: Math.abs(selected.saldoFinal), c: selected.saldoFinal >= 0 ? "text-white" : "text-red-400", p: selected.saldoFinal >= 0 ? "D " : "A " },
                 ].map(s => (
                   <div key={s.l} className="bg-white/5 rounded-lg p-3">
-                    <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mb-1">{s.l}</p>
-                    <p className={`font-mono text-sm font-bold ${s.c}`}>{s.p}{fmt(s.v)} €</p>
+                    <p className="text-[9px] tabular-nums text-slate-500 uppercase tracking-widest mb-1">{s.l}</p>
+                    <p className={`tabular-nums text-sm font-bold ${s.c}`}>{s.p}{fmt(s.v)} €</p>
                   </div>
                 ))}
               </div>
@@ -806,7 +806,7 @@ export default function LedgerPage() {
             {/* Progressive balance detail */}
             <div className="flex-1 overflow-y-auto">
               <div className="px-5 py-3 border-b border-slate-100">
-                <p className="text-[9px] font-mono font-semibold text-slate-400 uppercase tracking-widest">Saldo progresivo — {selected.movimientos.length} movimientos</p>
+                <p className="text-[9px] tabular-nums font-semibold text-slate-400 uppercase tracking-widest">Saldo progresivo — {selected.movimientos.length} movimientos</p>
               </div>
               <table className="tbl w-full text-xs">
                 <thead className="sticky top-0 bg-white border-b border-slate-200">
@@ -821,18 +821,18 @@ export default function LedgerPage() {
                   {selected.movimientos.map((m, i) => (
                     <tr key={i} className={`border-b border-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"} hover:bg-blue-50/20`}>
                       <td className="px-4 py-2">
-                        <p className="font-mono text-[10px] font-semibold text-slate-700">{m.fecha}</p>
-                        <p className="text-[9px] text-slate-400 font-mono">{m.entry}</p>
+                        <p className="tabular-nums text-[10px] font-semibold text-slate-700">{m.fecha}</p>
+                        <p className="text-[9px] text-slate-400 tabular-nums">{m.entry}</p>
                         <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{m.concepto.length > 35 ? m.concepto.slice(0, 33) + "…" : m.concepto}</p>
                       </td>
                       <td className="px-4 py-2 text-right align-top pt-2">
-                        {m.debe > 0 ? <span className="font-mono font-semibold text-slate-900">{fmt(m.debe)}</span> : <span className="text-slate-200">—</span>}
+                        {m.debe > 0 ? <span className="tabular-nums font-semibold text-slate-900">{fmt(m.debe)}</span> : <span className="text-slate-200">—</span>}
                       </td>
                       <td className="px-4 py-2 text-right align-top pt-2">
-                        {m.haber > 0 ? <span className="font-mono font-semibold text-red-600">{fmt(m.haber)}</span> : <span className="text-slate-200">—</span>}
+                        {m.haber > 0 ? <span className="tabular-nums font-semibold text-red-600">{fmt(m.haber)}</span> : <span className="text-slate-200">—</span>}
                       </td>
                       <td className="px-4 py-2 text-right align-top pt-2">
-                        <span className={`font-mono font-black text-sm ${m.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                        <span className={`tabular-nums font-black text-sm ${m.saldo >= 0 ? "text-slate-900" : "text-red-600"}`}>
                           {m.saldo >= 0 ? "D " : "A "}{fmt(Math.abs(m.saldo))}
                         </span>
                       </td>

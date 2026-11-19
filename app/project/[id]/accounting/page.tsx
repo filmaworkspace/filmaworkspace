@@ -467,7 +467,7 @@ export default function AccountingPanelPage() {
                       {s.label}
                     </span>
                     <span className="text-lg font-semibold tabular-nums text-slate-900">{s.count}</span>
-                    <span className="font-mono text-xs text-slate-600">{money(s.amount)}</span>
+                    <span className="tabular-nums text-xs text-slate-600">{money(s.amount)}</span>
                     <span className={`absolute inset-x-0 bottom-0 h-0.5 ${s.bar}`} />
                   </Link>
                 ))}
@@ -480,7 +480,7 @@ export default function AccountingPanelPage() {
                     Vencen esta semana
                   </span>
                   <span className="text-lg font-semibold tabular-nums text-slate-900">{flow.due.length}</span>
-                  <span className="font-mono text-xs text-slate-600">{money(flow.dueTotal)}</span>
+                  <span className="tabular-nums text-xs text-slate-600">{money(flow.dueTotal)}</span>
                   <span className="absolute inset-x-0 bottom-0 h-0.5 bg-red-500" />
                 </Link>
               </div>
@@ -529,7 +529,7 @@ export default function AccountingPanelPage() {
                       const third = profile === "accounting" ? r.department : profile === "head" ? r.requester : r.account;
                       return (
                         <tr key={`${r.kind}-${r.id}`} onClick={() => router.push(href)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
-                          <td className="relative whitespace-nowrap px-4 py-1.5 font-mono text-xs font-medium" title={st.label}>
+                          <td className="relative whitespace-nowrap px-4 py-1.5 tabular-nums text-xs font-medium" title={st.label}>
                             <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
                             <span className="sr-only">{st.label}</span>
                             {r.number}
@@ -539,7 +539,7 @@ export default function AccountingPanelPage() {
                             <div className="truncate text-xs text-slate-500">{r.concept || <span className="text-slate-300">Sin concepto</span>}</div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{third || "—"}</td>
-                          <td className="whitespace-nowrap px-4 py-1.5 text-right font-mono text-xs">{money(r.base)}</td>
+                          <td className="whitespace-nowrap px-4 py-1.5 text-right tabular-nums text-xs">{money(r.base)}</td>
                         </tr>
                       );
                     })}
@@ -629,8 +629,8 @@ export default function AccountingPanelPage() {
                         <span className="font-mono text-[11px] text-slate-500">{t.code}</span>
                         <span className="truncate">{t.name}</span>
                       </span>
-                      <span className="text-right font-mono text-xs">{money(t.committed, 0)}</span>
-                      <span className="text-right font-mono text-xs">{money(t.actual, 0)}</span>
+                      <span className="text-right tabular-nums text-xs">{money(t.committed, 0)}</span>
+                      <span className="text-right tabular-nums text-xs">{money(t.actual, 0)}</span>
                     </div>
                   ))}
                 </div>
@@ -659,7 +659,7 @@ export default function AccountingPanelPage() {
                               <span className="font-mono text-xs font-medium">{po.number}</span>
                               <span className="truncate">{po.supplier}</span>
                             </span>
-                            <span className="whitespace-nowrap font-mono text-xs">{money(po.base)}</span>
+                            <span className="whitespace-nowrap tabular-nums text-xs">{money(po.base)}</span>
                           </span>
                           <span aria-hidden="true" className="flex h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]">
                             <span className={warn ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(100, p)}%` }} />
@@ -692,13 +692,13 @@ export default function AccountingPanelPage() {
                         <Link key={inv.id} href={`/project/${id}/accounting/invoices/${inv.id}`} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-slate-100 px-3.5 py-2.5 hover:bg-[#FAFAFA]">
                           <span className={`text-xs font-medium tabular-nums ${late ? "text-red-700" : "text-slate-900"}`}>{late ? "Vencida" : shortDate(inv.dueDate)}</span>
                           <span className="truncate">{inv.supplier}</span>
-                          <span className="font-mono text-xs">{money(inv.total)}</span>
+                          <span className="tabular-nums text-xs">{money(inv.total)}</span>
                         </Link>
                       );
                     })}
                     <div className="flex justify-between bg-[#FAFAFA] px-3.5 py-2.5 text-xs text-slate-600">
                       <span>Total esta semana</span>
-                      <span className="font-mono font-medium text-slate-900">{money(flow.dueTotal)}</span>
+                      <span className="tabular-nums font-medium text-slate-900">{money(flow.dueTotal)}</span>
                     </div>
                   </div>
                 )}

@@ -826,7 +826,7 @@ const renderAccesos = () => (
               const canMoveDown = i < departments.length - 1;
               return (
                 <div key={dept} className="flex items-center gap-3 px-6 py-3">
-                  <span className="w-5 text-center text-xs font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
+                  <span className="w-5 text-center text-xs tabular-nums text-slate-400 flex-shrink-0">{i + 1}</span>
                   <div
                     className="w-0.5 h-6 rounded-full flex-shrink-0"
                     style={{ backgroundColor: TEAM_COLOR }}
@@ -1281,7 +1281,7 @@ const renderAccesos = () => (
                     value={accessDraftPIN}
                     onChange={e => setAccessDraftPIN(e.target.value.replace(/\D/g, ""))}
                     placeholder="PIN numérico"
-                    className="w-full text-[13px] font-mono tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 bg-white"
+                    className="w-full text-[13px] tabular-nums tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 bg-white"
                   />
                 )}
               </div>

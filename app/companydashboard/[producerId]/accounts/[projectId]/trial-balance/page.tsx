@@ -183,7 +183,7 @@ export default function TrialBalancePage() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-lg font-bold text-slate-900">Balance de Comprobación de Sumas y Saldos</h1>
-            <p className="font-mono text-xs text-slate-500 mt-0.5">{filtered.length} cuentas · PGC 2007</p>
+            <p className="tabular-nums text-xs text-slate-500 mt-0.5">{filtered.length} cuentas · PGC 2007</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
@@ -201,7 +201,7 @@ export default function TrialBalancePage() {
           {balanced ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           <div>
             <p className="text-sm font-semibold">{balanced ? "Balance cuadrado correctamente" : "El balance no cuadra — revisar asientos"}</p>
-            <p className="font-mono text-xs mt-0.5 opacity-80">
+            <p className="tabular-nums text-xs mt-0.5 opacity-80">
               Σ Debe {fmt(totals.sumaDebe)} € = Σ Haber {fmt(totals.sumaHaber)} € &nbsp;·&nbsp;
               Σ Deudor {fmt(totals.saldoDeudor)} € = Σ Acreedor {fmt(totals.saldoAcreedor)} €
             </p>
@@ -232,24 +232,24 @@ export default function TrialBalancePage() {
                 <tr key={row.code} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                   <td className="px-4 py-2.5"><span className="font-mono text-xs font-bold text-slate-900">{row.code}</span></td>
                   <td className="px-4 py-2.5 text-sm text-slate-700">{row.name}</td>
-                  <td className="px-4 py-2.5 text-right border-l border-slate-100"><span className="font-mono text-xs text-slate-700">{fmt(row.totalDebe)}</span></td>
-                  <td className="px-4 py-2.5 text-right"><span className="font-mono text-xs text-red-600">{fmt(row.totalHaber)}</span></td>
+                  <td className="px-4 py-2.5 text-right border-l border-slate-100"><span className="tabular-nums text-xs text-slate-700">{fmt(row.totalDebe)}</span></td>
+                  <td className="px-4 py-2.5 text-right"><span className="tabular-nums text-xs text-red-600">{fmt(row.totalHaber)}</span></td>
                   <td className="px-4 py-2.5 text-right border-l border-slate-100">
-                    {row.saldoDeudor > 0 ? <span className="font-mono text-xs font-bold text-slate-900">{fmt(row.saldoDeudor)}</span> : <span className="text-slate-200">—</span>}
+                    {row.saldoDeudor > 0 ? <span className="tabular-nums text-xs font-bold text-slate-900">{fmt(row.saldoDeudor)}</span> : <span className="text-slate-200">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    {row.saldoAcreedor > 0 ? <span className="font-mono text-xs font-bold text-red-600">{fmt(row.saldoAcreedor)}</span> : <span className="text-slate-200">—</span>}
+                    {row.saldoAcreedor > 0 ? <span className="tabular-nums text-xs font-bold text-red-600">{fmt(row.saldoAcreedor)}</span> : <span className="text-slate-200">—</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="bg-slate-900 border-t-2 border-slate-700">
-                <td colSpan={2} className="px-4 py-3"><span className="font-mono text-xs font-semibold text-slate-400 uppercase tracking-widest">Totales generales</span></td>
-                <td className="px-4 py-3 text-right border-l border-slate-700"><span className="font-mono text-sm font-bold text-white">{fmt(totals.sumaDebe)}</span></td>
-                <td className="px-4 py-3 text-right"><span className="font-mono text-sm font-bold text-red-400">{fmt(totals.sumaHaber)}</span></td>
-                <td className="px-4 py-3 text-right border-l border-slate-700"><span className="font-mono text-sm font-bold text-white">{fmt(totals.saldoDeudor)}</span></td>
-                <td className="px-4 py-3 text-right"><span className="font-mono text-sm font-bold text-red-400">{fmt(totals.saldoAcreedor)}</span></td>
+                <td colSpan={2} className="px-4 py-3"><span className="tabular-nums text-xs font-semibold text-slate-400 uppercase tracking-widest">Totales generales</span></td>
+                <td className="px-4 py-3 text-right border-l border-slate-700"><span className="tabular-nums text-sm font-bold text-white">{fmt(totals.sumaDebe)}</span></td>
+                <td className="px-4 py-3 text-right"><span className="tabular-nums text-sm font-bold text-red-400">{fmt(totals.sumaHaber)}</span></td>
+                <td className="px-4 py-3 text-right border-l border-slate-700"><span className="tabular-nums text-sm font-bold text-white">{fmt(totals.saldoDeudor)}</span></td>
+                <td className="px-4 py-3 text-right"><span className="tabular-nums text-sm font-bold text-red-400">{fmt(totals.saldoAcreedor)}</span></td>
               </tr>
             </tfoot>
           </table>

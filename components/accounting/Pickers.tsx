@@ -240,7 +240,7 @@ function GroupRows<T extends PickerSubAccount>({ label, items, showFigures, sele
             <td className="px-3 py-1.5 font-mono text-xs font-medium text-slate-900">{s.code}</td>
             <td className="px-3 py-1.5 text-slate-800">{s.description}</td>
             {showFigures && (
-              <td className={`px-3 py-1.5 text-right font-mono text-xs ${(s.available ?? 0) < 0 ? "text-red-700" : low ? "text-amber-800" : "text-slate-600"}`}>
+              <td className={`px-3 py-1.5 text-right tabular-nums text-xs ${(s.available ?? 0) < 0 ? "text-red-700" : low ? "text-amber-800" : "text-slate-600"}`}>
                 {s.available !== undefined ? money(s.available) : "—"}
               </td>
             )}
@@ -327,7 +327,7 @@ export function EpisodeModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-xs text-slate-500">{label ? `${label} · ` : ""}<span className="font-mono">{money(baseAmount)} €</span> de base</p>
+        <p className="text-xs text-slate-500">{label ? `${label} · ` : ""}<span className="tabular-nums">{money(baseAmount)} €</span> de base</p>
         <Segmented
           value={mode}
           onChange={(v) => { setMode(v); if (v === "specific" && !dist.length) setDist(equalize([{ episode: 1, amount: 0, percentage: 0 }])); }}
@@ -348,7 +348,7 @@ export function EpisodeModal({
                       key={ep}
                       type="button"
                       onClick={() => toggle(ep)}
-                      className={`h-7 min-w-[32px] rounded-md border px-2 font-mono text-xs transition-colors ${on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
+                      className={`h-7 min-w-[32px] rounded-md border px-2 tabular-nums text-xs transition-colors ${on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
                     >
                       {ep}
                     </button>
@@ -379,16 +379,16 @@ export function EpisodeModal({
                   <tbody>
                     {dist.map((e) => (
                       <tr key={e.episode} className="border-b border-slate-100 last:border-0">
-                        <td className="px-3 py-1 font-mono text-xs">Cap. {e.episode}</td>
+                        <td className="px-3 py-1 tabular-nums text-xs">Cap. {e.episode}</td>
                         <td className="px-3 py-1 text-right">
                           {split === "amount"
-                            ? <Input type="number" step="0.01" value={e.amount || ""} onChange={(ev) => setAmount(e.episode, parseFloat(ev.target.value) || 0)} className="h-7 text-right font-mono" />
-                            : <span className="font-mono text-xs">{money(e.amount)}</span>}
+                            ? <Input type="number" step="0.01" value={e.amount || ""} onChange={(ev) => setAmount(e.episode, parseFloat(ev.target.value) || 0)} className="h-7 text-right tabular-nums" />
+                            : <span className="tabular-nums text-xs">{money(e.amount)}</span>}
                         </td>
                         <td className="px-3 py-1 text-right">
                           {split === "percentage"
-                            ? <Input type="number" step="0.01" value={e.percentage || ""} onChange={(ev) => setPercent(e.episode, parseFloat(ev.target.value) || 0)} className="h-7 text-right font-mono" />
-                            : <span className="font-mono text-xs">{(e.percentage || 0).toFixed(1)}</span>}
+                            ? <Input type="number" step="0.01" value={e.percentage || ""} onChange={(ev) => setPercent(e.episode, parseFloat(ev.target.value) || 0)} className="h-7 text-right tabular-nums" />
+                            : <span className="tabular-nums text-xs">{(e.percentage || 0).toFixed(1)}</span>}
                         </td>
                       </tr>
                     ))}
@@ -396,8 +396,8 @@ export function EpisodeModal({
                   <tfoot>
                     <tr>
                       <td className="px-3 py-1.5 font-medium">Total</td>
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs font-semibold ${balanced ? "" : "text-amber-800"}`}>{money(split === "equal" ? baseAmount : totalAmt)}</td>
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs font-semibold ${balanced ? "" : "text-amber-800"}`}>{split === "equal" ? "100,0" : totalPct.toFixed(1)}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums text-xs font-semibold ${balanced ? "" : "text-amber-800"}`}>{money(split === "equal" ? baseAmount : totalAmt)}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums text-xs font-semibold ${balanced ? "" : "text-amber-800"}`}>{split === "equal" ? "100,0" : totalPct.toFixed(1)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -456,9 +456,9 @@ export function POItemsModal<T extends PickerPOItem>({
                     <tr key={it.id || idx} onClick={() => onPick(it, idx)} title="Añadir a la factura" className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#F4F4F5]">
                       <td className="px-3 py-1.5">{it.description || "Sin descripción"}</td>
                       <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{it.subAccountCode || "—"}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-xs">{money(it.totalAmount)}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-600">{money(it.invoicedAmount)}</td>
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs ${over ? "text-red-700" : low ? "text-amber-800" : ""}`}>{money(it.availableAmount)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-xs">{money(it.totalAmount)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{money(it.invoicedAmount)}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums text-xs ${over ? "text-red-700" : low ? "text-amber-800" : ""}`}>{money(it.availableAmount)}</td>
                     </tr>
                   );
                 })}

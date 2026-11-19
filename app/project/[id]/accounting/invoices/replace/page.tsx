@@ -567,7 +567,7 @@ export default function ReplaceDocumentPage() {
                 <p className="font-medium text-slate-900">{selectedDoc.supplierName}</p>
                 {selectedDoc.description && <p className="truncate text-xs text-slate-500">{selectedDoc.description}</p>}
               </div>
-              <p className="flex-shrink-0 font-mono">{formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}</p>
+              <p className="flex-shrink-0 tabular-nums">{formatCurrency(selectedDoc.totalAmount)} {getCurrencySymbol(selectedDoc.currency)}</p>
             </div>
 
             <div>

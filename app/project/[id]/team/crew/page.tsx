@@ -1040,7 +1040,7 @@ export default function CrewPage() {
                         {member.department && <span className="ml-2 text-xs text-slate-400">{member.department}</span>}
                       </td>
                       <td className="px-3 py-1.5">
-                        {member.phone && <a href={`tel:${member.phone}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-slate-700 hover:text-slate-900">{member.phone}</a>}
+                        {member.phone && <a href={`tel:${member.phone}`} onClick={(e) => e.stopPropagation()} className="tabular-nums text-xs text-slate-700 hover:text-slate-900">{member.phone}</a>}
                         {member.email && <a href={`mailto:${member.email}`} onClick={(e) => e.stopPropagation()} className={`${member.phone ? "ml-2 " : ""}text-xs text-slate-400 hover:text-slate-900`}>{member.email}</a>}
                         {!member.phone && !member.email && <span className="text-slate-300">—</span>}
                       </td>
@@ -1053,7 +1053,7 @@ export default function CrewPage() {
                           </>
                         ) : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className={`px-3 py-1.5 font-mono text-xs ${docs < REQUIRED_DOC_COUNT ? "text-amber-800" : "text-slate-500"}`}>{docs}/{REQUIRED_DOC_COUNT}</td>
+                      <td className={`px-3 py-1.5 tabular-nums text-xs ${docs < REQUIRED_DOC_COUNT ? "text-amber-800" : "text-slate-500"}`}>{docs}/{REQUIRED_DOC_COUNT}</td>
                       <td className="px-3 py-1.5">
                         <span className={`inline-flex items-center gap-1.5 text-xs ${st.t}`}><span className={`h-1.5 w-1.5 rounded-full ${st.c}`} />{st.l}</span>
                       </td>
@@ -1505,7 +1505,7 @@ export default function CrewPage() {
                       key={dept}
                       className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-md"
                     >
-                      <span className="text-xs font-mono text-slate-300 w-5 text-right flex-shrink-0">{idx + 1}</span>
+                      <span className="text-xs tabular-nums text-slate-300 w-5 text-right flex-shrink-0">{idx + 1}</span>
 
                       <div
                         className="w-0.5 h-8 rounded-full flex-shrink-0"
@@ -1526,7 +1526,7 @@ export default function CrewPage() {
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-lg flex-shrink-0">
               {/* PDF preview info */}
               <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
-                <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 font-mono truncate text-slate-500">
+                <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 tabular-nums truncate text-slate-500">
                   {projectName || "Proyecto"} · CREW LIST · {new Date().toLocaleDateString("es-ES")}
                 </div>
               </div>

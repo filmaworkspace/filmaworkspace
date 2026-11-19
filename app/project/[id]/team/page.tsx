@@ -232,18 +232,18 @@ export default function TeamPanelPage() {
                   {byDept.map(([dept, v]) => (
                     <tr key={dept} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
                       <td className="px-4 py-1.5 font-medium text-slate-900">{dept}</td>
-                      <td className="px-3 py-1.5 text-right font-mono text-xs">{v.active}</td>
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs ${v.pending ? "text-amber-800" : "text-slate-300"}`}>{v.pending}</td>
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs ${v.missing ? "text-amber-800" : "text-slate-300"}`}>{v.missing}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-xs">{v.active}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums text-xs ${v.pending ? "text-amber-800" : "text-slate-300"}`}>{v.pending}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums text-xs ${v.missing ? "text-amber-800" : "text-slate-300"}`}>{v.missing}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
                     <td className="px-4 py-2 font-medium">Total</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.active, 0)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.pending, 0)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.missing, 0)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.active, 0)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.pending, 0)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-xs font-semibold">{byDept.reduce((s, [, v]) => s + v.missing, 0)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -263,7 +263,7 @@ export default function TeamPanelPage() {
                   className={`flex items-center justify-between border-b border-slate-100 px-3.5 py-2 text-[13px] last:border-0 hover:bg-[#FAFAFA] ${p.n ? "text-slate-800" : "text-slate-400"}`}
                 >
                   {p.label}
-                  <span className={`font-mono text-xs ${p.n ? "font-semibold text-slate-900" : ""}`}>{p.n}</span>
+                  <span className={`tabular-nums text-xs ${p.n ? "font-semibold text-slate-900" : ""}`}>{p.n}</span>
                 </Link>
               ))}
             </div>
@@ -283,7 +283,7 @@ export default function TeamPanelPage() {
                 <>
                   <div className="flex items-baseline justify-between">
                     <span className="text-slate-600">Han respondido</span>
-                    <span className="font-mono text-sm font-semibold">{timesheet.responded} / {timesheet.recipients}</span>
+                    <span className="tabular-nums text-sm font-semibold">{timesheet.responded} / {timesheet.recipients}</span>
                   </div>
                   <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full bg-slate-900" style={{ width: `${timesheet.recipients ? Math.round((timesheet.responded / timesheet.recipients) * 100) : 0}%` }} />

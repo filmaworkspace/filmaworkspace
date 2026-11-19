@@ -281,7 +281,7 @@ function AccountSelect({ value, plan, onChange }: { value: string; plan: ChartAc
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => { setOpen(o => !o); setQ(""); }}
         className="w-full flex items-center justify-between gap-1 border border-slate-200 rounded px-2 py-0.5 bg-white hover:border-slate-400 text-left">
-        <span className="font-mono text-[10px] font-bold">{value}</span>
+        <span className="tabular-nums text-[10px] font-bold">{value}</span>
         {current && <span className="text-[9px] text-slate-400 truncate ml-1">{current.name}</span>}
         <ChevronDown size={9} className="text-slate-400 flex-shrink-0" />
       </button>
@@ -289,7 +289,7 @@ function AccountSelect({ value, plan, onChange }: { value: string; plan: ChartAc
         <div className="absolute top-full left-0 mt-0.5 z-[60] bg-white border border-slate-200 rounded-lg shadow-xl w-64">
           <div className="p-1.5 border-b border-slate-100">
             <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Código o nombre"
-              className="w-full text-xs px-2 py-1 border border-slate-200 rounded outline-none font-mono" />
+              className="w-full text-xs px-2 py-1 border border-slate-200 rounded outline-none tabular-nums" />
           </div>
           <div className="max-h-48 overflow-y-auto py-0.5">
             {matches.map(a => (
@@ -634,7 +634,7 @@ export default function JournalPage() {
                   <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-3">
                     <p className="text-xs font-semibold text-blue-800 mb-3">{selectedTpl.label}</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {selectedTpl.params.map(p => (<div key={p.key}><label className="block text-[10px] font-medium text-blue-700 mb-1">{p.label}</label><input type={p.type} placeholder={p.placeholder} value={tplParams[p.key] || ""} onChange={e => setTplParams(prev => ({ ...prev, [p.key]: p.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value }))} className="w-full px-2 py-1 border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-300 outline-none bg-white font-mono" /></div>))}
+                      {selectedTpl.params.map(p => (<div key={p.key}><label className="block text-[10px] font-medium text-blue-700 mb-1">{p.label}</label><input type={p.type} placeholder={p.placeholder} value={tplParams[p.key] || ""} onChange={e => setTplParams(prev => ({ ...prev, [p.key]: p.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value }))} className="w-full px-2 py-1 border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-300 outline-none bg-white tabular-nums" /></div>))}
                     </div>
                     <div className="flex gap-2 mt-3"><button onClick={buildFromTemplate} className="px-3 py-1.5 bg-blue-700 text-white text-xs rounded hover:bg-blue-800">Aplicar plantilla</button><button onClick={() => { setSelectedTpl(null); setTplParams({}); }} className="px-3 py-1.5 border border-blue-200 text-blue-700 text-xs rounded">Cancelar</button></div>
                   </div>
@@ -642,8 +642,8 @@ export default function JournalPage() {
               </div>
               {/* Base fields */}
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="block text-xs font-medium text-slate-600 mb-1">Nº Asiento *</label><input value={mNum} onChange={e => setMNum(e.target.value)} placeholder="M-2024-001" className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:ring-1 focus:ring-slate-400 outline-none" /></div>
-                <div><label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label><input value={mDate} onChange={e => setMDate(e.target.value)} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:ring-1 focus:ring-slate-400 outline-none" /></div>
+                <div><label className="block text-xs font-medium text-slate-600 mb-1">Nº Asiento *</label><input value={mNum} onChange={e => setMNum(e.target.value)} placeholder="M-2024-001" className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:ring-1 focus:ring-slate-400 outline-none" /></div>
+                <div><label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label><input value={mDate} onChange={e => setMDate(e.target.value)} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:ring-1 focus:ring-slate-400 outline-none" /></div>
                 <div><label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label><select value={mTipo} onChange={e => setMTipo(e.target.value)} className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none bg-white">{["manual","Gestión","Activación","Amortización","Fiscal","Nómina","Subvención","Tesorería","Periodificación","Ingresos","Cierre"].map(t => <option key={t}>{t}</option>)}</select></div>
                 <div className="col-span-3"><label className="block text-xs font-medium text-slate-600 mb-1">Concepto *</label><input value={mConcept} onChange={e => setMConcept(e.target.value)} placeholder="Fra. 2025/001 — Descripción. Proveedor SL" className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none" /></div>
               </div>
@@ -657,7 +657,7 @@ export default function JournalPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <label className="text-xs font-medium text-slate-600 uppercase tracking-wider">Líneas</label>
-                    <span className={`font-mono text-[10px] px-2 py-0.5 rounded border ${mOk ? "bg-emerald-50 text-emerald-700 border-emerald-200" : mDebe === 0 ? "bg-slate-50 text-slate-400 border-slate-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                    <span className={`tabular-nums text-[10px] px-2 py-0.5 rounded border ${mOk ? "bg-emerald-50 text-emerald-700 border-emerald-200" : mDebe === 0 ? "bg-slate-50 text-slate-400 border-slate-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                       {mOk ? `✓ ${fmt(mDebe)} €` : mDebe === 0 ? "Introduce importes" : `D ${fmt(mDebe)} H ${fmt(mHaber)} Δ ${fmt(mDiff)}`}
                     </span>
                   </div>
@@ -665,19 +665,19 @@ export default function JournalPage() {
                 </div>
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
                   <table className="tbl w-full text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-2 py-1.5 text-left text-[10px] font-mono text-slate-400 uppercase w-32">Cuenta</th><th className="px-2 py-1.5 text-left text-[10px] font-mono text-slate-400 uppercase">Descripción</th><th className="px-2 py-1.5 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Debe</th><th className="px-2 py-1.5 text-right text-[10px] font-mono text-slate-400 uppercase w-24">Haber</th><th className="w-7" /></tr></thead>
+                    <thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-2 py-1.5 text-left text-[10px] tabular-nums text-slate-400 uppercase w-32">Cuenta</th><th className="px-2 py-1.5 text-left text-[10px] tabular-nums text-slate-400 uppercase">Descripción</th><th className="px-2 py-1.5 text-right text-[10px] tabular-nums text-slate-400 uppercase w-24">Debe</th><th className="px-2 py-1.5 text-right text-[10px] tabular-nums text-slate-400 uppercase w-24">Haber</th><th className="w-7" /></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {mLines.map(line => (
                         <tr key={line.id}>
                           <td className="px-2 py-1"><AccountSelect value={line.code} plan={planCuentas} onChange={code => updateMLine(line.id, "code", code)} /></td>
                           <td className="px-2 py-1"><input value={line.name} onChange={e => updateMLine(line.id, "name", e.target.value)} placeholder={planCuentas.find(a => a.code === line.code)?.name || ""} className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full focus:border-slate-400 outline-none" /></td>
-                          <td className="px-2 py-1"><input type="number" value={line.debe || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "debe", parseFloat(e.target.value) || 0)} className="font-mono text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
-                          <td className="px-2 py-1"><input type="number" value={line.haber || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "haber", parseFloat(e.target.value) || 0)} className="font-mono text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
+                          <td className="px-2 py-1"><input type="number" value={line.debe || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "debe", parseFloat(e.target.value) || 0)} className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
+                          <td className="px-2 py-1"><input type="number" value={line.haber || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "haber", parseFloat(e.target.value) || 0)} className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
                           <td className="px-1"><button onClick={() => setMLines(p => p.filter(l => l.id !== line.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="border-t-2 border-slate-200 bg-slate-50"><tr><td colSpan={2} className={`px-2 py-1.5 font-mono text-[10px] font-bold ${mOk ? "text-emerald-600" : "text-red-600"}`}>{mOk ? "✓ Cuadrado" : mDebe === 0 ? "—" : `✗ Dif. ${fmt(mDiff)} €`}</td><td className="px-2 py-1.5 text-right font-mono text-xs font-bold text-slate-900">{fmt(mDebe)}</td><td className="px-2 py-1.5 text-right font-mono text-xs font-bold text-red-600">{fmt(mHaber)}</td><td /></tr></tfoot>
+                    <tfoot className="border-t-2 border-slate-200 bg-slate-50"><tr><td colSpan={2} className={`px-2 py-1.5 tabular-nums text-[10px] font-bold ${mOk ? "text-emerald-600" : "text-red-600"}`}>{mOk ? "✓ Cuadrado" : mDebe === 0 ? "—" : `✗ Dif. ${fmt(mDiff)} €`}</td><td className="px-2 py-1.5 text-right tabular-nums text-xs font-bold text-slate-900">{fmt(mDebe)}</td><td className="px-2 py-1.5 text-right tabular-nums text-xs font-bold text-red-600">{fmt(mHaber)}</td><td /></tr></tfoot>
                   </table>
                 </div>
               </div>
@@ -698,7 +698,7 @@ export default function JournalPage() {
               <div className="flex items-center gap-2">
                 <Users size={15} className="text-blue-600" />
                 <h3 className="font-semibold text-slate-900 text-sm">Contabilizar nóminas</h3>
-                <span className="text-[10px] font-mono text-slate-400">— genera 3 asientos: devengo · SS patronal · pago neto</span>
+                <span className="text-[10px] tabular-nums text-slate-400">— genera 3 asientos: devengo · SS patronal · pago neto</span>
               </div>
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
@@ -714,7 +714,7 @@ export default function JournalPage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Fecha asiento</label>
                   <input value={nFecha} onChange={e => setNFecha(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:ring-1 focus:ring-slate-400 outline-none" />
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:ring-1 focus:ring-slate-400 outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Cuenta pago neto</label>
@@ -739,7 +739,7 @@ export default function JournalPage() {
                   <div key={f.ph} className={`border rounded-lg px-3 py-2.5 ${f.color}`}>
                     <label className="block text-[10px] font-semibold text-slate-600 mb-1 uppercase tracking-wider">{f.label}</label>
                     <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                      className="w-full px-2 py-1 border border-slate-200 rounded text-sm font-mono focus:ring-1 focus:ring-slate-400 outline-none bg-white" />
+                      className="w-full px-2 py-1 border border-slate-200 rounded text-sm tabular-nums focus:ring-1 focus:ring-slate-400 outline-none bg-white" />
                   </div>
                 ))}
               </div>
@@ -757,17 +757,17 @@ export default function JournalPage() {
                   <table className="tbl w-full text-xs" style={{ minWidth: 900 }}>
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="px-2 py-2 text-left text-[10px] font-mono text-slate-400 uppercase">Nombre / NIF</th>
-                        <th className="px-2 py-2 text-left text-[10px] font-mono text-slate-400 uppercase">Categoría / Contrato</th>
-                        <th className="px-2 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-28">Cta. analítica</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase">Salario base €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase">Complement. €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase">IRPF %</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase">SS obrera €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase">SS patronal €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase bg-blue-50">IRPF €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase bg-emerald-50">Neto €</th>
-                        <th className="px-2 py-2 text-right text-[10px] font-mono text-slate-400 uppercase bg-amber-50">Coste emp. €</th>
+                        <th className="px-2 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase">Nombre / NIF</th>
+                        <th className="px-2 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase">Categoría / Contrato</th>
+                        <th className="px-2 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase w-28">Cta. analítica</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase">Salario base €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase">Complement. €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase">IRPF %</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase">SS obrera €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase">SS patronal €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase bg-blue-50">IRPF €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase bg-emerald-50">Neto €</th>
+                        <th className="px-2 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase bg-amber-50">Coste emp. €</th>
                         <th className="w-7" />
                       </tr>
                     </thead>
@@ -778,7 +778,7 @@ export default function JournalPage() {
                             <input value={w.nombre} onChange={e => updateWorker(w.id, "nombre", e.target.value)} placeholder="Nombre completo"
                               className="w-full text-xs border border-slate-200 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none mb-0.5" />
                             <input value={w.nif} onChange={e => updateWorker(w.id, "nif", e.target.value)} placeholder="NIF / NIE"
-                              className="w-full text-[10px] font-mono border border-slate-100 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none text-slate-500" />
+                              className="w-full text-[10px] tabular-nums border border-slate-100 rounded px-1.5 py-0.5 focus:border-slate-400 outline-none text-slate-500" />
                           </td>
                           <td className="px-2 py-1.5">
                             <input value={w.categoria} onChange={e => updateWorker(w.id, "categoria", e.target.value)} placeholder="Categoría"
@@ -790,19 +790,19 @@ export default function JournalPage() {
                           </td>
                           <td className="px-2 py-1.5">
                             <AccountSelect value={w.cuentaAnalitica || "640"} plan={planCuentas.filter(a => a.code.startsWith("64"))} onChange={code => updateWorker(w.id, "cuentaAnalitica", code)} />
-                            <p className="text-[9px] text-slate-400 mt-0.5 font-mono px-0.5">Cuenta 640.xx</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5 tabular-nums px-0.5">Cuenta 640.xx</p>
                           </td>
-                          <td className="px-2 py-1.5"><input type="number" value={w.bruto || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "bruto", parseFloat(e.target.value) || 0)} className="font-mono text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
-                          <td className="px-2 py-1.5"><input type="number" value={w.complementos || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "complementos", parseFloat(e.target.value) || 0)} className="font-mono text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" placeholder="0.00" /></td>
+                          <td className="px-2 py-1.5"><input type="number" value={w.bruto || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "bruto", parseFloat(e.target.value) || 0)} className="tabular-nums text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
+                          <td className="px-2 py-1.5"><input type="number" value={w.complementos || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "complementos", parseFloat(e.target.value) || 0)} className="tabular-nums text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" placeholder="0.00" /></td>
                           <td className="px-2 py-1.5">
-                            <input type="number" value={w.irpfPct || ""} min={0} max={50} step={0.1} onChange={e => updateWorker(w.id, "irpfPct", parseFloat(e.target.value) || 0)} className="font-mono text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
+                            <input type="number" value={w.irpfPct || ""} min={0} max={50} step={0.1} onChange={e => updateWorker(w.id, "irpfPct", parseFloat(e.target.value) || 0)} className="tabular-nums text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
                           </td>
-                          <td className="px-2 py-1.5"><input type="number" value={w.ssObreraEur || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "ssObreraEur", parseFloat(e.target.value) || 0)} className="font-mono text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
-                          <td className="px-2 py-1.5"><input type="number" value={w.ssPatronalEur || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "ssPatronalEur", parseFloat(e.target.value) || 0)} className="font-mono text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
+                          <td className="px-2 py-1.5"><input type="number" value={w.ssObreraEur || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "ssObreraEur", parseFloat(e.target.value) || 0)} className="tabular-nums text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
+                          <td className="px-2 py-1.5"><input type="number" value={w.ssPatronalEur || ""} min={0} step={0.01} onChange={e => updateWorker(w.id, "ssPatronalEur", parseFloat(e.target.value) || 0)} className="tabular-nums text-xs border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
                           {/* Calculated */}
-                          <td className="px-2 py-1.5 text-right bg-blue-50"><span className="font-mono text-xs font-semibold text-blue-800">{fmt(w.irpfEur)}</span></td>
-                          <td className="px-2 py-1.5 text-right bg-emerald-50"><span className={`font-mono text-xs font-bold ${w.netoAPagar >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmt(w.netoAPagar)}</span></td>
-                          <td className="px-2 py-1.5 text-right bg-amber-50"><span className="font-mono text-xs font-semibold text-amber-800">{fmt(w.costeTotalEmpresa)}</span></td>
+                          <td className="px-2 py-1.5 text-right bg-blue-50"><span className="tabular-nums text-xs font-semibold text-blue-800">{fmt(w.irpfEur)}</span></td>
+                          <td className="px-2 py-1.5 text-right bg-emerald-50"><span className={`tabular-nums text-xs font-bold ${w.netoAPagar >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmt(w.netoAPagar)}</span></td>
+                          <td className="px-2 py-1.5 text-right bg-amber-50"><span className="tabular-nums text-xs font-semibold text-amber-800">{fmt(w.costeTotalEmpresa)}</span></td>
                           <td className="px-1"><button onClick={() => removeWorker(w.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
                         </tr>
                       ))}
@@ -810,15 +810,15 @@ export default function JournalPage() {
                     {nWorkers.length > 0 && (
                       <tfoot className="border-t-2 border-slate-200 bg-slate-50">
                         <tr>
-                          <td colSpan={3} className="px-2 py-2 font-mono text-[10px] font-semibold text-slate-500 uppercase">{nTot.valid.length} trabajadores con datos</td>
-                          <td className="px-2 py-2 text-right font-mono text-xs font-bold text-slate-900">{fmt(nTot.valid.reduce((s,w)=>s+w.bruto,0))}</td>
-                          <td className="px-2 py-2 text-right font-mono text-xs font-bold text-slate-900">{fmt(nTot.valid.reduce((s,w)=>s+w.complementos,0))}</td>
+                          <td colSpan={3} className="px-2 py-2 tabular-nums text-[10px] font-semibold text-slate-500 uppercase">{nTot.valid.length} trabajadores con datos</td>
+                          <td className="px-2 py-2 text-right tabular-nums text-xs font-bold text-slate-900">{fmt(nTot.valid.reduce((s,w)=>s+w.bruto,0))}</td>
+                          <td className="px-2 py-2 text-right tabular-nums text-xs font-bold text-slate-900">{fmt(nTot.valid.reduce((s,w)=>s+w.complementos,0))}</td>
                           <td />
-                          <td className="px-2 py-2 text-right font-mono text-xs font-bold text-red-600">{fmt(nTot.ssObrera)}</td>
-                          <td className="px-2 py-2 text-right font-mono text-xs font-bold text-amber-700">{fmt(nTot.ssPatronal)}</td>
-                          <td className="px-2 py-2 text-right bg-blue-50 font-mono text-xs font-bold text-blue-800">{fmt(nTot.irpf)}</td>
-                          <td className="px-2 py-2 text-right bg-emerald-50 font-mono text-sm font-bold text-emerald-700">{fmt(nTot.neto)}</td>
-                          <td className="px-2 py-2 text-right bg-amber-50 font-mono text-sm font-bold text-amber-800">{fmt(nTot.costeEmpresa)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums text-xs font-bold text-red-600">{fmt(nTot.ssObrera)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums text-xs font-bold text-amber-700">{fmt(nTot.ssPatronal)}</td>
+                          <td className="px-2 py-2 text-right bg-blue-50 tabular-nums text-xs font-bold text-blue-800">{fmt(nTot.irpf)}</td>
+                          <td className="px-2 py-2 text-right bg-emerald-50 tabular-nums text-sm font-bold text-emerald-700">{fmt(nTot.neto)}</td>
+                          <td className="px-2 py-2 text-right bg-amber-50 tabular-nums text-sm font-bold text-amber-800">{fmt(nTot.costeEmpresa)}</td>
                           <td />
                         </tr>
                       </tfoot>
@@ -852,17 +852,17 @@ export default function JournalPage() {
                           <div className={`px-3 py-2 flex items-center justify-between border-b ${color === "blue" ? "border-blue-200" : color === "amber" ? "border-amber-200" : "border-emerald-200"}`}>
                             <div>
                               <p className={`text-[10px] font-semibold uppercase tracking-wider ${tc}`}>{titulo}</p>
-                              <p className="font-mono text-xs font-bold text-slate-900 mt-0.5">{num}</p>
+                              <p className="tabular-nums text-xs font-bold text-slate-900 mt-0.5">{num}</p>
                             </div>
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{ok ? "✓" : "✗"} {fmt(td)} €</span>
+                            <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{ok ? "✓" : "✗"} {fmt(td)} €</span>
                           </div>
                           <div className="px-3 py-2 space-y-1">
                             {lines.map((l, i) => (
                               <div key={i} className="flex items-center justify-between gap-1 text-[10px]">
                                 <span className={`font-mono font-bold px-1 py-0.5 rounded text-[9px] bg-white border ${color === "blue" ? "border-blue-200 text-blue-800" : color === "amber" ? "border-amber-200 text-amber-800" : "border-emerald-200 text-emerald-800"}`}>{l.code}</span>
                                 <span className="flex-1 text-slate-600 truncate mx-1">{l.name}</span>
-                                {l.debe  > 0 && <span className="font-mono font-semibold text-slate-900 whitespace-nowrap">{fmt(l.debe)} D</span>}
-                                {l.haber > 0 && <span className="font-mono font-semibold text-red-600 whitespace-nowrap">{fmt(l.haber)} H</span>}
+                                {l.debe  > 0 && <span className="tabular-nums font-semibold text-slate-900 whitespace-nowrap">{fmt(l.debe)} D</span>}
+                                {l.haber > 0 && <span className="tabular-nums font-semibold text-red-600 whitespace-nowrap">{fmt(l.haber)} H</span>}
                               </div>
                             ))}
                           </div>
@@ -890,7 +890,7 @@ export default function JournalPage() {
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900">Libro Diario</h1>
-            <p className="font-mono text-xs text-slate-500 mt-0.5">
+            <p className="tabular-nums text-xs text-slate-500 mt-0.5">
               {filtered.length} asientos · {manuals.length} manuales
               {filterYear !== "all" && <span> · Ejercicio {filterYear}</span>}
               {(filterFrom || filterTo) && <span className="text-amber-600"> · Fechas filtradas</span>}
@@ -940,12 +940,12 @@ export default function JournalPage() {
                     <div>
                       <label className="block text-[10px] font-medium text-slate-500 mb-1">Desde</label>
                       <input type="date" value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setFilterYear("all"); }}
-                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none font-mono" />
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none tabular-nums" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-medium text-slate-500 mb-1">Hasta</label>
                       <input type="date" value={filterTo} onChange={e => { setFilterTo(e.target.value); setFilterYear("all"); }}
-                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none font-mono" />
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded focus:border-slate-400 outline-none tabular-nums" />
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -957,7 +957,7 @@ export default function JournalPage() {
                       { label: "T4", from: `${currentYear}-10-01`, to: `${currentYear}-12-31` },
                     ].map(p => (
                       <button key={p.label} onClick={() => { setFilterFrom(p.from); setFilterTo(p.to); setFilterYear("all"); }}
-                        className={`flex-1 py-1 text-[10px] font-mono font-semibold border rounded transition-colors ${filterFrom === p.from && filterTo === p.to ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                        className={`flex-1 py-1 text-[10px] tabular-nums font-semibold border rounded transition-colors ${filterFrom === p.from && filterTo === p.to ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                         {p.label}
                       </button>
                     ))}
@@ -997,8 +997,8 @@ export default function JournalPage() {
               return (
                 <div key={entry.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden mb-3">
                   <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center gap-2.5 flex-wrap">
-                    <span className="font-mono text-xs font-bold bg-slate-900 text-white px-2.5 py-1 rounded">{entry.numero}</span>
-                    <span className="font-mono text-xs text-slate-500">{entry.fecha}</span>
+                    <span className="tabular-nums text-xs font-bold bg-slate-900 text-white px-2.5 py-1 rounded">{entry.numero}</span>
+                    <span className="tabular-nums text-xs text-slate-500">{entry.fecha}</span>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${tipoStyle}`}>{entry.tipo}</span>
                     {entry.recurrente && (
                       <span className="flex items-center gap-1 text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
@@ -1006,7 +1006,7 @@ export default function JournalPage() {
                       </span>
                     )}
                     <span className="text-sm text-slate-700 flex-1 truncate min-w-0">{entry.concepto}</span>
-                    <span className="font-mono text-xs text-slate-400">Σ {fmt(td)} €</span>
+                    <span className="tabular-nums text-xs text-slate-400">Σ {fmt(td)} €</span>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>{ok ? "Cuadrado" : "Descuadrado"}</span>
                     {entry.isManual && (
                       <>
@@ -1022,7 +1022,7 @@ export default function JournalPage() {
                     {[{ label: "Debe", lines: entry.lines.filter(l => l.debe > 0), total: td, tc: "text-slate-900" },
                       { label: "Haber", lines: entry.lines.filter(l => l.haber > 0), total: th, tc: "text-red-600" }].map(side => (
                       <div key={side.label} className="p-4">
-                        <p className="text-[9px] font-semibold font-mono text-slate-400 uppercase tracking-widest mb-3">{side.label}</p>
+                        <p className="text-[9px] font-semibold tabular-nums text-slate-400 uppercase tracking-widest mb-3">{side.label}</p>
                         <div className="space-y-1.5">
                           {side.lines.map(l => (
                             <div key={l.id} className="flex items-center justify-between gap-2">
@@ -1030,13 +1030,13 @@ export default function JournalPage() {
                                 <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex-shrink-0">{l.code}</span>
                                 <span className="text-xs text-slate-600 truncate">{l.name}</span>
                               </div>
-                              <span className={`font-mono text-xs font-semibold whitespace-nowrap ${side.tc}`}>{fmt(side.label === "Debe" ? l.debe : l.haber)}</span>
+                              <span className={`tabular-nums text-xs font-semibold whitespace-nowrap ${side.tc}`}>{fmt(side.label === "Debe" ? l.debe : l.haber)}</span>
                             </div>
                           ))}
                         </div>
                         <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between">
-                          <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Total {side.label}</span>
-                          <span className={`font-mono text-sm font-bold ${side.tc}`}>{fmt(side.total)} €</span>
+                          <span className="text-[9px] tabular-nums text-slate-400 uppercase tracking-wider">Total {side.label}</span>
+                          <span className={`tabular-nums text-sm font-bold ${side.tc}`}>{fmt(side.total)} €</span>
                         </div>
                       </div>
                     ))}
@@ -1046,12 +1046,12 @@ export default function JournalPage() {
             })}
 
             <div className="bg-slate-900 text-white rounded-lg px-6 py-4 flex items-center justify-between mt-4">
-              <span className="font-mono text-xs tracking-widest uppercase text-slate-400">
+              <span className="tabular-nums text-xs tracking-widest uppercase text-slate-400">
                 Totales — {filtered.length} asientos{filterYear !== "all" ? ` · Ejercicio ${filterYear}` : ""}
               </span>
               <div className="flex gap-12">
-                <div className="text-right"><p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Total Debe</p><p className="font-mono text-base font-bold">{fmt(totalDebe)} €</p></div>
-                <div className="text-right"><p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Total Haber</p><p className="font-mono text-base font-bold text-red-400">{fmt(totalHaber)} €</p></div>
+                <div className="text-right"><p className="text-[9px] text-slate-500 uppercase tabular-nums mb-1">Total Debe</p><p className="tabular-nums text-base font-bold">{fmt(totalDebe)} €</p></div>
+                <div className="text-right"><p className="text-[9px] text-slate-500 uppercase tabular-nums mb-1">Total Haber</p><p className="tabular-nums text-base font-bold text-red-400">{fmt(totalHaber)} €</p></div>
               </div>
             </div>
           </>

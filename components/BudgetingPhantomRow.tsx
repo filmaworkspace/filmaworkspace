@@ -77,7 +77,7 @@ export default function BudgetingPhantomRow({
         onChange={(e) => setCode(e.target.value)}
         onBlur={commit}
         onKeyDown={handleCodeKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`}
+        className={`${CELL_INPUT} tabular-nums text-xs pl-2`}
       />
       <div ref={descWrapRef} className="relative h-full">
         <input

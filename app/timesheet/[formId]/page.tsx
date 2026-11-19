@@ -128,7 +128,7 @@ export default function FormHorarioPage() {
       <div className={`min-h-screen bg-white flex flex-col items-center justify-center gap-4 ${inter.className}`}>
         <AlertCircle size={40} className="text-red-400" />
         <p className="text-slate-500 text-sm">Error al cargar el formulario.</p>
-        {loadError && <p className="text-xs text-red-400 font-mono">{loadError}</p>}
+        {loadError && <p className="text-xs text-red-400 tabular-nums">{loadError}</p>}
       </div>
     );
   }

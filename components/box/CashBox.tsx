@@ -486,7 +486,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             </Select>
             <Input value={l.description} onChange={(e) => setForm({ ...form, lines: form.lines.map((x, j) => j === i ? { ...x, description: e.target.value } : x) })} placeholder="Concepto" />
             <Input
-              type="number" step="0.01" min="0" className="text-right font-mono"
+              type="number" step="0.01" min="0" className="text-right tabular-nums"
               value={l.baseAmount || ""}
               onChange={(e) => {
                 const b = parseFloat(e.target.value) || 0;
@@ -505,7 +505,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
       </div>
       <div className="flex items-center justify-between text-xs">
         <button onClick={() => setForm({ ...form, lines: [...form.lines, emptyLine()] })} className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900"><Plus size={12} /> Línea</button>
-        <span className="text-slate-500">Base <span className="font-mono text-slate-900">{money(formTotals.base)}</span> · IVA <span className="font-mono text-slate-900">{money(formTotals.vat)}</span> · Total <span className="font-mono font-semibold text-slate-900">{money(formTotals.total)} €</span></span>
+        <span className="text-slate-500">Base <span className="tabular-nums text-slate-900">{money(formTotals.base)}</span> · IVA <span className="tabular-nums text-slate-900">{money(formTotals.vat)}</span> · Total <span className="tabular-nums font-semibold text-slate-900">{money(formTotals.total)} €</span></span>
       </div>
     </div>
   );
@@ -573,15 +573,15 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
               <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 md:grid-cols-4">
                 <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
                   <span className="text-[11px] uppercase tracking-wide text-slate-500">Efectivo en caja</span>
-                  <span className={`font-mono text-xl font-semibold ${balance < 0 ? "text-red-700" : "text-slate-900"}`}>{money(balance)} €</span>
+                  <span className={`tabular-nums text-xl font-semibold ${balance < 0 ? "text-red-700" : "text-slate-900"}`}>{money(balance)} €</span>
                 </div>
                 <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
                   <span className="text-[11px] uppercase tracking-wide text-slate-500">Anticipos fuera</span>
-                  <span className="font-mono text-xl font-semibold">{money(outstandingTotal)} €</span>
+                  <span className="tabular-nums text-xl font-semibold">{money(outstandingTotal)} €</span>
                 </div>
                 <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">
                   <span className="text-[11px] uppercase tracking-wide text-slate-500">Fondo total</span>
-                  <span className="font-mono text-xl font-semibold text-slate-600">{money(round2(balance + outstandingTotal))} €</span>
+                  <span className="tabular-nums text-xl font-semibold text-slate-600">{money(round2(balance + outstandingTotal))} €</span>
                 </div>
                 <div className="flex flex-col gap-0.5 px-4 py-3">
                   <span className="text-[11px] uppercase tracking-wide text-slate-500">Último arqueo</span>
@@ -650,11 +650,11 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                                   {m.description && <span className="block truncate text-xs text-slate-500">{m.description}</span>}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-1.5 font-mono text-xs text-slate-600">{(m.lines || []).map((l) => l.subAccountCode).filter(Boolean).join(", ") || "—"}</td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-emerald-800">{eff > 0 ? money(eff) : ""}</td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs">
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-emerald-800">{eff > 0 ? money(eff) : ""}</td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs">
                                   {eff < 0 ? money(-eff) : m.type === "settlement" ? <span className="text-slate-400" title="Justifica un anticipo; no mueve efectivo">({money(m.amount)})</span> : ""}
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{money(running)}</td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{money(running)}</td>
                                 <td className="whitespace-nowrap px-3 py-1.5 text-xs">
                                   {m.pendingFunding ? (
                                     <span className="inline-flex items-center gap-1.5 text-amber-800" title={m.forecastName ? `Previsión: ${m.forecastName}` : undefined}>
@@ -722,7 +722,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                             <div key={a.id} className="flex flex-col gap-1.5 border-b border-slate-100 px-3.5 py-2.5 last:border-0">
                               <div className="flex items-baseline justify-between gap-2">
                                 <span className="truncate font-medium">{a.personName}</span>
-                                <span className="font-mono text-xs font-medium">{money(outstanding)} €</span>
+                                <span className="tabular-nums text-xs font-medium">{money(outstanding)} €</span>
                               </div>
                               <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
                                 <span>
@@ -764,7 +764,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                         {floatMovements.filter((m) => m.pendingFunding).map((m) => (
                           <div key={m.id} className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2.5 text-xs last:border-0">
                             <span className="min-w-0">
-                              <span className="block font-mono font-medium text-slate-900">{money(m.amount)} €</span>
+                              <span className="block tabular-nums font-medium text-slate-900">{money(m.amount)} €</span>
                               <span className="block truncate text-slate-500">{m.forecastName} · {m.treasuryPaidAt ? "pagada por tesorería" : "pendiente de pago"}</span>
                             </span>
                             <button onClick={() => confirmFunding(m)} className="flex-shrink-0 font-medium text-slate-900 hover:underline">Recibida</button>
@@ -783,7 +783,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                         {floatCounts.slice(0, 6).map((c) => (
                           <div key={c.id} className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2 text-xs last:border-0">
                             <span className="text-slate-600">{shortDate(c.date)} · {c.createdByName}</span>
-                            <span className="font-mono">
+                            <span className="tabular-nums">
                               {money(c.counted)}
                               <span className={`ml-2 ${Math.abs(c.difference) < 0.005 ? "text-emerald-800" : "text-red-700"}`}>
                                 {Math.abs(c.difference) < 0.005 ? "✓" : `${c.difference > 0 ? "+" : ""}${money(c.difference)}`}
@@ -811,7 +811,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-[1fr_90px] gap-3">
             <Field label="Nombre"><Input value={floatForm.name} onChange={(e) => setFloatForm({ ...floatForm, name: e.target.value })} placeholder="Caja de producción" autoFocus /></Field>
-            <Field label="Código"><Input value={floatForm.code} onChange={(e) => setFloatForm({ ...floatForm, code: e.target.value.toUpperCase().slice(0, 4) })} placeholder="CP" className="font-mono" /></Field>
+            <Field label="Código"><Input value={floatForm.code} onChange={(e) => setFloatForm({ ...floatForm, code: e.target.value.toUpperCase().slice(0, 4) })} placeholder="CP" className="tabular-nums" /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Custodio (cajero-pagador)"><Input value={floatForm.custodianName} onChange={(e) => setFloatForm({ ...floatForm, custodianName: e.target.value })} /></Field>
@@ -823,7 +823,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             </Field>
           </div>
           {floatModal === "new" && (
-            <Field label="Fondo inicial (€)"><Input type="number" min="0" step="0.01" value={floatForm.initialAmount} onChange={(e) => setFloatForm({ ...floatForm, initialAmount: e.target.value })} className="font-mono" /></Field>
+            <Field label="Fondo inicial (€)"><Input type="number" min="0" step="0.01" value={floatForm.initialAmount} onChange={(e) => setFloatForm({ ...floatForm, initialAmount: e.target.value })} className="tabular-nums" /></Field>
           )}
           <Field label="Notas"><Textarea rows={2} value={floatForm.notes} onChange={(e) => setFloatForm({ ...floatForm, notes: e.target.value })} /></Field>
         </div>
@@ -837,7 +837,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
         title={form ? { advance: "Entregar anticipo", expense: "Pago con ticket", funding: "Reponer caja", settle: "Justificar anticipo", return: "Devolución de anticipo" }[form.kind] : ""}
         footer={
           <>
-            <span className="mr-auto text-xs text-slate-500">En caja: <span className="font-mono text-slate-900">{money(balance)} €</span></span>
+            <span className="mr-auto text-xs text-slate-500">En caja: <span className="tabular-nums text-slate-900">{money(balance)} €</span></span>
             <Button variant="secondary" onClick={() => setForm(null)}>Cancelar</Button>
             <Button variant="primary" onClick={submitForm} disabled={saving}>Registrar</Button>
           </>
@@ -875,7 +875,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             {(form.kind === "expense" || form.kind === "settle") && (
               <div className="grid grid-cols-[1fr_150px_130px] gap-3">
                 <Field label="Proveedor"><Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} autoFocus /></Field>
-                <Field label="NIF"><Input value={form.supplierTaxId} onChange={(e) => setForm({ ...form, supplierTaxId: e.target.value })} className="font-mono" /></Field>
+                <Field label="NIF"><Input value={form.supplierTaxId} onChange={(e) => setForm({ ...form, supplierTaxId: e.target.value })} className="tabular-nums" /></Field>
                 <Field label="Documento">
                   <Select value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value as "ticket" | "invoice" })}>
                     <option value="ticket">Ticket</option>
@@ -888,7 +888,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             <div className={`grid gap-3 ${form.kind === "expense" || form.kind === "settle" ? "grid-cols-[150px_1fr]" : "grid-cols-[150px_1fr]"}`}>
               <Field label="Fecha"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
               {(form.kind === "advance" || form.kind === "funding" || form.kind === "return") ? (
-                <Field label="Importe (€)"><Input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="font-mono" /></Field>
+                <Field label="Importe (€)"><Input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="tabular-nums" /></Field>
               ) : form.kind === "expense" ? (
                 <Field label="Pagado a (opcional)"><Input value={form.personName} onChange={(e) => setForm({ ...form, personName: e.target.value })} list="cash-persons" /></Field>
               ) : <div />}
@@ -962,8 +962,8 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
               return (
                 <Fragment key={d}>
                   <label className="col-span-1 flex items-center gap-2">
-                    <span className="w-14 text-right font-mono text-xs text-slate-600">{d >= 1 ? `${d} €` : `${Math.round(d * 100)} c`}</span>
-                    <Input type="number" min="0" step="1" value={countForm[String(d)] || ""} onChange={(e) => setCountForm({ ...countForm, [String(d)]: e.target.value })} className="h-7 text-right font-mono" aria-label={`Unidades de ${d} €`} />
+                    <span className="w-14 text-right tabular-nums text-xs text-slate-600">{d >= 1 ? `${d} €` : `${Math.round(d * 100)} c`}</span>
+                    <Input type="number" min="0" step="1" value={countForm[String(d)] || ""} onChange={(e) => setCountForm({ ...countForm, [String(d)]: e.target.value })} className="h-7 text-right tabular-nums" aria-label={`Unidades de ${d} €`} />
                   </label>
                   {units > 0 ? <span className="sr-only">{money(units * d)}</span> : null}
                 </Fragment>
@@ -971,9 +971,9 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
             })}
           </div>
           <dl className="grid grid-cols-3 overflow-hidden rounded-md border border-slate-200 text-center">
-            <div className="border-r border-slate-100 px-3 py-2"><dt className="text-[11px] text-slate-500">Contado</dt><dd className="font-mono font-semibold">{money(counted)}</dd></div>
-            <div className="border-r border-slate-100 px-3 py-2"><dt className="text-[11px] text-slate-500">Según libro</dt><dd className="font-mono">{money(balance)}</dd></div>
-            <div className="px-3 py-2"><dt className="text-[11px] text-slate-500">Diferencia</dt><dd className={`font-mono font-semibold ${Math.abs(countDiff) < 0.005 ? "text-emerald-800" : "text-red-700"}`}>{countDiff > 0 ? "+" : ""}{money(countDiff)}</dd></div>
+            <div className="border-r border-slate-100 px-3 py-2"><dt className="text-[11px] text-slate-500">Contado</dt><dd className="tabular-nums font-semibold">{money(counted)}</dd></div>
+            <div className="border-r border-slate-100 px-3 py-2"><dt className="text-[11px] text-slate-500">Según libro</dt><dd className="tabular-nums">{money(balance)}</dd></div>
+            <div className="px-3 py-2"><dt className="text-[11px] text-slate-500">Diferencia</dt><dd className={`tabular-nums font-semibold ${Math.abs(countDiff) < 0.005 ? "text-emerald-800" : "text-red-700"}`}>{countDiff > 0 ? "+" : ""}{money(countDiff)}</dd></div>
           </dl>
           {Math.abs(countDiff) >= 0.005 && counted > 0 && (
             <Checkbox label="Registrar el descuadre como ajuste en el libro" checked={countAdjust} onChange={setCountAdjust} />

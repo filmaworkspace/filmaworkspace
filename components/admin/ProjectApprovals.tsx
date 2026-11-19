@@ -209,8 +209,8 @@ export function ProjectApprovals({ projectId, onLog }: { projectId: string; onLo
               <tr key={`${r.type}:${r.id}`} onClick={() => setOpenId(`${r.type}:${r.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]" title={STATE_LABEL[r.state]}>
                 <td className="relative py-1.5 pl-4 pr-3 font-mono text-slate-900"><RowBar tone={STATE_TONE[r.state]} />{r.number}</td>
                 <td className="truncate px-3 text-slate-700">{r.supplier}{r.department && <span className="text-slate-400"> · {r.department}</span>}</td>
-                <td className="px-3 text-right font-mono tabular-nums">{eur(r.base)}</td>
-                <td className="px-3 font-mono text-slate-500">{r.level}</td>
+                <td className="px-3 text-right tabular-nums">{eur(r.base)}</td>
+                <td className="px-3 tabular-nums text-slate-500">{r.level}</td>
                 <td className={`truncate px-3 ${r.state === "blocked" ? "text-red-600" : r.state === "rejected" ? "text-slate-500" : "text-slate-700"}`} title={r.who}>{r.who}</td>
                 <td className="px-3 text-slate-500" title={fmtDate(r.since as never, true)}>{r.since ? timeAgo(r.since as never) : "—"}</td>
               </tr>
@@ -231,7 +231,7 @@ export function ProjectApprovals({ projectId, onLog }: { projectId: string; onLo
         {current && (
           <div className="space-y-5">
             <p className="text-[13px] text-slate-500">
-              {current.type === "po" ? "Orden de compra" : "Factura"} · Base <span className="font-mono text-slate-900">{eur(current.base)} €</span>
+              {current.type === "po" ? "Orden de compra" : "Factura"} · Base <span className="tabular-nums text-slate-900">{eur(current.base)} €</span>
               {current.department && <> · {current.department}</>}
             </p>
             {current.state === "rejected" ? (

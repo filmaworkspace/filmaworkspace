@@ -123,7 +123,7 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
             placeholder={isAdmin ? "Busca usuarios, proyectos, cuentas o escribe una acción…" : "Ir a…"}
             className="h-12 flex-1 bg-transparent text-[14px] text-slate-900 outline-none placeholder:text-slate-400"
           />
-          <kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 font-mono text-[10px] text-slate-400">esc</kbd>
+          <kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 tabular-nums text-[10px] text-slate-400">esc</kbd>
         </div>
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto p-1.5">
           {results.length === 0 && <p className="px-3 py-6 text-center text-[13px] text-slate-400">Sin resultados</p>}
@@ -150,9 +150,9 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
           })}
         </div>
         <div className="flex items-center gap-4 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400">
-          <span><kbd className="font-mono">↑↓</kbd> moverse</span>
-          <span><kbd className="font-mono">↵</kbd> abrir</span>
-          <span className="ml-auto"><kbd className="font-mono">⌘K</kbd> / <kbd className="font-mono">Ctrl K</kbd></span>
+          <span><kbd className="tabular-nums">↑↓</kbd> moverse</span>
+          <span><kbd className="tabular-nums">↵</kbd> abrir</span>
+          <span className="ml-auto"><kbd className="tabular-nums">⌘K</kbd> / <kbd className="tabular-nums">Ctrl K</kbd></span>
         </div>
       </div>
     </div>

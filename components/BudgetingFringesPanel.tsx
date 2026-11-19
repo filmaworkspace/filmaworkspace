@@ -362,7 +362,7 @@ export default function BudgetingFringesPanel({ draftId }: { draftId: string }) 
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1.5">Código</label>
                 <input value={folderEditForm.code} onChange={(e) => setFolderEditForm((f) => ({ ...f, code: e.target.value }))}
-                  placeholder="Código para PO, facturas, cajas..." className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2" />
+                  placeholder="Código para PO, facturas, cajas..." className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2" />
                 <p className="text-[11px] text-slate-400 mt-1.5">Todas las cargas sociales de esta carpeta se funden en una sola línea de presupuesto con este código.</p>
               </div>
             </div>

@@ -124,7 +124,7 @@ function AccountsInner() {
                   </td>
                   <td className="px-3 text-right"><Usage used={np} max={a.maxProjects} /></td>
                   <td className="px-3 text-right"><Usage used={nu} max={a.maxUsers} /></td>
-                  <td className="px-3 text-right font-mono tabular-nums">{act.now} <span className="text-slate-400">· antes {act.prev}</span></td>
+                  <td className="px-3 text-right tabular-nums">{act.now} <span className="text-slate-400">· antes {act.prev}</span></td>
                   <td className={`px-3 ${act.risk.tone === "bad" ? "text-red-600" : act.risk.tone === "warn" ? "text-amber-700" : "text-slate-600"}`}>{act.risk.label}</td>
                   <td className={`px-3 ${renewSoon ? "text-amber-700" : "text-slate-600"}`} title={fmtDate(a.renewalAt)}>{a.renewalAt ? timeAgo(a.renewalAt) : <span className="text-slate-300">—</span>}</td>
                 </tr>

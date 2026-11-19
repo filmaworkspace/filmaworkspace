@@ -307,7 +307,7 @@ export default function SupportPage() {
                 {waiting && <span className={`absolute inset-y-0 left-0 w-[3px] ${waitTone(c.lastMessageAt) === "bad" ? "bg-red-500" : waitTone(c.lastMessageAt) === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} />}
                 <div className="flex items-center gap-2">
                   <span className="truncate text-[13px] font-medium text-slate-900">{c.userName || c.userEmail || "Usuario"}</span>
-                  <span className="font-mono text-[10px] text-slate-400">{ticketNo(c.ticketNumber)}</span>
+                  <span className="tabular-nums text-[10px] text-slate-400">{ticketNo(c.ticketNumber)}</span>
                   <span className="ml-auto flex-shrink-0 text-[11px] text-slate-400">{timeAgo(c.archived ? c.closedAt : c.lastMessageAt)}</span>
                 </div>
                 <p className="mt-0.5 truncate text-xs text-slate-500">{c.lastMessage || "Sin mensajes"}</p>
@@ -332,7 +332,7 @@ export default function SupportPage() {
                   {active.userId ? (
                     <Link href={`/admindashboard/users/${active.userId}`} className="truncate text-[14px] font-semibold text-slate-900 hover:underline">{active.userName}</Link>
                   ) : <span className="text-[14px] font-semibold text-slate-900">{active.userName}</span>}
-                  <span className="font-mono text-[11px] text-slate-400">{ticketNo(active.ticketNumber)}</span>
+                  <span className="tabular-nums text-[11px] text-slate-400">{ticketNo(active.ticketNumber)}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
                   <span>{active.userEmail}</span>

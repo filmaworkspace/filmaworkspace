@@ -284,7 +284,7 @@ function UsersInner() {
           <div className="flex flex-col gap-4">
             <Field label="Nombre"><Input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} autoFocus /></Field>
             <Field label="Email"><Input value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} /></Field>
-            <Field label="Contraseña"><Input value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} className="font-mono" /></Field>
+            <Field label="Contraseña"><Input value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} className="tabular-nums" /></Field>
             {create === "agent" && (
               <Field label="Especialidad">
                 <Select value={createForm.specialty} onChange={(e) => setCreateForm({ ...createForm, specialty: e.target.value })}>

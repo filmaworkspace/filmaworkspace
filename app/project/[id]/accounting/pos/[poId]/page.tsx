@@ -936,9 +936,9 @@ export default function PODetailPage() {
                                   <div className="flex flex-col gap-3 text-[13px]">
                                     <p className="text-slate-600">{item.description}</p>
                                     <dl className="grid grid-cols-2 gap-y-1.5">
-                                      <dt className="text-slate-500">Comprometido</dt><dd className="text-right font-mono">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</dd>
-                                      <dt className="text-slate-500">Facturado</dt><dd className={`text-right font-mono ${isOverInvoiced ? "text-amber-800" : ""}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</dd>
-                                      <dt className="font-medium text-slate-900">Pendiente</dt><dd className="text-right font-mono font-semibold">{item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}</dd>
+                                      <dt className="text-slate-500">Comprometido</dt><dd className="text-right tabular-nums">{formatCurrency(itemCommitted)} {getCurrencySymbol()}</dd>
+                                      <dt className="text-slate-500">Facturado</dt><dd className={`text-right tabular-nums ${isOverInvoiced ? "text-amber-800" : ""}`}>{formatCurrency(itemInvoiced)} {getCurrencySymbol()}</dd>
+                                      <dt className="font-medium text-slate-900">Pendiente</dt><dd className="text-right tabular-nums font-semibold">{item.isClosed ? "0,00" : formatCurrency(itemRemaining)} {getCurrencySymbol()}</dd>
                                     </dl>
                                     <div>
                                       <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Facturado</span><span>{Math.round(itemProgress)} %</span></div>

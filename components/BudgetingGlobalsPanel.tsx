@@ -77,7 +77,7 @@ function GlobalRow({
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "#E86F4A1a", color: "#1D201F" }}>{g.code}</span>
         <span className="text-sm font-medium text-slate-900 truncate">{g.label}</span>
         {!isPlainNumber(g.value) && <span title="Fórmula"><Sigma size={11} className="text-[#E86F4A] flex-shrink-0" /></span>}
-        <span className="text-xs text-slate-400 truncate font-mono">{g.value}</span>
+        <span className="text-xs text-slate-400 truncate tabular-nums">{g.value}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {error ? (
@@ -270,7 +270,7 @@ export default function BudgetingGlobalsPanel({ draftId }: { draftId: string }) 
                   value={form.code}
                   onChange={(e) => { setForm((f) => ({ ...f, code: e.target.value })); setFormError(""); }}
                   placeholder="DIAS_RODAJE"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2"
                 />
               </div>
               <div>
@@ -287,7 +287,7 @@ export default function BudgetingGlobalsPanel({ draftId }: { draftId: string }) 
                   value={form.value}
                   onChange={(v) => { setForm((f) => ({ ...f, value: v })); setFormError(""); }}
                   globals={globals.filter((g) => g.id !== modalItem?.id).map((g) => ({ code: g.code, label: g.label }))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2"
                 />
               </div>
               <div>
@@ -304,7 +304,7 @@ export default function BudgetingGlobalsPanel({ draftId }: { draftId: string }) 
                         value={form.scenarioOverrides[sc.id] || ""}
                         onChange={(v) => setForm((f) => ({ ...f, scenarioOverrides: { ...f.scenarioOverrides, [sc.id]: v } }))}
                         globals={globals.filter((g) => g.id !== modalItem?.id).map((g) => ({ code: g.code, label: g.label }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm tabular-nums focus:outline-none focus:ring-2"
                       />
                     </div>
                   ))}

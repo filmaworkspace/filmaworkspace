@@ -312,7 +312,7 @@ function HubInner() {
                       </div>
                     </td>
                     <td className="px-2 text-slate-600">{day(it.date)}</td>
-                    <td className="px-2 text-right font-mono tabular-nums text-slate-900">{eur(it.base)}</td>
+                    <td className="px-2 text-right tabular-nums text-slate-900">{eur(it.base)}</td>
                     <td className="px-2 font-mono text-[11px] text-slate-500">{it.version}</td>
                   </tr>
                 ))}
@@ -351,7 +351,7 @@ function HubInner() {
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-4"><dt className="flex-shrink-0 text-slate-500">{k}</dt><dd className="truncate text-right text-slate-900" title={v}>{v}</dd></div>
                   ))}
-                  {preview?.fingerprint && <div><dt className="text-slate-500">Huella del contenido (SHA-256)</dt><dd className="mt-0.5 break-all font-mono text-[10.5px] text-slate-600">{preview.fingerprint}</dd></div>}
+                  {preview?.fingerprint && <div><dt className="text-slate-500">Huella del contenido (SHA-256)</dt><dd className="mt-0.5 break-all tabular-nums text-[10.5px] text-slate-600">{preview.fingerprint}</dd></div>}
                 </dl>
                 {(current.warnings.length > 0 || (preview?.missing.length || 0) > 0) && (
                   <div className="mt-4 rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2 text-xs text-amber-900">

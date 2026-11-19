@@ -928,7 +928,7 @@ export default function PaymentPayPage() {
           <Field label="Fecha de ejecución"><Input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} /></Field>
           <div className="flex items-baseline justify-between rounded-md border border-slate-200 px-3 py-2.5">
             <span className="text-slate-600">{pendingItems.length} {pendingItems.length === 1 ? "pago" : "pagos"}</span>
-            <span className="font-mono font-semibold">{formatCurrency(totalPending)} €</span>
+            <span className="tabular-nums font-semibold">{formatCurrency(totalPending)} €</span>
           </div>
           {(() => {
             const missing = pendingItems.filter((item) => {

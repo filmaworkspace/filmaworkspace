@@ -62,10 +62,10 @@ export default function SearchBar<T extends string>({
           onKeyDown={(e) => { if (e.key === "Escape" && value) { e.stopPropagation(); onChange(""); } }}
           onChange={(e) => onChange(e.target.value)}
           placeholder={current.placeholder || "Buscar"}
-          className={`pl-8 pr-8 ${current.mono ? "font-mono" : ""}`}
+          className={`pl-8 pr-8 ${current.mono ? "tabular-nums" : ""}`}
         />
         {!value && (
-          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-[#F7F7F8] px-1.5 font-mono text-[10px] text-slate-400">/</kbd>
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-[#F7F7F8] px-1.5 tabular-nums text-[10px] text-slate-400">/</kbd>
         )}
         {value && (
           <button

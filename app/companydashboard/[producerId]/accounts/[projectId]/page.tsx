@@ -231,7 +231,7 @@ function AccountCombobox({
         className="w-full flex items-center justify-between gap-1 border border-slate-200 rounded-md px-2 py-1 bg-white hover:border-slate-400 transition-colors focus:outline-none focus:border-slate-500 text-left"
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="font-mono text-[10px] font-bold text-slate-900 whitespace-nowrap">{value}</span>
+          <span className="tabular-nums text-[10px] font-bold text-slate-900 whitespace-nowrap">{value}</span>
           {current && (
             <span className="text-[10px] text-slate-500 truncate">{current.name}</span>
           )}
@@ -292,7 +292,7 @@ function AccountCombobox({
 
           {/* Footer hint */}
           <div className="px-3 py-2 border-t border-slate-100 bg-slate-50 rounded-b-lg">
-            <p className="text-[9px] text-slate-400 font-mono">
+            <p className="text-[9px] text-slate-400 tabular-nums">
               {matches.length} de {plan.length} cuentas · Escribe código o nombre
             </p>
           </div>
@@ -670,12 +670,12 @@ export default function CompanyAccountsPage() {
                           </td>
                           <td className="px-3 py-2"><span className="font-mono text-xs font-semibold">{inv.displayNumber}</span></td>
                           <td className="px-3 py-2 max-w-[130px]"><span className="text-xs text-slate-700 truncate block">{inv.supplier}</span></td>
-                          <td className="px-3 py-2"><span className="font-mono text-xs text-slate-500">{fmtDate(inv.invoiceDate || inv.createdAt)}</span></td>
+                          <td className="px-3 py-2"><span className="tabular-nums text-xs text-slate-500">{fmtDate(inv.invoiceDate || inv.createdAt)}</span></td>
                           <td className="px-3 py-2">
-                            {codes.slice(0, 2).map(c => <span key={c} className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-1">{c}</span>)}
+                            {codes.slice(0, 2).map(c => <span key={c} className="tabular-nums text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-1">{c}</span>)}
                             {codes.length > 2 && <span className="text-[10px] text-slate-400">+{codes.length - 2}</span>}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{fmt(inv.baseAmount)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-xs font-semibold">{fmt(inv.baseAmount)}</td>
                           <td className="px-3 py-2"><span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${st.bg} ${st.text}`}>{st.label}</span></td>
                           <td className="px-3 py-2">
                             {inv.accountingEntryNumber
@@ -701,7 +701,7 @@ export default function CompanyAccountsPage() {
             <div className="flex-shrink-0 bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button onClick={goToPrev} disabled={currentIdx <= 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronLeft size={16} /></button>
-                <span className="font-mono text-xs text-slate-500">{currentIdx + 1} / {filtered.length}</span>
+                <span className="tabular-nums text-xs text-slate-500">{currentIdx + 1} / {filtered.length}</span>
                 <button onClick={goToNext} disabled={currentIdx >= filtered.length - 1} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronRight size={16} /></button>
               </div>
               <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
@@ -728,10 +728,10 @@ export default function CompanyAccountsPage() {
                           </span>
                         )}
                         {selectedInvoice.displayNumber?.startsWith("A-") && (
-                          <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono">Fra. autónomo</span>
+                          <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded tabular-nums">Fra. autónomo</span>
                         )}
                         {(selectedInvoice.displayNumber?.includes("/R-") || selectedInvoice.displayNumber?.startsWith("R-")) && (
-                          <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-mono">Rectificativa</span>
+                          <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded tabular-nums">Rectificativa</span>
                         )}
                       </div>
                       <p className="text-sm text-slate-600 mt-0.5">{selectedInvoice.supplier}</p>
@@ -751,23 +751,23 @@ export default function CompanyAccountsPage() {
                       { l: "Total",       v: fmt(selectedInvoice.totalAmount) + " €" },
                     ].map(f => (
                       <div key={f.l} className="bg-slate-50 rounded-md p-2">
-                        <p className="text-[9px] font-mono text-slate-400 uppercase tracking-wider mb-0.5">{f.l}</p>
-                        <p className="font-mono text-xs font-semibold">{f.v}</p>
+                        <p className="text-[9px] tabular-nums text-slate-400 uppercase tracking-wider mb-0.5">{f.l}</p>
+                        <p className="tabular-nums text-xs font-semibold">{f.v}</p>
                       </div>
                     ))}
                   </div>
 
                   <div className="flex items-center gap-3 mt-2 text-xs">
                     {selectedInvoice.vatAmount > 0 && (
-                      <span className="font-mono text-slate-500">
+                      <span className="tabular-nums text-slate-500">
                         IVA {Math.round((selectedInvoice.vatAmount / selectedInvoice.baseAmount) * 100)}% = {fmt(selectedInvoice.vatAmount)} €
                       </span>
                     )}
                     {selectedInvoice.vatAmount === 0 && (
-                      <span className="font-mono text-amber-600 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded">SIN IVA</span>
+                      <span className="tabular-nums text-amber-600 text-[10px] bg-amber-50 px-1.5 py-0.5 rounded">SIN IVA</span>
                     )}
                     {selectedInvoice.irpfAmount < 0 && (
-                      <span className="font-mono text-blue-600 text-[10px] bg-blue-50 px-1.5 py-0.5 rounded">
+                      <span className="tabular-nums text-blue-600 text-[10px] bg-blue-50 px-1.5 py-0.5 rounded">
                         IRPF {Math.round((Math.abs(selectedInvoice.irpfAmount) / selectedInvoice.baseAmount) * 100)}% retención
                       </span>
                     )}
@@ -778,7 +778,7 @@ export default function CompanyAccountsPage() {
                 {validationWarnings.length > 0 && showWarnings && (
                   <div className="px-5 py-3 border-b border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider">Alertas contables</span>
+                      <span className="text-[10px] tabular-nums font-semibold text-slate-400 uppercase tracking-wider">Alertas contables</span>
                       <button onClick={() => setShowWarnings(false)} className="text-[10px] text-slate-400 hover:text-slate-600">Ocultar</button>
                     </div>
                     <div className="space-y-1.5">
@@ -803,7 +803,7 @@ export default function CompanyAccountsPage() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Asiento contable</h4>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${panelOk ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                      <span className={`text-[10px] tabular-nums px-2 py-0.5 rounded border ${panelOk ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                         {panelOk ? "Cuadrado" : `Dif. ${fmt(Math.abs(panelDebe - panelHaber))} €`}
                       </span>
                     </div>
@@ -830,10 +830,10 @@ export default function CompanyAccountsPage() {
                     <table className="tbl w-full text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-mono text-slate-400 uppercase w-[40%]">Cuenta</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-mono text-slate-400 uppercase">Descripción</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-mono text-slate-400 uppercase w-[80px]">Debe</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-mono text-slate-400 uppercase w-[80px]">Haber</th>
+                          <th className="px-3 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase w-[40%]">Cuenta</th>
+                          <th className="px-3 py-2 text-left text-[10px] tabular-nums text-slate-400 uppercase">Descripción</th>
+                          <th className="px-3 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase w-[80px]">Debe</th>
+                          <th className="px-3 py-2 text-right text-[10px] tabular-nums text-slate-400 uppercase w-[80px]">Haber</th>
                           {editingLines && <th className="w-7" />}
                         </tr>
                       </thead>
@@ -874,9 +874,9 @@ export default function CompanyAccountsPage() {
                                 {editingLines ? (
                                   <input type="number" value={line.debe || ""} min={0} step={0.01}
                                     onChange={e => updateDraftLine(line.id, "debe", parseFloat(e.target.value) || 0)}
-                                    className="font-mono text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
+                                    className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
                                 ) : (
-                                  <span className={`font-mono text-[11px] font-semibold ${line.debe > 0 ? "text-slate-900" : "text-slate-200"}`}>
+                                  <span className={`tabular-nums text-[11px] font-semibold ${line.debe > 0 ? "text-slate-900" : "text-slate-200"}`}>
                                     {line.debe > 0 ? fmt(line.debe) : "—"}
                                   </span>
                                 )}
@@ -885,9 +885,9 @@ export default function CompanyAccountsPage() {
                                 {editingLines ? (
                                   <input type="number" value={line.haber || ""} min={0} step={0.01}
                                     onChange={e => updateDraftLine(line.id, "haber", parseFloat(e.target.value) || 0)}
-                                    className="font-mono text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
+                                    className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" />
                                 ) : (
-                                  <span className={`font-mono text-[11px] font-semibold ${line.haber > 0 ? "text-red-600" : "text-slate-200"}`}>
+                                  <span className={`tabular-nums text-[11px] font-semibold ${line.haber > 0 ? "text-red-600" : "text-slate-200"}`}>
                                     {line.haber > 0 ? fmt(line.haber) : "—"}
                                   </span>
                                 )}
@@ -903,9 +903,9 @@ export default function CompanyAccountsPage() {
                       </tbody>
                       <tfoot className="border-t-2 border-slate-200 bg-slate-50">
                         <tr>
-                          <td colSpan={2} className="px-3 py-2 font-mono text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total</td>
-                          <td className="px-3 py-2 text-right font-mono text-xs font-bold text-slate-900">{fmt(panelDebe)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-xs font-bold text-red-600">{fmt(panelHaber)}</td>
+                          <td colSpan={2} className="px-3 py-2 tabular-nums text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-xs font-bold text-slate-900">{fmt(panelDebe)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-xs font-bold text-red-600">{fmt(panelHaber)}</td>
                           {editingLines && <td />}
                         </tr>
                       </tfoot>
@@ -921,12 +921,12 @@ export default function CompanyAccountsPage() {
                     ].map(r => (
                       <div key={r.l} className="flex justify-between">
                         <span className="text-slate-500">{r.l}</span>
-                        <span className={`font-mono font-medium ${r.v < 0 ? "text-red-600" : "text-slate-900"}`}>{fmt(r.v)} €</span>
+                        <span className={`tabular-nums font-medium ${r.v < 0 ? "text-red-600" : "text-slate-900"}`}>{fmt(r.v)} €</span>
                       </div>
                     ))}
                     <div className="border-t border-slate-200 pt-1.5 flex justify-between">
                       <span className="font-semibold text-slate-900">Total factura</span>
-                      <span className="font-mono font-bold text-slate-900">{fmt(selectedInvoice.totalAmount)} €</span>
+                      <span className="tabular-nums font-bold text-slate-900">{fmt(selectedInvoice.totalAmount)} €</span>
                     </div>
                   </div>
 
@@ -939,8 +939,8 @@ export default function CompanyAccountsPage() {
                           Nº Asiento <span className="text-red-500">*</span>
                         </label>
                         <input value={entryNumber} onChange={e => setEntryNumber(e.target.value)} placeholder="A-2024-001"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none font-mono" />
-                        <p className="text-[10px] text-slate-400 mt-1 font-mono">Formato recomendado: A-YYYY-NNN</p>
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-400 outline-none tabular-nums" />
+                        <p className="text-[10px] text-slate-400 mt-1 tabular-nums">Formato recomendado: A-YYYY-NNN</p>
                       </div>
                       <button onClick={handleMarkAccounted} disabled={saving || !entryNumber.trim() || !panelOk || (!selectedInvoice?.codedAt && selectedInvoice?.status !== "coded")}
                         className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">

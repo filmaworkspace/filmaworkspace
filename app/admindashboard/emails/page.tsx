@@ -117,7 +117,7 @@ function EmailsInner() {
 
       {!kpi.tracked && base.length > 0 && (
         <p className="mt-4 rounded-md border border-slate-200 bg-[#F7F7F8] px-3 py-2 text-xs text-slate-600">
-          Para ver si cada email se entrega, rebota o se abre, configura el webhook de Resend apuntando a <code className="font-mono">/api/webhooks/resend</code> y guarda su clave en <code className="font-mono">RESEND_WEBHOOK_SECRET</code>.
+          Para ver si cada email se entrega, rebota o se abre, configura el webhook de Resend apuntando a <code className="tabular-nums">/api/webhooks/resend</code> y guarda su clave en <code className="tabular-nums">RESEND_WEBHOOK_SECRET</code>.
         </p>
       )}
 

@@ -281,8 +281,8 @@ export default function GuidesListPage() {
                             {guide.published ? "Publicada" : "Borrador"}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">{guide.views || 0}</td>
-                        <td className="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">{formatDate(guide.updatedAt)}</td>
+                        <td className="px-4 py-3 text-center tabular-nums text-xs text-slate-700">{guide.views || 0}</td>
+                        <td className="px-4 py-3 tabular-nums text-[11px] text-slate-400 whitespace-nowrap">{formatDate(guide.updatedAt)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-0.5">
                             {guide.published && (

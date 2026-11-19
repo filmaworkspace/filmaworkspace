@@ -357,9 +357,9 @@ export default function GuideEditorPage() {
             <input
               value={slug}
               onChange={(e) => { setSlugTouched(true); setSlug(e.target.value.replace(/[^a-z0-9-]/g, "")); }}
-              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm tabular-nums outline-none focus:ring-2 focus:ring-slate-900"
             />
-            <p className="text-[11px] text-slate-400 mt-1.5 font-mono truncate">/guias/{slug || "..."}</p>
+            <p className="text-[11px] text-slate-400 mt-1.5 tabular-nums truncate">/guias/{slug || "..."}</p>
           </div>
 
           <div>
@@ -391,7 +391,7 @@ export default function GuideEditorPage() {
 
           <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
             <p>Estado: <span className={published ? "text-emerald-600 font-medium" : "text-slate-500 font-medium"}>{published ? "Publicada" : "Borrador"}</span></p>
-            {existing && <p>Vistas: <span className="font-mono">{existing.views || 0}</span></p>}
+            {existing && <p>Vistas: <span className="tabular-nums">{existing.views || 0}</span></p>}
             {existing?.createdByName && <p>Autor: {existing.createdByName}</p>}
           </div>
         </div>
@@ -535,7 +535,7 @@ function BlockEditor({
             value={block.url}
             onChange={(e) => onChange({ url: e.target.value } as Partial<GuideBlock>)}
             placeholder="https://..."
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono outline-none bg-white"
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm tabular-nums outline-none bg-white"
           />
         </div>
       )}

@@ -175,7 +175,7 @@ export default function AccountPage() {
                       <tr key={i.id} onClick={() => router.push(`/admindashboard/accounts/billing/invoices/${i.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
                         <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={st.tone} />{i.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
                         <td className="px-3"><div className="truncate text-slate-900">{i.kind === "rectifying" ? "Rectificativa" : "Factura"} · {i.projectName || "—"}</div><div className="truncate text-xs text-slate-500">{[fmtDay(i.issueDate), i.periodMonth && monthName(i.periodMonth), i.quoteNumber].filter(Boolean).join(" · ")}</div></td>
-                        <td className="w-40 px-3 text-right font-mono tabular-nums text-slate-900">{eur(t.totalAmount)}</td>
+                        <td className="w-40 px-3 text-right tabular-nums text-slate-900">{eur(t.totalAmount)}</td>
                         <td className="w-28 px-3 text-slate-600">{st.label}</td>
                       </tr>
                     );

@@ -716,8 +716,8 @@ export default function InvoicesPage() {
                         </div>
                         <div className="truncate text-xs text-slate-500">{invoice.description || <span className="text-slate-300">Sin concepto</span>}</div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{formatCurrency(invoice.baseAmount)}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{formatCurrency(invoice.totalAmount)}</td>
                       <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-600">
                         {formatDate(invoice.dueDate)}
                         {due && <span className={`ml-1.5 text-xs ${due.cls}`}>{due.text}</span>}
@@ -750,8 +750,8 @@ export default function InvoicesPage() {
               <tfoot>
                 <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                   <td className="px-4 py-2 font-semibold" colSpan={2}>Total {rows.length === invoices.length ? "" : "filtrado "}sin anuladas</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.base)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(totals.total)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.base)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.total)}</td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>

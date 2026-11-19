@@ -562,7 +562,7 @@ export default function AccountingUsersPage() {
                       {m.name && <span className="block truncate text-xs text-slate-500">{m.email}</span>}
                     </td>
                     <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{groupOf(m)}</td>
-                    <td className="whitespace-nowrap px-3 py-1.5">{PROJECT_ROLES.includes(m.role || "") ? <span className="font-mono text-xs">{m.role}</span> : m.position || "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-1.5">{PROJECT_ROLES.includes(m.role || "") ? <span className="tabular-nums text-xs">{m.role}</span> : m.position || "—"}</td>
                     <td className="px-3 py-1.5"><LevelDot level={m.accountingAccessLevel} /></td>
                     <td className="px-3 py-1.5 text-slate-600">{m.boxAccess ? "Sí" : "—"}</td>
                     <td className="py-1.5 pr-3 text-right">

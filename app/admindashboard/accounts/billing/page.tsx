@@ -166,8 +166,8 @@ function BillingInner() {
                     </td>
                     <td className="px-3 text-slate-600">{fmtDay(i.issueDate)}</td>
                     <td className={`px-3 ${s.tone === "bad" ? "text-red-600" : "text-slate-600"}`}>{i.kind === "standard" ? fmtDay(i.dueDate) : "—"}</td>
-                    <td className="px-3 text-right font-mono tabular-nums">{eur(t.baseAmount)}</td>
-                    <td className="px-3 text-right font-mono tabular-nums text-slate-900">{eur(t.totalAmount)}</td>
+                    <td className="px-3 text-right tabular-nums">{eur(t.baseAmount)}</td>
+                    <td className="px-3 text-right tabular-nums text-slate-900">{eur(t.totalAmount)}</td>
                     <td className={`px-3 ${s.tone === "bad" ? "text-red-600" : s.tone === "ok" ? "text-emerald-700" : s.tone === "warn" ? "text-amber-700" : "text-slate-500"}`}>{s.label}</td>
                   </tr>
                 );
@@ -202,12 +202,12 @@ function BillingInner() {
                     <div className="truncate text-xs text-slate-500">{x.projectName}{x.title ? ` · ${x.title}` : ""}</div>
                   </td>
                   <td className="px-3 text-slate-600">{x.billingMode === "monthly" ? `Mensual · ${x.months || "?"} meses` : "Pago único"}</td>
-                  <td className="px-3 text-right font-mono tabular-nums text-slate-900">{eur(t.baseAmount)}{x.billingMode === "monthly" && <span className="font-sans text-[11px] text-slate-400">/mes</span>}</td>
+                  <td className="px-3 text-right tabular-nums text-slate-900">{eur(t.baseAmount)}{x.billingMode === "monthly" && <span className="font-sans text-[11px] text-slate-400">/mes</span>}</td>
                   <td className="px-3">
                     {x.status === "draft" ? <span className="text-slate-300">—</span> : (
                       <span className="flex items-center gap-2">
                         <span className="h-1 w-20 overflow-hidden rounded-full bg-slate-100"><span className="block h-full" style={{ width: `${pct}%`, background: "#24406E" }} /></span>
-                        <span className="font-mono text-[11px] tabular-nums text-slate-500">{pct} %</span>
+                        <span className="text-[11px] tabular-nums text-slate-500">{pct} %</span>
                       </span>
                     )}
                   </td>

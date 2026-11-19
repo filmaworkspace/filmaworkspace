@@ -139,7 +139,7 @@ function ProjectsInner() {
                   <td className="px-3 py-2"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full" style={{ background: PHASE_DOT[p.phase] || "#94A3B8" }} />{p.phase}</span></td>
                   <td className="px-3 py-2 text-slate-600">{p.producers.map((id) => producerById(id)?.name || "—").join(", ") || <span className="text-slate-300">—</span>}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{p.members.length}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-600">{s ? s.pos30 + s.invoices30 : "…"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{s ? s.pos30 + s.invoices30 : "…"}</td>
                   <td className="px-3 py-2 text-slate-600">{s ? (s.lastActivityAt ? timeAgo(s.lastActivityAt) : "Sin actividad") : "…"}</td>
                   <td className="px-3 py-2" title={h.label}><HealthMeter value={p.phase === "Finalizado" ? undefined : s?.health} tone={h.tone} /></td>
                   <td className="px-1 py-2" onClick={(e) => e.stopPropagation()}>

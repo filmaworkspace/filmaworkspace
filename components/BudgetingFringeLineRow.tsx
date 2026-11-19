@@ -48,7 +48,7 @@ export default function BudgetingFringeLineRow({
         <Percent size={11} />
       </span>
       <input value={code} onChange={(e) => setCode(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
-        className={`${CELL_INPUT} font-mono text-xs pl-2`} />
+        className={`${CELL_INPUT} tabular-nums text-xs pl-2`} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={commit} onKeyDown={handleKeyDown}
         className={`${CELL_INPUT} text-xs pl-2`} />
       <span className="flex items-center justify-end text-xs font-medium text-slate-500 pr-2" title="Importe calculado a partir de las líneas de detalle: no se edita aquí">

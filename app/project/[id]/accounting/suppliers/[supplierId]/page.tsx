@@ -877,7 +877,7 @@ export default function SupplierDetailPage() {
                           </td>
                           <td className="max-w-[360px] truncate px-3 py-1.5 text-slate-700">{inv.description || "—"}</td>
                           <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-500">{formatDate(inv.issueDate)}</td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(inv.totalAmount)}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(inv.totalAmount)}</td>
                           <td className="px-4 py-1.5"><Dot state={getInvoiceDisplayState(inv)} /></td>
                         </tr>
                       ))
@@ -888,7 +888,7 @@ export default function SupplierDetailPage() {
                           </td>
                           <td className="max-w-[360px] truncate px-3 py-1.5 text-slate-700">{po.description || "—"}</td>
                           <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-500">{formatDate(po.createdAt)}</td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs">{formatCurrency(po.baseAmount)}</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(po.baseAmount)}</td>
                           <td className="px-4 py-1.5"><Dot state={po.status} /></td>
                         </tr>
                       ))}
@@ -896,7 +896,7 @@ export default function SupplierDetailPage() {
                 <tfoot>
                   <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
                     <td className="px-4 py-2 font-semibold" colSpan={3}>Total base</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold">{formatCurrency(rowsBase)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(rowsBase)}</td>
                     <td className="px-4 py-2 text-right">
                       <Link href={`/project/${projectId}/accounting/${docTab === "invoices" ? "invoices" : "pos"}?supplier=${supplierId}`} className="text-slate-600 hover:text-slate-900">Abrir en {docTab === "invoices" ? "Facturas" : "POs"} →</Link>
                     </td>
@@ -993,7 +993,7 @@ export default function SupplierDetailPage() {
             <Field label="Número"><Input value={editForm.address.number} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, number: e.target.value } })} /></Field>
           </div>
           <div className="grid grid-cols-[110px_1fr_1fr] gap-3">
-            <Field label="CP"><Input value={editForm.address.postalCode} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, postalCode: e.target.value } })} className="font-mono" /></Field>
+            <Field label="CP"><Input value={editForm.address.postalCode} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, postalCode: e.target.value } })} className="tabular-nums" /></Field>
             <Field label="Ciudad"><Input value={editForm.address.city} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, city: e.target.value } })} /></Field>
             <Field label="Provincia"><Input value={editForm.address.province} onChange={(e) => setEditForm({ ...editForm, address: { ...editForm.address, province: e.target.value } })} /></Field>
           </div>
@@ -1009,7 +1009,7 @@ export default function SupplierDetailPage() {
               bic={editForm.bic}
               onIBANChange={(v) => setEditForm({ ...editForm, bankAccount: v })}
               onBICChange={(v) => setEditForm({ ...editForm, bic: v })}
-              ibanClassName="h-8 w-full rounded-md border border-slate-200 px-2.5 font-mono text-[13px] focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
+              ibanClassName="h-8 w-full rounded-md border border-slate-200 px-2.5 tabular-nums text-[13px] focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
               bicClassName="h-8 w-full rounded-md border border-slate-200 px-2.5 font-mono text-[13px] focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10"
               ibanPlaceholder="20 dígitos o IBAN completo"
               bicPlaceholder="BIC/SWIFT"
@@ -1033,18 +1033,18 @@ export default function SupplierDetailPage() {
       >
         <ol className="flex flex-col gap-5 text-[13px]">
           <li className="text-slate-600">
-            {invoices.length} {invoices.length === 1 ? "factura" : "facturas"} pagadas · <span className="font-mono text-slate-900">{formatCurrency(invoices.reduce((sum, inv) => sum + inv.totalAmount, 0))}</span>
+            {invoices.length} {invoices.length === 1 ? "factura" : "facturas"} pagadas · <span className="tabular-nums text-slate-900">{formatCurrency(invoices.reduce((sum, inv) => sum + inv.totalAmount, 0))}</span>
           </li>
           <li className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-slate-500"><span className="font-mono">01</span> Carta de fin de proyecto</span>
+            <span className="text-xs font-medium text-slate-500"><span className="tabular-nums">01</span> Carta de fin de proyecto</span>
             <Link href={`/project/${projectId}/accounting/document-center?doc=sup-close:${supplierId}`} target="_blank" className={buttonClass("secondary")}><FileText size={14} /> Abrir en documentación para firmar</Link>
           </li>
           <li className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-slate-500"><span className="font-mono">02</span> Nota (opcional)</span>
+            <span className="text-xs font-medium text-slate-500"><span className="tabular-nums">02</span> Nota (opcional)</span>
             <Textarea value={closeProjectData.notes} onChange={(e) => setCloseProjectData({ ...closeProjectData, notes: e.target.value })} rows={3} />
           </li>
           <li className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-slate-500"><span className="font-mono">03</span> Carta firmada (opcional)</span>
+            <span className="text-xs font-medium text-slate-500"><span className="tabular-nums">03</span> Carta firmada (opcional)</span>
             {!closeProjectData.signedLetterFile ? (
               <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 px-4 py-5 text-center hover:bg-[#FAFAFA]">
                 <span className="text-[13px] text-slate-900">Elegir archivo</span>
