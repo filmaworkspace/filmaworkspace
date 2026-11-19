@@ -302,3 +302,12 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
   }
   return pdf;
 }
+
+// ─── Nomenclatura del hub ────────────────────────────────────────────────────
+// Número del documento sin el código del proyecto (el proyecto ya va en la
+// cabecera): PO-0001, INV-0001… El nombre de archivo añade el proveedor.
+export type HubDocKind = "PO" | "INV" | "BOX" | "SUP" | "PAY";
+export const hubNumber = (kind: HubDocKind, n: number | string) =>
+  `${kind}-${String(n).replace(/^\D+-?/, "").padStart(4, "0")}`;
+export const hubFileName = (number: string, supplier?: string, version?: string) =>
+  `${number}${version && version !== "V01" ? `-${version}` : ""}${supplier ? ` · ${supplier.replace(/[\\/:*?"<>|]+/g, " ").trim()}` : ""}.pdf`;
