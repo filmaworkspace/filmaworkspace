@@ -76,7 +76,11 @@ export async function contentFingerprint(data: unknown): Promise<string> {
 }
 
 // ─── Especificación de un documento ──────────────────────────────────────────
-export interface DocProject { name: string; code: string; producer?: string; phase?: string; seed: string; band: string }
+export interface DocProject {
+  name: string; code: string; producer?: string; phase?: string; seed: string; band: string;
+  /** Datos fiscales de la productora (razón social · NIF · dirección), en pequeño al pie. */
+  legal?: string;
+}
 export interface DocApproval {
   level: number;
   role: string;
@@ -94,7 +98,6 @@ export interface ProjectDocSpec {
   status?: { label: string; tone: "ok" | "warn" | "bad" | "none" };
   meta: [string, string][];
   party?: { title: string; name: string; lines: string[] };
-  secondParty?: { title: string; name: string; lines: string[] };
   summary?: { title: string; text: string };
   table?: { columns: DocColumn[]; rows: string[][]; subRows?: (string | null)[] };
   /** La base imponible es la cifra protagonista; IVA, IRPF y total van debajo en pequeño. */
@@ -114,7 +117,7 @@ const fmtStamp = (d: Date) =>
 
 export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
-  const W = 210, M = 16, BOTTOM = 270;
+  const W = 210, M = 16, BOTTOM = 266;
   const pal = projectPalette(spec.project.seed);
   const ACC: RGB = pal.base[1];
   const set = (size: number, color: RGB, style: "normal" | "bold" = "normal") => { pdf.setFont("helvetica", style); pdf.setFontSize(size); pdf.setTextColor(...color); };
@@ -163,9 +166,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     return yy;
   };
   if (spec.party) {
-    const y1 = party(spec.party, M, 84);
-    const y2 = spec.secondParty ? party(spec.secondParty, M + 92, 84) : y1;
-    y = Math.max(y1, y2) + 3;
+    y = party(spec.party, M, 120) + 3;
   }
   if (spec.summary) {
     set(6.5, FAINT, "bold"); pdf.text(spec.summary.title.toUpperCase(), M, y, { charSpace: 0.4 });
@@ -290,6 +291,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
       pdf.setFillColor(...ACC); pdf.rect(0, 0, W, 2.2, "F");
       set(7, MUTED); pdf.text(`${spec.project.name}  ·  ${spec.number}`, M, 10);
     }
+    if (spec.project.legal) { set(6.3, FAINT); pdf.text(pdf.splitTextToSize(spec.project.legal, W - 2 * M)[0], M, 276); }
     pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.line(M, 279, W - M, 279);
     set(6.8, MUTED);
     pdf.text(`${spec.number}${spec.version ? ` · ${spec.version}` : ""}  ·  Generado el ${fmtStamp(spec.generatedAt)} por ${spec.generatedBy}`, M, 283.5);
