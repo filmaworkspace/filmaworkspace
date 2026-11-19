@@ -10,7 +10,8 @@ import { AnchoredPanel, Input, Modal } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { AccountPickerModal, EpisodeModal, POItemsModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { LineOrigin, POItemPicker, type OriginPO, type OriginPOItem } from "@/components/accounting/LineOrigin";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { nextDocNumber } from "@/lib/docCounter";
@@ -114,16 +115,6 @@ const DOCUMENT_TYPES = {
     borderColor: "border-slate-200",
     requiresReplacement: true,
   },
-  budget: {
-    code: "PRS",
-    label: "Presupuesto",
-    article: "del",
-    icon: FileCheck,
-    bgColor: "bg-amber-50",
-    textColor: "text-amber-700",
-    borderColor: "border-amber-200",
-    requiresReplacement: true,
-  },
   guarantee: {
     code: "FNZ",
     label: "Fianza",
@@ -183,6 +174,9 @@ interface POItemWithInvoiced extends POItem {
 interface InvoiceItem {
   id: string;
   description: string;
+  /** PO del ítem (puede ser otra distinta de la de la factura). */
+  poId?: string | null;
+  poNumber?: string | null;
   poItemId?: string;
   poItemIndex?: number;
   isNewItem: boolean;
@@ -326,6 +320,8 @@ export default function NewInvoicePage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [approvalConfig, setApprovalConfig] = useState<ApprovalStep[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>("invoice");
+  // Selector para añadir una línea desde un ítem de PO (la de la factura u otra).
+  const [addPicker, setAddPicker] = useState<null | "po" | "other">(null);
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [linkedDocumentId, setLinkedDocumentId] = useState<string>("");
 
@@ -334,7 +330,6 @@ export default function NewInvoicePage() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showCreateSupplierModal, setShowCreateSupplierModal] = useState(false);
-  const [showPOItemsModal, setShowPOItemsModal] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
 
   // Estados de búsqueda
@@ -352,7 +347,6 @@ export default function NewInvoicePage() {
   const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedPO, setSelectedPO] = useState<PO | null>(null);
-  const [poItemsWithInvoiced, setPOItemsWithInvoiced] = useState<POItemWithInvoiced[]>([]);
 
   const [formData, setFormData] = useState({
     invoiceType: "with-po" as "with-po" | "without-po",
@@ -399,7 +393,7 @@ export default function NewInvoicePage() {
   // modales a pantalla completa de esta página está abierto.
   useBodyScrollLock(
     showPOModal || showAccountModal || showSupplierModal || showCreateSupplierModal ||
-    showPOItemsModal || showReplaceModal || showEpisodeModal
+    !!addPicker || showReplaceModal || showEpisodeModal
   );
 
   // Estados de reemplazo
@@ -441,17 +435,10 @@ export default function NewInvoicePage() {
   }, [items]);
 
   useEffect(() => {
-    if (selectedPO) {
-      calculatePOStats();
-      loadPOItemsInvoiced();
-    }
-  }, [selectedPO]);
+    if (selectedPO) calculatePOStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPO, items]);
 
-  useEffect(() => {
-    if (selectedPO && poItemsWithInvoiced.length > 0) {
-      updateAvailableWithCurrentItems();
-    }
-  }, [items, poItemsWithInvoiced.length]);
 
   useEffect(() => {
     if (id) {
@@ -599,6 +586,7 @@ export default function NewInvoicePage() {
           department: d.data().department || "",
           totalAmount: d.data().totalAmount || 0,
           baseAmount: d.data().baseAmount || d.data().totalAmount || 0,
+          invoicedAmount: d.data().invoicedAmount || 0,
           items: (d.data().items || []).map((item: any, idx: number) => ({
             ...item,
             id: item.id || "item-" + idx,
@@ -749,60 +737,10 @@ export default function NewInvoicePage() {
   };
 
   // Facturas vigentes de una PO que este usuario puede leer (lib/accountingScope).
-  const invoicesOfPO = async (poId: string) =>
-    (await getScopedDocs(collection(db, "projects/" + id + "/invoices"), scopeFromPermissions(permissions), [
-      where("poId", "==", poId),
-      where("status", "in", ["pending", "pending_approval", "approved", "paid", "overdue"]),
-    ])).filter((d) => d.data().poId === poId && ["pending", "pending_approval", "approved", "paid", "overdue"].includes(d.data().status));
 
-  const loadPOItemsInvoiced = async () => {
-    if (!selectedPO) return;
 
-    try {
-      const invSnap = { docs: await invoicesOfPO(selectedPO.id) };
 
-      const invoicedByItem: Record<string, number> = {};
-      invSnap.docs.forEach((invDoc) => {
-        (invDoc.data().items || []).forEach((invItem: any) => {
-          if (invItem.poItemId || invItem.poItemIndex !== undefined) {
-            const key = invItem.poItemId || "index-" + invItem.poItemIndex;
-            invoicedByItem[key] = (invoicedByItem[key] || 0) + (invItem.totalAmount || 0);
-          }
-        });
-      });
 
-      setPOItemsWithInvoiced(
-        selectedPO.items.map((item, idx) => {
-          const key = item.id || "index-" + idx;
-          const invoicedAmount = invoicedByItem[key] || 0;
-          return {
-            ...item,
-            id: item.id || "item-" + idx,
-            invoicedAmount: invoicedAmount,
-            availableAmount: item.totalAmount - invoicedAmount,
-          };
-        })
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const updateAvailableWithCurrentItems = () => {
-    const currentByItem: Record<string, number> = {};
-    items.forEach((item) => {
-      if (item.poItemId) {
-        currentByItem[item.poItemId] = (currentByItem[item.poItemId] || 0) + item.totalAmount;
-      }
-    });
-
-    setPOItemsWithInvoiced((prev) =>
-      prev.map((poItem) => ({
-        ...poItem,
-        availableAmount: poItem.totalAmount - poItem.invoicedAmount - (currentByItem[poItem.id!] || 0),
-      }))
-    );
-  };
 
   // Funciones de aprobación
   // Flujo de aprobación: lógica única en lib/approvalFlow (pasos sin aprobador
@@ -828,24 +766,17 @@ export default function NewInvoicePage() {
     setTotals(documentTotals(items));
   };
 
-  const calculatePOStats = async () => {
+  // Estado de facturación de la PO en BASE IMPONIBLE: lo ya facturado (lo
+  // mantiene el servidor, lib/budgetLedger) más lo que lleva esta factura.
+  const calculatePOStats = () => {
     if (!selectedPO) return;
-
-    try {
-      const invSnap = { docs: await invoicesOfPO(selectedPO.id) };
-
-      const invoiced = invSnap.docs.reduce((s, d) => s + (d.data().totalAmount || 0), 0) + totals.totalAmount;
-
-      setPOStats({
-        totalAmount: selectedPO.totalAmount,
-        invoicedAmount: invoiced,
-        percentageInvoiced: selectedPO.totalAmount > 0 ? (invoiced / selectedPO.totalAmount) * 100 : 0,
-        isOverInvoiced: invoiced > selectedPO.totalAmount,
-      });
-    } catch (e) {
-      console.error(e);
-    }
+    const base = selectedPO.baseAmount || 0;
+    const already = (selectedPO as any).invoicedAmount || 0;
+    const here = items.filter((it) => !it.isNewItem && (!it.poId || it.poId === selectedPO.id)).reduce((t, it) => t + (it.baseAmount || 0), 0);
+    const invoiced = already + here;
+    setPOStats({ totalAmount: base, invoicedAmount: invoiced, percentageInvoiced: base > 0 ? (invoiced / base) * 100 : 0, isOverInvoiced: invoiced > base + 0.005 });
   };
+
 
   // Funciones de items
   const updateItem = (i: number, field: keyof InvoiceItem, value: any) => {
@@ -878,32 +809,51 @@ export default function NewInvoicePage() {
     ]);
   };
 
-  const addPOItemToInvoice = (poItem: POItemWithInvoiced, idx: number) => {
-    setItems([
-      ...items,
-      {
-        id: String(Date.now()),
-        description: poItem.description,
-        poItemId: poItem.id,
-        poItemIndex: idx,
-        isNewItem: false,
-        subAccountId: poItem.subAccountId,
-        subAccountCode: poItem.subAccountCode,
-        subAccountDescription: poItem.subAccountDescription,
-        quantity: poItem.quantity,
-        unitPrice: poItem.unitPrice,
-        baseAmount: poItem.baseAmount,
-        vatRate: poItem.vatRate,
-        vatAmount: poItem.vatAmount,
-        irpfRate: poItem.irpfRate,
-        irpfAmount: poItem.irpfAmount,
-        totalAmount: poItem.totalAmount,
-        episodeAssignment: poItem.episodeAssignment || "general",
-        episodes: poItem.episodes ? [...poItem.episodes] : undefined,
-      },
-    ]);
-    setShowPOItemsModal(false);
+  // Ítems de PO: la de la factura u otra cualquiera aprobada que se pueda ver.
+  const originPOs: OriginPO[] = pos.map((p) => ({ id: p.id, number: p.number, supplier: p.supplier, items: p.items as OriginPOItem[] }));
+  const invoiceOriginPO: OriginPO | null = selectedPO ? { id: selectedPO.id, number: selectedPO.number, supplier: selectedPO.supplier, items: selectedPO.items as OriginPOItem[] } : null;
+  // Lo que esta factura ya lleva en cada ítem (para el disponible del selector).
+  const pendingByPOItem = items.reduce<Record<string, number>>((m, it) => {
+    if (!it.isNewItem && it.poItemIndex !== undefined) {
+      const k = `${it.poId || selectedPO?.id}:${it.poItemIndex}`;
+      m[k] = (m[k] || 0) + (it.baseAmount || 0);
+    }
+    return m;
+  }, {});
+
+  /** Datos que una línea toma del ítem de PO elegido (el concepto solo si está vacío o venía del ítem anterior). */
+  const linkFields = (po: OriginPO, poItem: OriginPOItem, idx: number, prev?: InvoiceItem): Partial<InvoiceItem> => {
+    const prevPoDesc = prev && !prev.isNewItem && prev.poItemIndex !== undefined
+      ? (pos.find((p) => p.id === (prev.poId || selectedPO?.id))?.items[prev.poItemIndex] as OriginPOItem | undefined)?.description : undefined;
+    const keepDesc = prev && prev.description.trim() && prev.description !== prevPoDesc;
+    return {
+      poId: po.id, poNumber: po.number, poItemIndex: idx, poItemId: poItem.id || "item-" + idx, isNewItem: false,
+      description: keepDesc ? prev!.description : poItem.description || "",
+      subAccountId: poItem.subAccountId || "", subAccountCode: poItem.subAccountCode || "", subAccountDescription: poItem.subAccountDescription || "",
+    };
   };
+
+  const addPOItemToInvoice = (po: OriginPO, poItem: OriginPOItem, idx: number) => {
+    const full = poItem as any;
+    const line: InvoiceItem = {
+      id: String(Date.now()),
+      description: "", isNewItem: false, subAccountId: "", subAccountCode: "", subAccountDescription: "",
+      quantity: full.quantity || 1, unitPrice: full.unitPrice || 0, baseAmount: full.baseAmount || 0,
+      vatRate: full.vatRate ?? 21, vatAmount: full.vatAmount || 0, irpfRate: full.irpfRate || 0, irpfAmount: full.irpfAmount || 0, totalAmount: full.totalAmount || 0,
+      episodeAssignment: full.episodeAssignment || "general",
+      episodes: full.episodes ? [...full.episodes] : undefined,
+    };
+    setItems([...items, { ...line, ...linkFields(po, poItem, idx) } as InvoiceItem]);
+  };
+
+  /** Cambiar el origen de una línea ya creada (sin tocar sus importes). */
+  const relinkItem = (index: number, po: OriginPO, poItem: OriginPOItem, idx: number) => {
+    setItems((prev) => prev.map((it, i) => (i === index ? ({ ...it, ...linkFields(po, poItem, idx, it) } as InvoiceItem) : it)));
+  };
+  const unlinkItem = (index: number) => {
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, isNewItem: true, poId: null, poNumber: null, poItemIndex: undefined, poItemId: undefined } : it)));
+  };
+
 
   const removeItem = (i: number) => {
     setItems(items.filter((_, idx) => idx !== i));
@@ -1285,7 +1235,7 @@ export default function NewInvoicePage() {
 
     items.forEach((it, i) => {
       if (!it.description.trim()) e["item_" + i + "_description"] = "Obligatorio";
-      if (!it.subAccountId) e["item_" + i + "_account"] = "Obligatorio";
+      if (!it.subAccountId && !(delegateToAccounting && it.isNewItem)) e["item_" + i + "_account"] = "Obligatorio";
       if (it.quantity <= 0) e["item_" + i + "_quantity"] = "> 0";
       if (it.unitPrice <= 0) e["item_" + i + "_unitPrice"] = "> 0";
     });
@@ -1322,6 +1272,9 @@ export default function NewInvoicePage() {
       // Preparar items
       const itemsData = items.map((i) => ({
         description: i.description.trim(),
+        // Vínculo con el ítem de PO (metadato; independiente del concepto).
+        poId: !i.isNewItem ? (i.poId || selectedPO?.id || null) : null,
+        poNumber: !i.isNewItem ? (i.poNumber || selectedPO?.number || null) : null,
         poItemId: i.poItemId || null,
         poItemIndex: i.poItemIndex !== undefined ? i.poItemIndex : null,
         isNewItem: i.isNewItem || false,
@@ -1864,15 +1817,15 @@ export default function NewInvoicePage() {
                         </div>
                         <div className="flex-1">
                           <p className={cx("text-[13px] font-semibold mb-2", poStats.isOverInvoiced ? "text-red-800" : "text-slate-700")}>
-                            {poStats.isOverInvoiced ? "Excede el total de la PO" : "Estado de facturación"}
+                            {poStats.isOverInvoiced ? "Excede la base de la PO" : "Facturación de la PO"}
                           </p>
                           <div className="grid grid-cols-2 gap-4 text-[13px]">
                             <div>
-                              <p className="text-slate-500">Total PO</p>
+                              <p className="text-slate-500">Base PO</p>
                               <p className="font-semibold text-slate-900">{formatCurrency(poStats.totalAmount)} €</p>
                             </div>
                             <div>
-                              <p className="text-slate-500">Facturado</p>
+                              <p className="text-slate-500">Facturado (con esta)</p>
                               <p className={cx("font-semibold", poStats.isOverInvoiced ? "text-red-600" : "text-emerald-600")}>
                                 {formatCurrency(poStats.invoicedAmount)} €
                               </p>
@@ -2311,11 +2264,20 @@ export default function NewInvoicePage() {
                 <div className="flex items-center gap-2">
                   {formData.invoiceType === "with-po" && selectedPO && (
                     <button
-                      onClick={() => setShowPOItemsModal(true)}
-                      className="flex items-center gap-1.5 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium"
+                      onClick={() => setAddPicker("po")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium"
                     >
                       <Plus size={14} />
-                      De PO
+                      De PO-{selectedPO.number}
+                    </button>
+                  )}
+                  {formData.invoiceType === "with-po" && (
+                    <button
+                      onClick={() => setAddPicker("other")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-md text-[13px] font-medium"
+                    >
+                      <Plus size={14} />
+                      De otra PO
                     </button>
                   )}
                   <button
@@ -2328,8 +2290,8 @@ export default function NewInvoicePage() {
                 </div>
               </div>
               
-              {/* Toggle delegar a contabilidad */}
-              {formData.invoiceType === "without-po" && (
+              {/* Toggle delegar a contabilidad (con o sin PO: afecta a las líneas nuevas) */}
+              {(
                 <div className="px-6 py-3 bg-slate-50 border-b border-slate-100">
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <button
@@ -2347,14 +2309,9 @@ export default function NewInvoicePage() {
                         )}
                       />
                     </button>
-                    <div>
-                      <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900">
-                        Delegar codificación a contabilidad
-                      </span>
-                      <p className="text-xs text-slate-500">
-                        No asignaré cuentas, lo hará el departamento de contabilidad
-                      </p>
-                    </div>
+                    <span className="text-[13px] font-medium text-slate-700 group-hover:text-slate-900">
+                      Delegar codificación a contabilidad
+                    </span>
                   </label>
                 </div>
               )}
@@ -2366,9 +2323,6 @@ export default function NewInvoicePage() {
                       <ShoppingCart size={20} className={hasError("items") ? "text-red-400" : "text-slate-400"} />
                     </div>
                     <p className={cx("text-[13px] font-medium", hasError("items") ? "text-red-700" : "text-slate-700")}>No hay ítems</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {formData.invoiceType === "with-po" && selectedPO ? "Añade items de la PO o crea uno nuevo" : "Añade items"}
-                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -2384,12 +2338,17 @@ export default function NewInvoicePage() {
                                 {itemComplete ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Hash size={12} />}
                                 Item {index + 1}
                               </span>
-                              {item.isNewItem ? (
-                                <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">Nuevo</span>
+                              {formData.invoiceType === "with-po" ? (
+                                <LineOrigin
+                                  link={{ poId: item.poId || (item.isNewItem ? null : selectedPO?.id), poNumber: item.poNumber, poItemIndex: item.poItemIndex, poItemId: item.poItemId, isNewItem: item.isNewItem }}
+                                  invoicePO={invoiceOriginPO}
+                                  pos={originPOs}
+                                  pending={pendingByPOItem}
+                                  onLink={(po, poItem, idx) => relinkItem(index, po, poItem, idx)}
+                                  onNew={() => unlinkItem(index)}
+                                />
                               ) : (
-                                <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)", color: "#2F52E0" }}>
-                                  De PO
-                                </span>
+                                <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">Nuevo</span>
                               )}
                               {itemComplete && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
                             </div>
@@ -2821,11 +2780,12 @@ export default function NewInvoicePage() {
         </div>
       </Modal>
 
-      <POItemsModal
-        open={showPOItemsModal && !!selectedPO}
-        onClose={() => setShowPOItemsModal(false)}
-        poNumber={selectedPO?.number}
-        items={poItemsWithInvoiced}
+      <POItemPicker
+        open={!!addPicker}
+        onClose={() => setAddPicker(null)}
+        pos={addPicker === "po" && invoiceOriginPO ? [invoiceOriginPO] : originPOs.filter((p) => p.id !== selectedPO?.id)}
+        fixedPoId={addPicker === "po" ? selectedPO?.id : undefined}
+        pending={pendingByPOItem}
         onPick={addPOItemToInvoice}
       />
 

@@ -27,6 +27,7 @@ import {
   query,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
@@ -73,6 +74,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { syncBudget } from "@/lib/ledgerClient";
+import { LineOrigin, type OriginPO, type OriginPOItem } from "@/components/accounting/LineOrigin";
 import { PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
 import { stepLabel } from "@/lib/approvalFlow";
 import { repairDoc } from "@/lib/approvalActions";
@@ -342,7 +344,9 @@ export default function InvoiceDetailPage() {
     supplierNumber: "", invoiceDate: "", dueDate: "", description: "", supplierTaxId: "", supplierIban: "", supplierBic: "",
     paymentMethod: "transfer", currency: "EUR", accountingEntry: "", isAsset: false, assetCategory: "", notes: "",
   });
-  const [codingItems, setCodingItems] = useState<Array<{ description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; vatRate: number; irpfRate: number; poItemIndex?: number; isNewItem: boolean; }>>([]);
+  const [codingItems, setCodingItems] = useState<Array<{ description: string; subAccountId: string; subAccountCode: string; subAccountDescription: string; quantity: number; unitPrice: number; vatRate: number; irpfRate: number; poId?: string | null; poNumber?: string | null; poItemId?: string | null; poItemIndex?: number; isNewItem: boolean; }>>([]);
+  // POs aprobadas visibles: para imputar una línea a un ítem de otra PO.
+  const [originPOs, setOriginPOs] = useState<OriginPO[]>([]);
   const [searchSubAccount, setSearchSubAccount] = useState("");
   const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
   const [replacingDocument, setReplacingDocument] = useState(false);
@@ -444,7 +448,7 @@ export default function InvoiceDetailPage() {
       setCodingItems((data.items || []).map((i: any) => ({
         description: i.description || "", subAccountId: i.subAccountId || "", subAccountCode: i.subAccountCode || "",
         subAccountDescription: i.subAccountDescription || "", quantity: i.quantity || 1, unitPrice: i.unitPrice || 0,
-        vatRate: i.vatRate ?? 21, irpfRate: i.irpfRate ?? 0, poItemIndex: i.poItemIndex, isNewItem: i.isNewItem ?? (i.poItemIndex === undefined || i.poItemIndex === null),
+        vatRate: i.vatRate ?? 21, irpfRate: i.irpfRate ?? 0, poId: i.poId ?? null, poNumber: i.poNumber ?? null, poItemId: i.poItemId ?? null, poItemIndex: i.poItemIndex ?? undefined, isNewItem: i.isNewItem ?? (i.poItemIndex === undefined || i.poItemIndex === null),
       })));
 
       // Load PO
@@ -456,6 +460,12 @@ export default function InvoiceDetailPage() {
           setLinkedPO({ id: poDoc.id, number: poData.number, supplier: poData.supplier, baseAmount: poData.baseAmount || 0, invoicedAmount: poData.invoicedAmount || 0, status: poData.status, items: poData.items });
         }
       }
+
+      try {
+        const approved = (await getScopedDocs(collection(db, `projects/${projectId}/pos`), scopeFromPermissions(permissions), [where("status", "==", "approved")]))
+          .filter((d) => d.data().status === "approved");
+        setOriginPOs(approved.map((d) => ({ id: d.id, number: d.data().number, supplier: d.data().supplier, items: (d.data().items || []) as OriginPOItem[] })));
+      } catch { setOriginPOs([]); }
 
       // Load invoice IDs for nav - filtrar por permisos
       const navInvoices = sortByTime(await getScopedDocs(collection(db, `projects/${projectId}/invoices`), scopeFromPermissions(permissions)), "createdAt", "asc");
@@ -1006,6 +1016,7 @@ export default function InvoiceDetailPage() {
                           unitPrice: poItem.unitPrice || 0,
                           vatRate: poItem.vatRate ?? 21,
                           irpfRate: poItem.irpfRate ?? 0,
+                          poId: linkedPO.id, poNumber: linkedPO.number, poItemId: poItem.id || `item-${idx}`,
                           poItemIndex: idx,
                           isNewItem: false,
                         }));
@@ -1038,6 +1049,7 @@ export default function InvoiceDetailPage() {
                             unitPrice: poItem.unitPrice || 0,
                             vatRate: poItem.vatRate ?? 21,
                             irpfRate: poItem.irpfRate ?? 0,
+                            poId: linkedPO.id, poNumber: linkedPO.number, poItemId: poItem.id || `item-${idx}`,
                             poItemIndex: idx,
                             isNewItem: false,
                           }]);
@@ -1058,15 +1070,20 @@ export default function InvoiceDetailPage() {
                   <div key={idx} className={`border rounded-md p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-slate-200 bg-[#F7F7F8]"}`}>
                     <div className="absolute -top-2 left-3 flex items-center gap-2">
                       <span className="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-500 font-medium">Línea {idx + 1}</span>
-                      {item.isNewItem ? (
-                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
-                          <Plus size={10} />Nuevo
-                        </span>
-                      ) : (
-                        <span className="bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
-                          <LinkIcon size={10} />De PO
-                        </span>
-                      )}
+                    </div>
+                    <div className="mb-2 mt-1">
+                      <LineOrigin
+                        link={{ poId: item.poId || (item.isNewItem ? null : linkedPO?.id), poNumber: item.poNumber, poItemIndex: item.poItemIndex, poItemId: item.poItemId, isNewItem: item.isNewItem }}
+                        invoicePO={linkedPO ? { id: linkedPO.id, number: linkedPO.number, supplier: linkedPO.supplier, items: (linkedPO.items || []) as OriginPOItem[] } : null}
+                        pos={originPOs}
+                        onLink={(po, poItem, i) => setCodingItems((prev) => prev.map((x, k) => k !== idx ? x : {
+                          ...x, poId: po.id, poNumber: po.number, poItemIndex: i, poItemId: poItem.id || `item-${i}`, isNewItem: false,
+                          // El concepto se conserva si ya se escribió; el vínculo va por el ítem.
+                          description: x.description.trim() ? x.description : poItem.description || "",
+                          subAccountId: poItem.subAccountId || x.subAccountId, subAccountCode: poItem.subAccountCode || x.subAccountCode, subAccountDescription: poItem.subAccountDescription || x.subAccountDescription,
+                        }))}
+                        onNew={() => setCodingItems((prev) => prev.map((x, k) => k !== idx ? x : { ...x, isNewItem: true, poId: null, poNumber: null, poItemId: null, poItemIndex: undefined }))}
+                      />
                     </div>
                     {codingItems.length > 1 && <button onClick={() => removeCodingItem(idx)} className="absolute top-2 right-2 p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
                     
@@ -1103,72 +1120,6 @@ export default function InvoiceDetailPage() {
                           )}
                         </div>
                       </div>
-
-                      {linkedPO && linkedPO.items && (
-                        <div className="col-span-3">
-                          <label className="text-xs text-slate-500 block mb-1">Origen</label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateCodingItem(idx, "isNewItem", !item.isNewItem);
-                                if (!item.isNewItem) updateCodingItem(idx, "poItemIndex", undefined);
-                              }}
-                              className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${item.isNewItem ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"}`}
-                            >
-                              Nuevo
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateCodingItem(idx, "isNewItem", false)}
-                              className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${!item.isNewItem ? "bg-[#F1F1F3] text-slate-900 border border-slate-200" : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"}`}
-                            >
-                              De PO
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {linkedPO && linkedPO.items && !item.isNewItem && (
-                        <div className="col-span-3">
-                          <label className="text-xs text-slate-500 block mb-1">Línea de PO</label>
-                          <div className="relative custom-dropdown">
-                            <button
-                              type="button"
-                              onClick={() => setOpenDropdown(openDropdown === `poitem-${idx}` ? null : `poitem-${idx}`)}
-                              className="w-full px-3 py-2 border border-slate-200 bg-[#F7F7F8] rounded-lg text-[13px] text-left flex items-center justify-between gap-2 hover:border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
-                            >
-                              <span className="text-slate-900 truncate">
-                                {item.poItemIndex !== undefined && item.poItemIndex !== null
-                                  ? `#${item.poItemIndex + 1} - ${linkedPO.items[item.poItemIndex]?.description?.substring(0, 30) || `Línea ${item.poItemIndex + 1}`}`
-                                  : "Seleccionar..."}
-                              </span>
-                              <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `poitem-${idx}` ? "rotate-180" : ""}`} />
-                            </button>
-                            {openDropdown === `poitem-${idx}` && (
-                              <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                                <button
-                                  type="button"
-                                  onClick={() => { updateCodingItem(idx, "poItemIndex", undefined); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.poItemIndex === undefined || item.poItemIndex === null ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                                >
-                                  Seleccionar...
-                                </button>
-                                {linkedPO.items.map((poItem: any, i: number) => (
-                                  <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => { updateCodingItem(idx, "poItemIndex", i); setOpenDropdown(null); }}
-                                    className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.poItemIndex === i ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                                  >
-                                    #{i + 1} - {poItem.description?.substring(0, 30) || `Línea ${i + 1}`}
-                                  </button>
-                                ))}
-                              </AnchoredPanel>
-                            )}
-                          </div>
-                        </div>
-                      )}
 
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500 block mb-1">IVA %</label>

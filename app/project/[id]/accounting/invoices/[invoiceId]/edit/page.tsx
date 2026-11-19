@@ -10,7 +10,8 @@ import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { db, storage } from "@/lib/firebase";
-import { AccountPickerModal, EpisodeModal, POItemsModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { AccountPickerModal, EpisodeModal, SupplierPickerModal } from "@/components/accounting/Pickers";
+import { POItemPicker, type OriginPOItem } from "@/components/accounting/LineOrigin";
 import { documentTotals, lineAmounts } from "@/lib/amounts";
 import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
@@ -98,6 +99,8 @@ interface EpisodeDistribution {
 interface InvoiceItem {
   id: string;
   description: string;
+  poId?: string | null;
+  poNumber?: string | null;
   poItemId?: string;
   poItemIndex?: number;
   isNewItem: boolean;
@@ -293,7 +296,6 @@ export default function EditInvoicePage() {
   useBodyScrollLock(showEpisodeModal || showSupplierModal || showAccountModal || showPOItemsModal);
 
   // Items de PO
-  const [poItemsWithInvoiced, setPOItemsWithInvoiced] = useState<POItemWithInvoiced[]>([]);
 
   // Dropdown departamento
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
@@ -375,6 +377,8 @@ export default function EditInvoicePage() {
       const loadedItems = (data.items || []).map((item: any, idx: number) => ({
         id: item.id || String(idx + 1),
         description: item.description || "",
+        poId: item.poId || null,
+        poNumber: item.poNumber || null,
         poItemId: item.poItemId || undefined,
         poItemIndex: item.poItemIndex,
         isNewItem: item.isNewItem ?? true,
@@ -487,55 +491,9 @@ export default function EditInvoicePage() {
   const removeItem = (i: number) => { if (items.length > 1) setItems(items.filter((_, idx) => idx !== i)); };
 
   // Cargar items de PO con facturado
-  const loadPOItemsWithInvoiced = async () => {
-    if (!linkedPO) return;
-    try {
-      // Obtener todas las facturas de esta PO (excluyendo la actual)
-      const LIVE = ["pending", "pending_approval", "approved", "paid", "overdue"];
-      const invoicesSnap = {
-        docs: (await getScopedDocs(collection(db, `projects/${id}/invoices`), scopeFromPermissions(permissions), [
-          where("poId", "==", linkedPO.id), where("status", "in", LIVE),
-        ])).filter((d) => d.data().poId === linkedPO.id && LIVE.includes(d.data().status)),
-      };
-      
-      // Calcular cuánto está facturado por item
-      const itemInvoicedAmounts: Record<number, number> = {};
-      invoicesSnap.docs.forEach(invDoc => {
-        if (invDoc.id === invoiceId) return; // Excluir factura actual
-        const invData = invDoc.data();
-        (invData.items || []).forEach((item: any) => {
-          if (item.poItemIndex !== undefined && item.poItemIndex !== null) {
-            itemInvoicedAmounts[item.poItemIndex] = (itemInvoicedAmounts[item.poItemIndex] || 0) + (item.totalAmount || 0);
-          }
-        });
-      });
+  // Lo facturado por ítem lo mantiene el servidor en la PO (lib/budgetLedger).
+  const loadPOItemsWithInvoiced = async () => { if (linkedPO) setShowPOItemsModal(true); };
 
-      const poItemsEnriched: POItemWithInvoiced[] = (linkedPO.items || []).map((item: any, idx: number) => ({
-        id: item.id,
-        description: item.description || "",
-        subAccountId: item.subAccountId || "",
-        subAccountCode: item.subAccountCode || "",
-        subAccountDescription: item.subAccountDescription || "",
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice || 0,
-        baseAmount: item.baseAmount || 0,
-        vatRate: item.vatRate ?? 21,
-        vatAmount: item.vatAmount || 0,
-        irpfRate: item.irpfRate || 0,
-        irpfAmount: item.irpfAmount || 0,
-        totalAmount: item.totalAmount || 0,
-        episodeAssignment: item.episodeAssignment || "general",
-        episodes: item.episodes,
-        invoicedAmount: itemInvoicedAmounts[idx] || 0,
-        availableAmount: (item.totalAmount || 0) - (itemInvoicedAmounts[idx] || 0),
-      }));
-
-      setPOItemsWithInvoiced(poItemsEnriched);
-      setShowPOItemsModal(true);
-    } catch (error) {
-      console.error("Error loading PO items:", error);
-    }
-  };
 
   const addPOItemToInvoice = (poItem: POItemWithInvoiced, idx: number) => {
     setItems([...items, {
@@ -705,6 +663,9 @@ export default function EditInvoicePage() {
       const itemsData = items.map(i => {
         const itemData: any = {
           description: i.description?.trim() || "",
+          // Vínculo con el ítem de PO (puede ser de otra PO): se conserva al editar.
+          poId: !i.isNewItem ? ((i as any).poId || linkedPO?.id || null) : null,
+          poNumber: !i.isNewItem ? ((i as any).poNumber || linkedPO?.number || null) : null,
           poItemId: i.poItemId || null,
           poItemIndex: i.poItemIndex !== undefined ? i.poItemIndex : null,
           isNewItem: i.isNewItem || false,
@@ -1347,12 +1308,12 @@ export default function EditInvoicePage() {
         </div>
       </main>
 
-      <POItemsModal
+      <POItemPicker
         open={showPOItemsModal && !!linkedPO}
         onClose={() => setShowPOItemsModal(false)}
-        poNumber={linkedPO?.number}
-        items={poItemsWithInvoiced}
-        onPick={addPOItemToInvoice}
+        pos={linkedPO ? [{ id: linkedPO.id, number: linkedPO.number, supplier: linkedPO.supplier, items: linkedPO.items as OriginPOItem[] }] : []}
+        fixedPoId={linkedPO?.id}
+        onPick={(_po, poItem, idx) => addPOItemToInvoice({ ...(poItem as any), id: poItem.id || `item-${idx}` }, idx)}
       />
 
       <SupplierPickerModal
