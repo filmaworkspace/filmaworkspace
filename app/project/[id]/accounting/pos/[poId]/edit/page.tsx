@@ -405,7 +405,7 @@ export default function EditPOPage() {
         let name = memberData.name || memberData.email || memberDocSnap.id;
         try {
           const userDoc = await getDoc(doc(db, "users", memberDocSnap.id));
-          if (userDoc.exists()) name = userDoc.data().displayName || userDoc.data().email || name;
+          if (userDoc.exists()) name = userDoc.data().displayName || name;
         } catch (e) {}
         membersData.push({ userId: memberDocSnap.id, name, email: memberData.email, role: memberData.role, department: memberData.department, position: memberData.position, permissions: memberData.permissions || null, accountingAccessLevel: memberData.accountingAccessLevel || null });
       }

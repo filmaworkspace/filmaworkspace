@@ -504,7 +504,7 @@ export default function NewPOPage() {
         try {
           const userDoc = await getDoc(doc(db, "users", memberDocSnap.id));
           if (userDoc.exists()) {
-            name = userDoc.data().displayName || userDoc.data().email || name;
+            name = userDoc.data().displayName || name;
           }
         } catch (e) {}
         membersData.push({

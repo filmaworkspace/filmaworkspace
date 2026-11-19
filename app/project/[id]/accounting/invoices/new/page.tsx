@@ -558,7 +558,7 @@ export default function NewInvoicePage() {
         try {
           const uDoc = await getDoc(doc(db, "users", mDoc.id));
           if (uDoc.exists()) {
-            name = uDoc.data().displayName || uDoc.data().email || name;
+            name = uDoc.data().displayName || name;
           }
         } catch (e) {}
         membersData.push({

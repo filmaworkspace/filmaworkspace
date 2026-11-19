@@ -301,3 +301,11 @@ export function stripUndefined<T>(obj: T): T {
   }
   return obj;
 }
+
+/** Rellena nombres de aprobadores que falten (flujos antiguos) a partir de los miembros. */
+export function withNames<T extends { approvalSteps?: ApprovalStepState[] | null }>(doc: T, members: FlowMember[]): T {
+  if (!doc.approvalSteps?.length) return doc;
+  const byId = new Map(members.map((m) => [m.userId, memberName(m, m.userId)]));
+  const fix = (ids: string[] = [], names: string[] = []) => ids.map((u, k) => (names[k] && names[k] !== u ? names[k] : byId.get(u) || u));
+  return { ...doc, approvalSteps: doc.approvalSteps.map((s) => ({ ...s, approverNames: fix(s.approvers, s.approverNames), approvedByNames: fix(s.approvedBy, s.approvedByNames) })) };
+}

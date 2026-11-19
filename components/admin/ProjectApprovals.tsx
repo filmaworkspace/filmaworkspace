@@ -13,7 +13,7 @@ import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { Pills, RowBar, timeAgo, fmtDate, type Tone } from "@/components/admin/ui";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ApprovalSteps, PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
-import { hasAccountingAccess, pendingSummary, stepLabel, type ApprovalStepState, type FlowMember } from "@/lib/approvalFlow";
+import { hasAccountingAccess, pendingSummary, stepLabel, withNames, type ApprovalStepState, type FlowMember } from "@/lib/approvalFlow";
 import {
   FLOW_ACTION_LABEL, forceApprove, isAwaitingApproval, isRejected, loadFlowContext, rebuildDoc, reassignStep, repairDoc,
   replaceApprover, resumeFrom, skipStep, type FlowActor, type FlowDocType, type FlowAction,
@@ -45,7 +45,8 @@ const docNumber = (type: FlowDocType, d: AnyDoc) => d.displayNumber || `${type =
 const FIELDS: SearchField<"all">[] = [{ value: "all", label: "Buscar", placeholder: "Número, proveedor o aprobador" }];
 
 /** Clasifica un documento y explica qué le pasa. Null si no está en circuito. */
-function classify(type: FlowDocType, id: string, d: AnyDoc, members: FlowMember[]): Row | null {
+function classify(type: FlowDocType, id: string, raw: AnyDoc, members: FlowMember[]): Row | null {
+  const d = withNames(raw, members);
   const base = { type, id, d, number: docNumber(type, d), supplier: d.supplier || d.supplierName || "—", base: d.baseAmount || 0, department: d.department || "" };
   const steps: ApprovalStepState[] = d.approvalSteps || [];
   if (isRejected(type, d)) {

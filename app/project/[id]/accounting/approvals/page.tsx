@@ -17,7 +17,7 @@ import { getScopedDocs, scopeFromMember, type DocScope } from "@/lib/accountingS
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
 import { afterApprovalComplete } from "@/lib/approvalActions";
-import { applyApproval, applyRejection, canApprove, stripUndefined } from "@/lib/approvalFlow";
+import { applyApproval, applyRejection, canApprove, stripUndefined, withNames } from "@/lib/approvalFlow";
 import {
   onAuthStateChanged,
 } from "firebase/auth";
@@ -277,6 +277,7 @@ export default function ApprovalsPage() {
       const membersMap: Record<string, string> = {};
       for (const mDoc of membersSnap.docs) { const mData = mDoc.data(); membersMap[mDoc.id] = mData.name || mData.email || mDoc.id; }
       setMembers(membersMap);
+      const memberList = Object.entries(membersMap).map(([userId, name]) => ({ userId, name }));
 
       let localUserRole = "", localUserDepartment = "", localUserPosition = "";
       const memberDoc = await getDoc(doc(db, `projects/${id}/members`, userId!));
@@ -306,7 +307,7 @@ export default function ApprovalsPage() {
             projectId: id, projectName: localProjectName, supplier: d.supplier, supplierId: d.supplierId,
             amount: d.totalAmount || 0, baseAmount: d.baseAmount || d.totalAmount || 0, description: d.generalDescription || d.description || "",
             createdAt, createdBy: d.createdBy, createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
-            currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+            currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
             attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
             items: d.items || [], department: d.department, poType: d.poType, currency: d.currency || "EUR",
             timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "po", subAccountsMap),
@@ -334,7 +335,7 @@ export default function ApprovalsPage() {
               supplier: d.supplier, supplierId: d.supplierId, amount: d.totalAmount || 0, baseAmount: d.baseAmount || d.totalAmount || 0,
               description: d.description || "", createdAt, createdBy: d.createdBy,
               createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
-              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
               attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
               items: d.items || [], poId: d.poId, poNumber: d.poNumber,
               timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "invoice", subAccountsMap),
@@ -382,7 +383,7 @@ export default function ApprovalsPage() {
               supplier: cardName, amount: d.totalAmount || 0, baseAmount: d.totalBase || 0,
               description: `Sobre de tarjeta · ${d.expenseCount || 0} gastos`,
               createdAt, createdBy: d.createdBy, createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
-              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
               timeline: buildTimeline(d, membersMap), autoChecks: [],
               daysWaiting, isUrgent: daysWaiting >= 3,
               boxType: "card", boxExpenses, expenseCount: d.expenseCount || 0, cardName,
@@ -422,7 +423,7 @@ export default function ApprovalsPage() {
               supplier: `Transferencia`, amount: d.totalAmount || 0, baseAmount: d.totalBase || 0,
               description: `Sobre de transferencia · ${d.expenseCount || 0} gastos`,
               createdAt, createdBy: d.createdBy, createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
-              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: d.approvalSteps || [],
+              currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
               timeline: buildTimeline(d, membersMap), autoChecks: [],
               daysWaiting, isUrgent: daysWaiting >= 3,
               boxType: "transfer", boxExpenses, expenseCount: d.expenseCount || 0, paymentDate: d.paymentDate,
