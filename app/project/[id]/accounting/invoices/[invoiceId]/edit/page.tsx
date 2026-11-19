@@ -17,6 +17,7 @@ import { getScopedDocs, scopeFromPermissions } from "@/lib/accountingScope";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
 import { syncBudget } from "@/lib/ledgerClient";
+import { AmountSummary } from "@/components/accounting/AmountSummary";
 import { useFormAutosave } from "@/hooks/useFormAutosave";
 import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
@@ -1000,7 +1001,7 @@ export default function EditInvoicePage() {
 
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-slate-600">Fecha vencimiento</label>
-                    <input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
+                    <input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} className="w-44 px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white text-[13px]" />
                   </div>
                 </div>
 
@@ -1181,10 +1182,7 @@ export default function EditInvoicePage() {
                         </div>
 
                         <div className="flex justify-end">
-                          <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
-                            <span className="text-slate-400">Total:</span>
-                            <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} €</span>
-                          </div>
+                          <div className="flex items-baseline gap-3 text-[13px]"><span className="text-xs text-slate-400">Total {formatCurrency(item.totalAmount)} €</span><span className="text-slate-500">Base</span><span className="text-base font-semibold tabular-nums text-slate-900">{formatCurrency(item.baseAmount)} €</span></div>
                         </div>
                       </div>
                     </div>
@@ -1271,17 +1269,7 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Totales */}
-            <div className="bg-white border border-slate-200 rounded-lg p-5">
-              <h3 className="font-semibold text-slate-900 mb-4">Resumen</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[13px]"><span className="text-slate-500">Base imponible</span><span className="text-slate-900">{formatCurrency(totals.baseAmount)} €</span></div>
-                <div className="flex justify-between text-[13px]"><span className="text-slate-500">IVA</span><span className="text-slate-900">{formatCurrency(totals.vatAmount)} €</span></div>
-                {totals.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-500">IRPF</span><span className="text-red-600">-{formatCurrency(totals.irpfAmount)} €</span></div>}
-                <div className="border-t border-slate-100 pt-2 mt-2">
-                  <div className="flex justify-between"><span className="font-medium text-slate-900">Total</span><span className="font-bold text-lg text-slate-900">{formatCurrency(totals.totalAmount)} €</span></div>
-                </div>
-              </div>
-            </div>
+            <AmountSummary base={totals.baseAmount} vat={totals.vatAmount} irpf={totals.irpfAmount} total={totals.totalAmount} />
 
             {/* Aprobación */}
             <div className="bg-white border border-slate-200 rounded-lg p-5">

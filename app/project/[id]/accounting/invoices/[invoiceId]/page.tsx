@@ -74,6 +74,8 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { syncBudget } from "@/lib/ledgerClient";
+import { AmountSummary } from "@/components/accounting/AmountSummary";
+import { SupplierHeader } from "@/components/accounting/SupplierPreview";
 import { LineOrigin, type OriginPO, type OriginPOItem } from "@/components/accounting/LineOrigin";
 import { PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
 import { stepLabel } from "@/lib/approvalFlow";
@@ -1371,6 +1373,8 @@ export default function InvoiceDetailPage() {
       </div>
 
       <main className="px-6 sm:px-10 py-8">
+        <SupplierHeader projectId={projectId} supplierId={invoice.supplierId} name={invoice.supplier}
+          meta={[invoice.supplierNumber ? `Nº proveedor ${invoice.supplierNumber}` : null, invoice.poNumber ? `PO-${invoice.poNumber}` : null].filter(Boolean).join(" · ")} />
         {/* Banner de delegación a contabilidad */}
         {invoice.status === "coding" && invoice.delegatedToAccounting && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-md px-5 py-4">
@@ -1570,15 +1574,7 @@ export default function InvoiceDetailPage() {
             </div>
 
             {/* Summary AFTER items */}
-            <div className="bg-white border border-slate-200 rounded-lg p-6">
-              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Resumen</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-[13px]"><span className="text-slate-500">Base imponible</span><span className="font-medium">{formatCurrency(invoice.baseAmount)} €</span></div>
-                <div className="flex justify-between text-[13px]"><span className="text-slate-500">IVA</span><span className="font-medium text-emerald-600">+{formatCurrency(invoice.vatAmount)} €</span></div>
-                {invoice.irpfAmount > 0 && <div className="flex justify-between text-[13px]"><span className="text-slate-500">IRPF</span><span className="font-medium text-red-600">-{formatCurrency(invoice.irpfAmount)} €</span></div>}
-                <div className="pt-3 border-t border-slate-200 flex justify-between"><span className="font-medium">Total</span><span className="text-xl font-bold">{formatCurrency(invoice.totalAmount)} €</span></div>
-              </div>
-            </div>
+            <AmountSummary base={invoice.baseAmount || 0} vat={invoice.vatAmount || 0} irpf={invoice.irpfAmount || 0} total={invoice.totalAmount || 0} />
 
             {/* Coding Status - Only show if NOT coded yet */}
             {!invoice.codedAt && canCode() && invoice.status !== "cancelled" ? (

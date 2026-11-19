@@ -18,6 +18,7 @@ import { nextDocNumber } from "@/lib/docCounter";
 import { approverIdsOf } from "@/lib/approvers";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
 import { syncBudget } from "@/lib/ledgerClient";
+import { AmountSummary } from "@/components/accounting/AmountSummary";
 import { useFormAutosave } from "@/hooks/useFormAutosave";
 import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 import { buildFlow, type ApprovalStepConfig, type FlowMember } from "@/lib/approvalFlow";
@@ -863,7 +864,9 @@ export default function NewInvoicePage() {
       episodeAssignment: full.episodeAssignment || "general",
       episodes: full.episodes ? [...full.episodes] : undefined,
     };
-    setItems([...items, { ...line, ...linkFields(po, poItem, idx) } as InvoiceItem]);
+    const linked = { ...line, ...linkFields(po, poItem, idx) } as InvoiceItem;
+    // Importes siempre recalculados (cantidad × precio, IVA, IRPF) para que cuadren.
+    setItems([...items, { ...linked, ...lineAmounts(linked) }]);
   };
 
   /** Cambiar el origen de una línea ya creada (sin tocar sus importes). */
@@ -2058,10 +2061,7 @@ export default function NewInvoicePage() {
                 <div className="grid grid-cols-2 gap-5">
                   <div className="col-span-2">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-[13px] font-medium text-slate-700 flex items-center gap-2">
-                        <Calendar size={14} />
-                        Vencimiento *
-                      </label>
+                      <label className="text-xs font-medium text-slate-600">Vencimiento</label>
                       <button
                         type="button"
                         onClick={() => {
@@ -2070,12 +2070,7 @@ export default function NewInvoicePage() {
                           }
                           setMultipleDueDates(!multipleDueDates);
                         }}
-                        className={cx(
-                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                          multipleDueDates
-                            ? "bg-[#F1F1F3] text-slate-900 border border-slate-200"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        )}
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"
                       >
                         <Split size={12} />
                         {multipleDueDates ? "Vencimiento único" : "Dividir vencimiento"}
@@ -2090,11 +2085,10 @@ export default function NewInvoicePage() {
                           onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                           onBlur={() => handleBlur("dueDate")}
                           className={cx(
-                            "w-full px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]",
-                            hasError("dueDate") ? "border-red-300 bg-red-50" : formData.dueDate ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
+                            "w-44 px-2.5 py-1.5 border rounded-md focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 text-[13px]",
+                            hasError("dueDate") ? "border-red-300 bg-red-50" : "border-slate-200"
                           )}
                         />
-                        {formData.dueDate && <CheckCircle2 size={16} className="absolute right-10 top-1/2 -translate-y-1/2 text-emerald-600" />}
                         {hasError("dueDate") && (
                           <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
                             <AlertCircle size={12} />
@@ -2561,10 +2555,7 @@ export default function NewInvoicePage() {
                               </div>
                             </div>
                             <div className="flex justify-end">
-                              <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
-                                <span className="text-slate-400">Total:</span>
-                                <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} €</span>
-                              </div>
+                              <div className="flex items-baseline gap-3 text-[13px]"><span className="text-xs text-slate-400">Total {formatCurrency(item.totalAmount)} €</span><span className="text-slate-500">Base</span><span className="text-base font-semibold tabular-nums text-slate-900">{formatCurrency(item.baseAmount)} €</span></div>
                             </div>
                           </div>
                         </div>
@@ -2647,33 +2638,7 @@ export default function NewInvoicePage() {
               </div>
 
               {/* Totals Card */}
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Total</h2>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-3 mb-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">Base</span>
-                      <span className="font-medium text-slate-900">{formatCurrency(totals.baseAmount)} €</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">IVA</span>
-                      <span className="font-medium text-emerald-600">+{formatCurrency(totals.vatAmount)} €</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">IRPF</span>
-                      <span className="font-medium text-red-600">-{formatCurrency(totals.irpfAmount)} €</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-base font-semibold text-slate-900">Total</span>
-                      <span className="text-xl font-bold text-slate-900">{formatCurrency(totals.totalAmount)} €</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <AmountSummary base={totals.baseAmount} vat={totals.vatAmount} irpf={totals.irpfAmount} total={totals.totalAmount} />
 
               {/* Approval Preview Card */}
               <div className={cx("border rounded-lg overflow-hidden", approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200")}>

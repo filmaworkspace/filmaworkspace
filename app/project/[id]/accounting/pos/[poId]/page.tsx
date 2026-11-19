@@ -79,6 +79,8 @@ const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { FilmaPDF } from "@/lib/pdfBuilder";
 import { syncBudget } from "@/lib/ledgerClient";
+import { AmountSummary } from "@/components/accounting/AmountSummary";
+import { SupplierHeader } from "@/components/accounting/SupplierPreview";
 import { needsNewVersion, revisePO } from "@/lib/poRevision";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -835,6 +837,8 @@ export default function PODetailPage() {
       </div>
 
       <main className="px-6 sm:px-10 py-8">
+        <SupplierHeader projectId={projectId} supplierId={po.supplierId} name={po.supplier}
+          meta={po.department || undefined} />
         <div className="grid grid-cols-3 gap-8">
           <div className="col-span-2 space-y-6">
             {po.generalDescription && (
@@ -928,7 +932,10 @@ export default function PODetailPage() {
                           </div>
                           <p className="text-[13px] text-slate-500 mt-0.5">{item.subAccountCode} · {item.subAccountDescription}</p>
                         </div>
-                        <p className="font-bold text-slate-900">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</p>
+                        <div className="text-right">
+                          <p className="font-semibold tabular-nums text-slate-900">{formatCurrency(item.baseAmount)} {getCurrencySymbol()}</p>
+                          <p className="text-xs tabular-nums text-slate-400">Total {formatCurrency(item.totalAmount)} {getCurrencySymbol()}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-6 text-[13px] text-slate-500">
                         <span>{item.quantity} × {formatCurrency(item.unitPrice)} {getCurrencySymbol()}</span>
@@ -1084,29 +1091,7 @@ export default function PODetailPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-lg p-6">
-              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Resumen</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-slate-500">Base imponible</span>
-                  <span className="font-medium text-slate-900">{formatCurrency(po.baseAmount)} {getCurrencySymbol()}</span>
-                </div>
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-slate-500">IVA</span>
-                  <span className="font-medium text-slate-700">+{formatCurrency(po.vatAmount)} {getCurrencySymbol()}</span>
-                </div>
-                {po.irpfAmount > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-500">IRPF</span>
-                    <span className="font-medium text-red-600">-{formatCurrency(po.irpfAmount)} {getCurrencySymbol()}</span>
-                  </div>
-                )}
-                <div className="pt-3 border-t border-slate-200 flex justify-between">
-                  <span className="font-medium text-slate-700">Total</span>
-                  <span className="text-xl font-bold text-slate-900">{formatCurrency(po.totalAmount)} {getCurrencySymbol()}</span>
-                </div>
-              </div>
-            </div>
+            <AmountSummary base={po.baseAmount || 0} vat={po.vatAmount || 0} irpf={po.irpfAmount || 0} total={po.totalAmount || 0} symbol={getCurrencySymbol()} />
 
             <div className="bg-white border border-slate-200 rounded-lg p-6">
               <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Detalles</h3>

@@ -70,6 +70,7 @@ import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getCostSettings, shouldCommitPO } from "@/lib/budgetRules";
 import { syncBudget } from "@/lib/ledgerClient";
+import { AmountSummary } from "@/components/accounting/AmountSummary";
 import { useFormAutosave } from "@/hooks/useFormAutosave";
 import { AutosaveNotice, AutosaveStatus } from "@/components/accounting/AutosaveNotice";
 
@@ -184,6 +185,8 @@ const PO_TYPES = [
   { value: "service", label: "Servicio", icon: Wrench, description: "Trabajos, honorarios" },
   { value: "deposit", label: "Fianza", icon: Shield, description: "Depósitos de garantía" },
 ];
+
+const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 const CURRENCIES = [
   { value: "EUR", label: "EUR", symbol: "€" },
@@ -1039,12 +1042,14 @@ export default function EditPOPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Moneda</label>
-                  <div className="flex gap-2">
-                    {CURRENCIES.map((currency) => (
-                      <button key={currency.value} onClick={() => canEdit() && setFormData({ ...formData, currency: currency.value })} disabled={!canEdit()} className={`flex-1 px-4 py-1.5 rounded-md border transition-all text-[13px] font-medium ${formData.currency === currency.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:border-slate-300 text-slate-600 bg-white"} disabled:opacity-50 disabled:cursor-not-allowed`}>
-                        {currency.symbol} {currency.label}
+                {/* Moneda: compacta */}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-slate-600">Moneda</span>
+                  <div className="inline-flex rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5">
+                    {CURRENCIES.map((c) => (
+                      <button key={c.value} type="button" onClick={() => setFormData({ ...formData, currency: c.value })}
+                        className={cx("h-6 rounded-[5px] px-2 text-xs transition-colors", formData.currency === c.value ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-900")}>
+                        {c.symbol} {c.value}
                       </button>
                     ))}
                   </div>
@@ -1301,10 +1306,7 @@ export default function EditPOPage() {
                         </div>
 
                         <div className="flex justify-end">
-                          <div className="bg-slate-900 text-white px-4 py-2 rounded-md text-[13px]">
-                            <span className="text-slate-400">Total:</span>
-                            <span className="ml-2 font-semibold">{formatCurrency(item.totalAmount)} {getCurrencySymbol()}</span>
-                          </div>
+                          <div className="flex items-baseline gap-3 text-[13px]"><span className="text-xs text-slate-400">Total {formatCurrency(item.totalAmount)} {getCurrencySymbol()}</span><span className="text-slate-500">Base</span><span className="text-base font-semibold tabular-nums text-slate-900">{formatCurrency(item.baseAmount)} {getCurrencySymbol()}</span></div>
                         </div>
                       </div>
                     </div>
@@ -1427,33 +1429,7 @@ export default function EditPOPage() {
               </div>
 
               {/* Totals */}
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Total de la orden</h2>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-3 mb-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">Base imponible</span>
-                      <span className="font-medium text-slate-900">{formatCurrency(totals.baseAmount)} {getCurrencySymbol()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">IVA</span>
-                      <span className="font-medium text-emerald-600">+{formatCurrency(totals.vatAmount)} {getCurrencySymbol()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[13px] text-slate-500">IRPF</span>
-                      <span className="font-medium text-red-600">-{formatCurrency(totals.irpfAmount)} {getCurrencySymbol()}</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-base font-semibold text-slate-900">Total</span>
-                      <span className="text-xl font-bold text-slate-900">{formatCurrency(totals.totalAmount)} {getCurrencySymbol()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <AmountSummary base={totals.baseAmount} vat={totals.vatAmount} irpf={totals.irpfAmount} total={totals.totalAmount} symbol={getCurrencySymbol()} />
 
               {/* Approval Preview */}
               {canEdit() && (
