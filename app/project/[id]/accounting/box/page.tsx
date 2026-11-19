@@ -78,7 +78,7 @@ import {
 } from "lucide-react";
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, unzipSync } from "fflate";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
@@ -420,7 +420,6 @@ export default function BoxesPage() {
   const [showReceiptImportModal, setShowReceiptImportModal] = useState(false);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [uploadingReceipts, setUploadingReceipts] = useState(false);
-  const [exportingEnvelope, setExportingEnvelope] = useState(false);
   const [showManualExpenseModal, setShowManualExpenseModal] = useState(false);
   const [cardExpensesList, setCardExpensesList] = useState<Array<{
     id: string; type: "invoice" | "ticket"; supplier: string; supplierTaxId: string;
@@ -1232,260 +1231,6 @@ export default function BoxesPage() {
     }
   };
 
-  // ── Export envelope: ZIP with XLSX + renamed receipts ─────────────────────
-  const handleExportEnvelope = async (envelope: Envelope) => {
-    setExportingEnvelope(true);
-    try {
-      const exps = expenses.filter(e => e.envelopeId === envelope.id)
-        .sort((a, b) => a.number - b.number);
-
-      const esc = (s: string) => s
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-      const fmtDateStr = (d: any): string => {
-        const dt = d instanceof Date ? d : d?.toDate?.();
-        if (!dt) return "";
-        return dt.toLocaleDateString("es-ES");
-      };
-
-      const headers = [
-        "Número", "Fecha", "Tipo", "Proveedor", "CIF", "Nº Factura",
-        "Descripción", "Cuenta", "Descripción cuenta",
-        "Base imponible", "IVA %", "Cuota IVA", "IRPF %", "Cuota IRPF", "Total línea",
-        "Estado", "Incidencia",
-      ];
-
-      type Row = (string | number)[];
-      const rows: Row[] = [];
-      for (const exp of exps) {
-        const lines = exp.items && exp.items.length > 0 ? exp.items : [{
-          baseAmount: exp.baseAmount,
-          vatRate: 0,
-          vatAmount: exp.vatAmount,
-          subAccountCode: exp.subAccountCode,
-          subAccountDescription: exp.subAccountDescription,
-        } as any];
-
-        lines.forEach((item: any, li: number) => {
-          const base    = item.baseAmount ?? 0;
-          const vatRate = item.vatRate ?? 0;
-          const vatAmt  = item.vatAmount ?? Math.round(base * vatRate / 100 * 100) / 100;
-          const irpfRate = li === 0 ? (exp.irpfRate ?? 0) : 0;
-          const irpfAmt  = li === 0 ? (exp.irpfAmount ?? 0) : 0;
-          const total    = Math.round((base + vatAmt - irpfAmt) * 100) / 100;
-
-          // Use per-item subAccountCode if available (FIX applied here too)
-          const lineAccountCode = item.subAccountCode ?? exp.subAccountCode ?? "";
-          const lineAccountDesc = item.subAccountDescription ?? exp.subAccountDescription ?? "";
-
-          rows.push([
-            li === 0 ? exp.displayNumber : "",
-            li === 0 ? fmtDateStr(exp.date) : "",
-            li === 0 ? (exp.type === "invoice" ? "Factura" : "Ticket") : "",
-            li === 0 ? exp.supplier : "",
-            li === 0 ? (exp.supplierTaxId ?? "") : "",
-            li === 0 ? (exp.supplierNumber ?? "") : "",
-            li === 0 ? (exp.description ?? "") : "",
-            lineAccountCode,
-            lineAccountDesc,
-            base, vatRate, vatAmt, irpfRate, irpfAmt, total,
-            li === 0 ? exp.status : "",
-            li === 0 ? (exp.conflictType ?? "") : "",
-          ]);
-        });
-      }
-
-      const numCols   = headers.length;
-      const titleRowNum = 1;
-      const headerRowNum = 2;
-      const dataStart = 3;
-      const dataEnd   = dataStart + rows.length - 1;
-      const totalRow: (string | number)[] = new Array(numCols).fill("");
-      totalRow[0]  = "TOTAL";
-      totalRow[9]  = `=SUM(J${dataStart}:J${dataEnd})`;
-      totalRow[11] = `=SUM(L${dataStart}:L${dataEnd})`;
-      totalRow[13] = `=SUM(N${dataStart}:N${dataEnd})`;
-      totalRow[14] = `=SUM(O${dataStart}:O${dataEnd})`;
-
-      const colLetter = (n: number) => {
-        let s = "";
-        while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
-        return s;
-      };
-
-      // Style indices: 0=default, 1=title (white bold on dark), 2=header (white bold on orange), 3=total (bold)
-      const cellXml = (col: number, row: number, val: string | number, styleIdx = 0): string => {
-        const addr = colLetter(col) + row;
-        const s = styleIdx > 0 ? ` s="${styleIdx}"` : "";
-        if (typeof val === "number") return `<c r="${addr}"${s}><v>${val}</v></c>`;
-        if (typeof val === "string" && val.startsWith("="))
-          return `<c r="${addr}" t="str"${s}><f>${esc(val.slice(1))}</f></c>`;
-        return `<c r="${addr}" t="inlineStr"${s}><is><t>${esc(String(val))}</t></is></c>`;
-      };
-
-      // Row 1: title spanning all columns — production name + envelope id
-      const titleText = `${projectName ? projectName.toUpperCase() + " · " : ""}${envelope.displayNumber}`;
-      let sheetRows = `<row r="1" ht="22" customHeight="1">${cellXml(0, 1, titleText, 1)}${Array.from({length: numCols - 1}, (_, i) => `<c r="${colLetter(i+1)}1" s="1"/>`).join("")}</row>`;
-
-      // Row 2: column headers with orange background
-      sheetRows += `<row r="2" ht="18" customHeight="1">${headers.map((h, c) => cellXml(c, 2, h, 2)).join("")}</row>`;
-
-      // Data rows
-      rows.forEach((row, ri) => {
-        const r = ri + dataStart;
-        sheetRows += `<row r="${r}">${row.map((v, c) => cellXml(c, r, v)).join("")}</row>`;
-      });
-
-      // Total row
-      const tr = rows.length + dataStart;
-      sheetRows += `<row r="${tr}">${totalRow.map((v, c) => v !== "" ? cellXml(c, tr, v, 3) : "").join("")}</row>`;
-
-      const colWidths = [16,12,8,24,12,16,24,10,24,12,6,10,6,10,12,10,14];
-      const colsXml = colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
-
-      // Styles XML: fonts, fills, borders, cellXfs
-      const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="4">
-    <font><sz val="11"/><name val="Calibri"/></font>
-    <font><b/><sz val="13"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-    <font><b/><sz val="11"/><name val="Calibri"/></font>
-  </fonts>
-  <fills count="4">
-    <fill><patternFill patternType="none"/></fill>
-    <fill><patternFill patternType="gray125"/></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFF97316"/></patternFill></fill>
-  </fills>
-  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
-  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="4">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-    <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
-  </cellXfs>
-</styleSheet>`;
-
-      const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<cols>${colsXml}</cols>
-<sheetData>${sheetRows}</sheetData>
-</worksheet>`;
-
-      const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Gastos" sheetId="1" r:id="rId1"/></sheets></workbook>`;
-      const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`;
-      const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-</Types>`;
-      const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>`;
-      const sharedStringsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>`;
-
-      const xlsxFiles: Record<string, Uint8Array> = {
-        "[Content_Types].xml":         strToU8(contentTypes),
-        "_rels/.rels":                 strToU8(rootRels),
-        "xl/workbook.xml":             strToU8(workbookXml),
-        "xl/_rels/workbook.xml.rels":  strToU8(wbRels),
-        "xl/worksheets/sheet1.xml":    strToU8(sheetXml),
-        "xl/styles.xml":               strToU8(stylesXml),
-        "xl/sharedStrings.xml":        strToU8(sharedStringsXml),
-      };
-      const xlsxZip = zipSync(xlsxFiles);
-
-      // ── Build outer ZIP with correct structure ─────────────────────────────
-      // Structure: ENV-XX-001/
-      //              ENV-XX-001.xlsx
-      //              documents/
-      //                BOX-XX-F-0001.pdf
-      //                BOX-XX-T-0002.jpg
-      const folderName = envelope.displayNumber;
-      const zipEntries: Record<string, Uint8Array> = {
-        [`${folderName}/${folderName}.xlsx`]: xlsxZip,
-      };
-
-      // Download documents via server-side proxy (bypasses Firebase Storage CORS)
-      let docsIncluded = 0;
-      const expsWithDocs = exps.filter(e => e.documentUrl);
-
-      const fetchPromises = expsWithDocs.map(async (e) => {
-          try {
-            // Extract extension from storage path in the URL pathname after /o/
-            const u = new URL(e.documentUrl!);
-            const pathMatch = u.pathname.match(/\/o\/(.+)$/);
-            const storagePath = pathMatch ? decodeURIComponent(pathMatch[1]) : "";
-            const extMatch = storagePath.match(/\.(\w{2,4})$/);
-            const ext = extMatch ? extMatch[1].toLowerCase() : "pdf";
-
-            // Use server-side proxy — pass URL + expense data for banner generation
-            const expenseData = {
-              displayNumber: e.displayNumber,
-              supplier: e.supplier,
-              supplierNumber: e.supplierNumber || "",
-              date: e.date instanceof Date ? e.date.toISOString() : String(e.date),
-              type: e.type,
-              items: e.items,
-              baseAmount: e.baseAmount,
-              vatAmount: e.vatAmount,
-              irpfRate: e.irpfRate,
-              irpfAmount: e.irpfAmount,
-              totalAmount: e.totalAmount,
-            };
-            const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(e.documentUrl!)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-            const resp = await fetch(proxyUrl);
-
-            if (!resp.ok) {
-              console.warn(`[Export] Proxy failed for ${e.displayNumber}: ${resp.status}`);
-              return;
-            }
-
-            const buf = await resp.arrayBuffer();
-            if (buf.byteLength > 0) {
-              // Proxy always returns PDF (images get converted too)
-              zipEntries[`${folderName}/documents/${e.displayNumber}.pdf`] = new Uint8Array(buf);
-              docsIncluded++;
-              console.log(`[Export] ✓ ${e.displayNumber}.pdf (${buf.byteLength} bytes)`);
-            }
-          } catch (err) {
-            console.warn(`[Export] Error en ${e.displayNumber}:`, err);
-          }
-        });
-      await Promise.all(fetchPromises);
-      console.log(`[Export] ZIP entries:`, Object.keys(zipEntries));
-
-      const outerZip = zipSync(zipEntries);
-      const blob = new Blob([outerZip], { type: "application/zip" });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url;
-      a.download = `${envelope.displayNumber}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showToast("success", `Sobre exportado · ${docsIncluded} documento${docsIncluded !== 1 ? "s" : ""} incluido${docsIncluded !== 1 ? "s" : ""}`);
-    } catch (e) {
-      console.error(e);
-      showToast("error", "Error al exportar");
-    } finally {
-      setExportingEnvelope(false);
-    }
-  };
 
   const handleReviewExpense = async (expense: BoxExpense) => {
     try {
@@ -2408,7 +2153,7 @@ export default function BoxesPage() {
                           <Menu trigger={(t) => <IconButton label="Más acciones del sobre" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
                             {(close) => (
                               <>
-                                <MenuItem onClick={() => { close(); handleExportEnvelope(selectedEnvelope); }}>{exportingEnvelope ? "Exportando…" : "Exportar sobre"}</MenuItem>
+                                <MenuItem onClick={() => { close(); router.push(`/project/${projectId}/accounting/document-center?doc=card-env:${selectedEnvelope.id}`); }}>Ver en documentación</MenuItem>
                                 {open && <MenuItem onClick={() => { close(); setShowImportModal(true); }}>Importar Excel de la tarjeta</MenuItem>}
                                 {open && envelopeExpenses.length > 0 && <MenuItem onClick={() => { close(); setReceiptFiles([]); setShowReceiptImportModal(true); }}>Importar recibos</MenuItem>}
                               </>

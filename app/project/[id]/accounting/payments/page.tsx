@@ -616,55 +616,6 @@ export default function PaymentsPage() {
 
   const toggleRowExpanded = (forecastId: string) => { const newExpanded = new Set(expandedRows); if (newExpanded.has(forecastId)) newExpanded.delete(forecastId); else newExpanded.add(forecastId); setExpandedRows(newExpanded); };
 
-  const exportForecastPDF = (forecast: PaymentForecast) => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 20;
-    let y = margin;
-    pdf.setFillColor(30, 41, 59); pdf.rect(0, 0, pageWidth, 45, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFontSize(24); pdf.setFont("helvetica", "bold");
-    pdf.text("PREVISIÓN DE PAGO", margin, 20);
-    pdf.setFontSize(14); pdf.text(forecast.name, margin, 32);
-    pdf.setFontSize(10); pdf.text(forecast.type === "remesa" ? "REMESA BANCARIA" : "FUERA DE REMESA", margin, 40);
-    y = 55;
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin, y, (pageWidth - margin * 2 - 10) / 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139); pdf.setFontSize(8); pdf.setFont("helvetica", "bold");
-    pdf.text("FECHA DE PAGO", margin + 5, y + 8);
-    pdf.setTextColor(30, 41, 59); pdf.setFontSize(12);
-    pdf.text(formatDate(forecast.paymentDate), margin + 5, y + 18);
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin + (pageWidth - margin * 2 - 10) / 2 + 10, y, (pageWidth - margin * 2 - 10) / 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139); pdf.setFontSize(8); pdf.setFont("helvetica", "bold");
-    pdf.text("IMPORTE TOTAL", margin + (pageWidth - margin * 2 - 10) / 2 + 15, y + 8);
-    pdf.setTextColor(30, 41, 59); pdf.setFontSize(12);
-    pdf.text(formatCurrency(forecast.totalAmount) + " €", margin + (pageWidth - margin * 2 - 10) / 2 + 15, y + 18);
-    y += 35;
-    pdf.setTextColor(100, 116, 139); pdf.setFontSize(8);
-    pdf.text("ESTADO: " + getStatusConfig(forecast.status).label.toUpperCase(), margin, y);
-    y += 10;
-    pdf.setTextColor(30, 41, 59); pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
-    pdf.text("PAGOS (" + forecast.items.length + ")", margin, y);
-    y += 8;
-    forecast.items.forEach((item, index) => {
-      if (y > 260) { pdf.addPage(); y = margin; }
-      pdf.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 20, 0, 0, "F");
-      pdf.setTextColor(30, 41, 59); pdf.setFontSize(9); pdf.setFont("helvetica", "bold");
-      pdf.text((item.invoiceNumber ? "FRA-" + item.invoiceNumber : item.description).substring(0, 40), margin + 5, y + 7);
-      pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139);
-      pdf.text(item.supplier.substring(0, 40), margin + 5, y + 14);
-      if (item.status === "completed") { pdf.setTextColor(16, 185, 129); pdf.text("Completado", pageWidth - margin - 50, y + 7); }
-      else { pdf.setTextColor(245, 158, 11); pdf.text("Pendiente", pageWidth - margin - 50, y + 7); }
-      pdf.setTextColor(30, 41, 59); pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
-      pdf.text(formatCurrency(item.partialAmount || item.amount) + " €", pageWidth - margin - 5, y + 14, { align: "right" });
-      y += 22;
-    });
-    y += 10;
-    pdf.setTextColor(100, 116, 139); pdf.setFontSize(8); pdf.setFont("helvetica", "normal");
-    pdf.text("Generado el " + formatDateTime(new Date()) + " - Creado por " + forecast.createdByName, margin, y);
-    pdf.save("Prevision_" + forecast.name.replace(/\s+/g, "_") + "_" + formatDateForFile(forecast.paymentDate) + ".pdf");
-  };
 
   // Verificar permisos - solo accounting_extended puede acceder
   const canAccessPayments = permissions.accountingAccessLevel === "accounting_extended";
@@ -861,7 +812,6 @@ export default function PaymentsPage() {
                                 style={{ top: menuPosition.top, right: menuPosition.right }}
                               >
                                 <button onClick={() => { setShowForecastDetail(forecast); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Eye size={14} /> Ver detalles</button>
-                                <button onClick={() => { exportForecastPDF(forecast); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Download size={14} /> Exportar PDF</button>
                                 {forecast.status === "draft" && (<><button onClick={() => { setSelectedForecastId(forecast.id); setShowAddPaymentModal(true); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Plus size={14} /> Añadir pago</button>{forecast.items.length > 0 && (<button onClick={() => { handleSendForecast(forecast.id); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-amber-600 hover:bg-amber-50 flex items-center gap-2"><Send size={14} /> Enviar</button>)}</>)}
                                 {(forecast.status === "pending" || forecast.status === "completed") && (<button onClick={() => { router.push("/project/" + id + "/accounting/payments/" + forecast.id + "/pay"); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"><Banknote size={14} /> {forecast.status === "completed" ? "Ver pagos" : "Ir a pagar"}</button>)}
                                 <div className="border-t border-slate-100 my-1" />
@@ -1088,7 +1038,7 @@ export default function PaymentsPage() {
             width="max-w-3xl"
             footer={fc ? (
               <>
-                <Button variant="ghost" className="mr-auto" onClick={() => exportForecastPDF(fc)}><Download size={13} /> PDF</Button>
+                <span className="mr-auto" />
                 {fc.status === "draft" && <Button variant="secondary" onClick={() => { setSelectedForecastId(fc.id); setShowAddPaymentModal(true); setShowForecastDetail(null); }}>Añadir pago</Button>}
                 {fc.status === "draft" && fc.items.length > 0 && <Button variant="primary" onClick={() => { handleSendForecast(fc.id); setShowForecastDetail(null); }}>Enviar a pago</Button>}
                 {(fc.status === "pending" || fc.status === "completed") && (

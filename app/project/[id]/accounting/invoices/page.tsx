@@ -823,7 +823,7 @@ export default function InvoicesPage() {
                           {(close) => (
                             <>
                               <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
-                              {invoice.attachmentUrl && <MenuItem onClick={() => { close(); window.open(invoice.attachmentUrl, "_blank", "noopener"); }}>Ver adjunto</MenuItem>}
+                              <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/document-center?doc=inv:${invoice.id}`); }}>Ver en documentación</MenuItem>
                               <MenuItem onClick={() => { close(); navigator.clipboard?.writeText(invoice.displayNumber); }}>Copiar número</MenuItem>
                               {needsReplacement && permissions.canCreatePO && (
                                 <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/invoices/new?linkTo=${invoice.id}`); }}>Subir factura definitiva</MenuItem>

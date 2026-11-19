@@ -661,69 +661,6 @@ export default function POsPage() {
     }
   };
 
-  const generatePDF = (po: PO) => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 20;
-    let y = margin;
-    pdf.setFillColor(30, 41, 59);
-    pdf.rect(0, 0, pageWidth, 45, "F");
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ORDEN DE COMPRA", margin, 20);
-    pdf.setFontSize(32);
-    pdf.text("PO-" + po.number, margin, 35);
-    if (po.version > 1) {
-      pdf.setFontSize(12);
-      pdf.text("V" + String(po.version).padStart(2, "0"), margin + pdf.getTextWidth("PO-" + po.number) + 5, 35);
-    }
-    y = 55;
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin, y, pageWidth - margin * 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("PROVEEDOR", margin + 5, y + 8);
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(12);
-    pdf.text(po.supplier || "Sin proveedor asignado", margin + 5, y + 18);
-    y += 35;
-    pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(margin, y, pageWidth - margin * 2, 25, 3, 3, "F");
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("IMPORTE TOTAL", margin + 5, y + 8);
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(16);
-    pdf.text(formatCurrency(po.totalAmount) + " €", margin + 5, y + 18);
-    y += 35;
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ITEMS (" + po.items.length + ")", margin, y);
-    y += 8;
-    po.items.forEach((item, index) => {
-      pdf.setFillColor(index % 2 === 0 ? 255 : 248, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 12, 0, 0, "F");
-      pdf.setTextColor(30, 41, 59);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      const desc = (item.description || "").substring(0, 50) + ((item.description || "").length > 50 ? "..." : "");
-      pdf.text(desc, margin + 5, y + 8);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(formatCurrency(item.totalAmount) + " €", pageWidth - margin - 25, y + 8);
-      y += 12;
-    });
-    y += 10;
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Generado el " + formatDateTime(new Date()), margin, y);
-    pdf.save("PO-" + po.number + (po.version > 1 ? "-V" + String(po.version).padStart(2, "0") : "") + ".pdf");
-    closeMenu();
-  };
 
   if (permissionsLoading || loading) {
     return (
@@ -928,7 +865,7 @@ export default function POsPage() {
                             <>
                               <MenuItem onClick={() => { close(); setPreviewPO(po); }}>Vista rápida</MenuItem>
                               <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
-                              <MenuItem onClick={() => { close(); generatePDF(po); }}>Descargar PDF</MenuItem>
+                              <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/document-center?doc=po:${po.id}`); }}>Ver en documentación</MenuItem>
                               {po.status === "draft" && poPerms.canEdit && <MenuItem onClick={() => { close(); handleEditDraft(po); }}>Editar borrador</MenuItem>}
                               {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
                               {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}

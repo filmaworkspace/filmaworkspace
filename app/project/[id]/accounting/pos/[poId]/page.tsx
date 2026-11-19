@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeft,
+  FileText,
   Ban,
   BookCheck,
   Building2,
@@ -729,56 +730,6 @@ export default function PODetailPage() {
     }
   };
 
-  const generatePDF = () => {
-    if (!po) return;
-    const currency = getCurrencySymbol();
-    const docNumber = "PO-" + po.number + (po.version > 1 ? " · V" + String(po.version).padStart(2, "0") : "");
-
-    const doc = new FilmaPDF({ accent: "accounting", docRef: docNumber });
-    doc.header({
-      eyebrow: "Accounting" + (projectName ? ` · ${projectName}` : ""),
-      title: "Orden de compra",
-      docNumber,
-      meta: config.label,
-    });
-
-    doc.infoCards([
-      { label: "Proveedor", value: po.supplier || "Sin proveedor asignado" },
-      { label: "Departamento", value: po.department || "—" },
-      { label: "Importe total", value: `${formatCurrency(po.totalAmount)} ${currency}`, big: true },
-    ]);
-
-    doc.sectionTitle("Items", po.items.length);
-    doc.table(
-      [
-        { label: "Descripción", width: 66 },
-        { label: "Cuenta", width: 28 },
-        { label: "Cant.", width: 18, align: "right" },
-        { label: "Precio", width: 27, align: "right" },
-        { label: "Total", width: 35, align: "right" },
-      ],
-      po.items.map((item) => [
-        item.description || "",
-        item.subAccountCode || "—",
-        String(item.quantity ?? 1),
-        `${formatCurrency(item.unitPrice)} ${currency}`,
-        `${formatCurrency(item.totalAmount)} ${currency}`,
-      ])
-    );
-
-    doc.totalsBlock([
-      { label: "Base imponible", value: `${formatCurrency(po.baseAmount)} ${currency}` },
-      { label: "IVA", value: `+${formatCurrency(po.vatAmount)} ${currency}` },
-      ...(po.irpfAmount ? [{ label: "IRPF", value: `-${formatCurrency(po.irpfAmount)} ${currency}` }] : []),
-      { label: "Total", value: `${formatCurrency(po.totalAmount)} ${currency}`, emphasis: true },
-    ]);
-
-    if (po.generalDescription?.trim()) doc.paragraph("Descripción general", po.generalDescription);
-    if (po.paymentTerms?.trim()) doc.paragraph("Condiciones de pago", po.paymentTerms);
-    if (po.notes?.trim()) doc.paragraph("Notas", po.notes);
-
-    doc.save(docNumber.replace(" · ", "-").replace(/\s/g, "") + ".pdf");
-  };
 
   if (permissionsLoading || loading) {
     return (
@@ -884,14 +835,15 @@ export default function PODetailPage() {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
                     <AnchoredPanel className="w-56 bg-white border border-slate-200 rounded-md shadow-xl py-1 animate-fadeIn" align="right" gap={8}>
-                      {/* Descargar PDF - Siempre visible */}
-                      <button 
-                        onClick={() => { generatePDF(); setShowActionsMenu(false); }} 
+                      {/* Los documentos se descargan siempre desde el hub de documentación */}
+                      <Link
+                        href={`/project/${projectId}/accounting/document-center?doc=po:${poId}`}
+                        onClick={() => setShowActionsMenu(false)}
                         className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"
                       >
-                        <Download size={16} className="text-slate-400" />
-                        Descargar PDF
-                      </button>
+                        <FileText size={16} className="text-slate-400" />
+                        Ver en documentación
+                      </Link>
                       
                       {/* Reemplazar documento */}
                       {canReplaceDocument() && (

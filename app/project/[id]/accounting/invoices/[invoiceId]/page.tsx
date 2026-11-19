@@ -1427,7 +1427,7 @@ export default function InvoiceDetailPage() {
               <div className="relative">
                 <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-md hover:bg-slate-50"><MoreHorizontal size={18} /></button>
                 {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><AnchoredPanel className="w-56 bg-white border border-slate-200 rounded-md shadow-xl py-1" align="right" gap={8}>
-                  {invoice.attachmentUrl && <a href={invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><Download size={16} className="text-slate-400" />Descargar</a>}
+                  <Link href={`/project/${projectId}/accounting/document-center?doc=inv:${invoiceId}`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileText size={16} className="text-slate-400" />Ver en documentación</Link>
                   {canReplaceDocument() && (
                     <button 
                       onClick={() => { fileInputRef.current?.click(); setShowActionsMenu(false); }} 

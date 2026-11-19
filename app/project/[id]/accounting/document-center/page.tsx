@@ -1,644 +1,379 @@
 "use client";
 
-// ─── Framework ────────────────────────────────────────────────────────────────
-import { getInvoiceDisplayState } from "@/lib/invoiceHelpers";
-import { Button, Checkbox, EmptyState, IconButton, Input, Page, PageHeader, Select, Spinner, Modal } from "@/components/ds";
-import SearchBar, { type SearchField } from "@/components/SearchBar";
-import { matchAmount, matchCode, matchWords } from "@/lib/search";
-import { useState, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+// ─── Documentation hub de contabilidad ───────────────────────────────────────
+// Todos los documentos del proyecto en carpetas (Box, Invoices, Purchase
+// Orders, Suppliers; siempre en orden alfabético) generados con el diseño del
+// proyecto: carátula con la codificación, aprobaciones auditadas e historial
+// de versiones, seguida del documento real. Es el único sitio desde el que se
+// descargan documentos de contabilidad: de uno en uno, una selección o una
+// carpeta entera en un ZIP con su manifiesto (MANIFEST.csv con las huellas).
+
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
-
-// ─── Firebase ────────────────────────────────────────────────────────────────
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { zipSync } from "fflate";
+import { AlertTriangle, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Folder, FolderOpen, Hash, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import {
-  collection,
-  getDocs,
-  orderBy,
-  query,
-} from "firebase/firestore";
-
-// ─── Icons ───────────────────────────────────────────────────────────────────
-import {
-  ArrowLeft,
-  Building2,
-  Calendar,
-  CheckCircle,
-  CheckSquare,
-  ChevronDown,
-  Download,
-  Eye,
-  FileCheck,
-  FileImage,
-  FileText,
-  Paperclip,
-  Receipt,
-  Search,
-  Shield,
-  ShieldAlert,
-  Square,
-  X,
-} from "lucide-react";
-
-// ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
-import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { scopeFromPermissions } from "@/lib/accountingScope";
+import { Button, Checkbox, EmptyState, IconButton, Modal, NoAccess, Page, PageHeader, PageLoading, Select, Spinner, useToast } from "@/components/ds";
+import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { loadHub, numberingGaps, renderHubItem, type HubItem, type HubProject } from "@/lib/docs/hub";
+import { DOC_TYPES, type DocTypeKey } from "@/lib/docs/projectPdf";
 
-// ─────────────────────────────────────────────────────────────────────────────
+type F = "all" | "number" | "name" | "status";
+const FIELDS: SearchField<F>[] = [
+  { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o estado" },
+  { value: "number", label: "Número", placeholder: "PO-0013, INV-0012…", mono: true },
+  { value: "name", label: "Proveedor / persona", placeholder: "Nombre" },
+  { value: "status", label: "Estado", placeholder: "Pagada, aprobada…" },
+];
+const TOP = ["Box", "Invoices", "Purchase Orders", "Suppliers"];
+const eur = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0) + " €";
+const day = (d: Date | null) => (d ? d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
+const pathKey = (p: string[]) => p.join("/");
+const byName = (a: string, b: string) => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
 
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type DocumentType = "invoice" | "proforma" | "budget" | "guarantee";
-type InvoiceStatus = "pending_approval" | "pending" | "paid" | "overdue" | "cancelled" | "rejected";
-
-interface InvoiceItem {
-  description: string;
-  subAccountCode: string;
-  subAccountDescription: string;
-  baseAmount: number;
-  vatRate: number;
-  vatAmount: number;
-  irpfRate: number;
-  irpfAmount: number;
-  totalAmount: number;
+async function sha256(bytes: Uint8Array) {
+  const d = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+function saveBlob(bytes: Uint8Array, name: string, type: string) {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-interface Invoice {
-  id: string;
-  documentType: DocumentType;
-  number: string;
-  displayNumber: string;
-  supplierNumber?: string;
-  supplier: string;
-  supplierId: string;
-  supplierTaxId?: string;
-  department?: string;
-  description: string;
-  items: InvoiceItem[];
-  baseAmount: number;
-  vatAmount: number;
-  irpfAmount: number;
-  totalAmount: number;
-  currency: string;
-  status: InvoiceStatus;
-  displayState: string;
-  dueDate: Date;
-  invoiceDate?: Date;
-  createdAt: Date;
-  createdBy: string;
-  createdByName: string;
-  attachmentUrl?: string;
-  attachmentFileName?: string;
-  codedAt?: Date;
-  codedByName?: string;
-  accountingEntry?: string;
-  paidAt?: Date;
-  paidAmount?: number;
-  paymentMethod?: string;
-  paymentReference?: string;
-  paidByName?: string;
-  receiptUrl?: string;
-  receiptName?: string;
-  poId?: string;
-  poNumber?: string;
-}
+function HubInner() {
+  const { id: projectId } = useParams() as { id: string };
+  const router = useRouter();
+  const params = useSearchParams();
+  const { loading: permLoading, permissions } = useAccountingPermissions(projectId);
+  const [toast, showToast] = useToast();
+  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<HubProject | null>(null);
+  const [items, setItems] = useState<HubItem[]>([]);
+  const [used, setUsed] = useState<{ PO: number[]; INV: number[] }>({ PO: [], INV: [] });
+  const [path, setPath] = useState<string[]>([]);
+  const [open, setOpen] = useState<Set<string>>(new Set(TOP));
+  const [field, setField] = useState<F>("all");
+  const [q, setQ] = useState("");
+  const [type, setType] = useState<"all" | DocTypeKey>("all");
+  const [onlyWarnings, setOnlyWarnings] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [current, setCurrent] = useState<HubItem | null>(null);
+  const [preview, setPreview] = useState<{ url: string; missing: string[]; fingerprint: string; pages?: number } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const previewUrl = useRef<string | null>(null);
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const DOCUMENT_TYPES: Record<DocumentType, { label: string; icon: React.ElementType }> = {
-  invoice:   { label: "Factura",     icon: Receipt   },
-  proforma:  { label: "Proforma",    icon: FileText  },
-  budget:    { label: "Presupuesto", icon: FileCheck },
-  guarantee: { label: "Fianza",      icon: Shield    },
-};
-
-const PAYMENT_METHODS: Record<string, string> = {
-  transfer:     "Transferencia bancaria",
-  card:         "Tarjeta",
-  cash:         "Efectivo",
-  check:        "Cheque",
-  direct_debit: "Domiciliación",
-};
-
-const STATUS_FALLBACK = { bg: "bg-slate-100", text: "text-slate-600", label: "Sin estado" };
-
-const STATUS_CONFIG: Record<InvoiceStatus, { bg: string; text: string; label: string }> = {
-  pending_approval: { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pte. aprobación" },
-  pending:          { bg: "bg-amber-50",   text: "text-amber-700",   label: "Pte. pago"        },
-  paid:             { bg: "bg-emerald-50", text: "text-emerald-700", label: "Pagada"            },
-  overdue:          { bg: "bg-red-50",     text: "text-red-700",     label: "Vencida"           },
-  cancelled:        { bg: "bg-slate-100",  text: "text-slate-600",   label: "Cancelada"         },
-  rejected:         { bg: "bg-red-50",     text: "text-red-700",     label: "Rechazada"         },
-};
-
-function cx(...args: (string | boolean | null | undefined)[]): string {
-  return args.filter(Boolean).join(" ");
-}
-
-const fmtDate = (date: Date) =>
-  date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date) : "-";
-
-const fmtDateTime = (date: Date) =>
-  date ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date) : "-";
-
-const fmtMoney = (amount: number, currency = "EUR") => {
-  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "€";
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount) + " " + symbol;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function DocumentCenterPage() {
-  const params = useParams();
-  const id = params?.id as string;
-  const { loading: permissionsLoading, error: permissionsError, permissions } = useAccountingPermissions(id);
-
-  const [loading, setLoading]   = useState(true);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-
-  const [searchTerm, setSearchTerm]         = useState("");
-  const [docField, setDocField] = useState<"all" | "number" | "supplier" | "concept" | "amount">("all");
-  const [supplierFilter, setSupplierFilter] = useState("all");
-  const [missingFiles, setMissingFiles] = useState(false);
-  const [uncodedOnly, setUncodedOnly] = useState(false);
-  const [statusFilter, setStatusFilter]     = useState("all");
-  const [dateRange, setDateRange]           = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [showStatusDD, setShowStatusDD]     = useState(false);
-
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [downloading, setDownloading] = useState(false);
-  const [dlProgress, setDlProgress]   = useState({ current: 0, total: 0 });
-
-  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
-
-  // Bloquea el scroll de la página de detrás mientras el modal de vista previa está abierto.
-  useBodyScrollLock(!!previewInvoice);
-
-  useEffect(() => {
-    if (!permissionsLoading && permissions.userId && id) loadData();
-  }, [permissionsLoading, permissions.userId, id]);
-
-  const loadData = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const snap = await getDocs(query(collection(db, `projects/${id}/invoices`), orderBy("createdAt", "desc")));
-      const data: Invoice[] = [];
-      for (const d of snap.docs) {
-        const raw = d.data();
-        const canView =
-          permissions.canViewAllPOs ||
-          (permissions.canViewDepartmentPOs && raw.department === permissions.department) ||
-          (permissions.canViewOwnPOs && raw.createdBy === permissions.userId);
-        if (!canView) continue;
-        data.push({
-          id: d.id,
-          documentType: raw.documentType || "invoice",
-          number: raw.number,
-          displayNumber: raw.displayNumber || `FRA-${raw.number}`,
-          supplierNumber: raw.supplierNumber,
-          supplier: raw.supplier,
-          supplierId: raw.supplierId,
-          supplierTaxId: raw.supplierTaxId,
-          department: raw.department,
-          description: raw.description,
-          items: raw.items || [],
-          baseAmount: raw.baseAmount || 0,
-          vatAmount: raw.vatAmount || 0,
-          irpfAmount: raw.irpfAmount || 0,
-          totalAmount: raw.totalAmount || 0,
-          currency: raw.currency || "EUR",
-          status: raw.status,
-          displayState: getInvoiceDisplayState({ status: raw.status, codedAt: raw.codedAt, approvedAt: raw.approvedAt, accountedAt: raw.accountedAt, paidAt: raw.paidAt, dueDate: raw.dueDate?.toDate() }),
-          dueDate: raw.dueDate?.toDate() || new Date(),
-          invoiceDate: raw.invoiceDate?.toDate(),
-          createdAt: raw.createdAt?.toDate() || new Date(),
-          createdBy: raw.createdBy,
-          createdByName: raw.createdByName,
-          attachmentUrl: raw.attachmentUrl,
-          attachmentFileName: raw.attachmentFileName,
-          codedAt: raw.codedAt?.toDate(),
-          codedByName: raw.codedByName,
-          accountingEntry: raw.accountingEntry,
-          paidAt: raw.paidAt?.toDate(),
-          paidAmount: raw.paidAmount,
-          paymentMethod: raw.paymentMethod,
-          paymentReference: raw.paymentReference,
-          paidByName: raw.paidByName,
-          receiptUrl: raw.receiptUrl,
-          receiptName: raw.receiptName,
-          poId: raw.poId,
-          poNumber: raw.poNumber,
-        });
-      }
-      setInvoices(data);
-    } catch (e) { console.error(e); }
+      const scope = scopeFromPermissions({ userId: permissions.userId, canViewAllPOs: permissions.canViewAllPOs, canViewDepartmentPOs: permissions.canViewDepartmentPOs, department: permissions.department });
+      const r = await loadHub(db, projectId, scope, permissions.canViewAllPOs);
+      setProject(r.project); setItems(r.items); setUsed(r.usedNumbers);
+    } catch (e) { console.error(e); showToast("error", "No se pudo cargar la documentación"); }
     finally { setLoading(false); }
-  };
+  }, [projectId, permissions.userId, permissions.canViewAllPOs, permissions.canViewDepartmentPOs, permissions.department, showToast]);
 
-  const suppliers = useMemo(() => {
-    const map = new Map<string, string>();
-    invoices.forEach(inv => map.set(inv.supplierId || inv.supplier, inv.supplier));
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [invoices]);
+  useEffect(() => { if (!permLoading && permissions.hasAccountingAccess) load(); }, [permLoading, permissions.hasAccountingAccess, load]);
 
-  const filteredInvoices = useMemo(() => {
-    let f = [...invoices];
-    const q = searchTerm.trim();
-    if (q) {
-      f = f.filter(inv => {
-        const byNumber = matchCode(q, inv.displayNumber, inv.number, inv.poNumber ? `PO-${inv.poNumber}` : "");
-        const bySupplier = matchWords(q, inv.supplier) || matchCode(q, inv.supplierTaxId);
-        const byConcept = matchWords(q, inv.description);
-        const byAmount = matchAmount(q, inv.totalAmount) === true;
-        return docField === "number" ? byNumber : docField === "supplier" ? bySupplier : docField === "concept" ? byConcept : docField === "amount" ? byAmount : byNumber || bySupplier || byConcept || byAmount;
-      });
-    }
-    if (statusFilter !== "all") f = f.filter(inv => inv.displayState === statusFilter);
-    if (dateRange.from) { const d = new Date(dateRange.from); f = f.filter(inv => inv.createdAt >= d); }
-    if (dateRange.to)   { const d = new Date(dateRange.to); d.setHours(23,59,59,999); f = f.filter(inv => inv.createdAt <= d); }
-    return f;
-  }, [invoices, searchTerm, statusFilter, dateRange, docField]);
+  // Enlace directo: ?doc=po:<id>
+  useEffect(() => {
+    const d = params.get("doc");
+    if (!d || !items.length) return;
+    const it = items.find((i) => i.id === d);
+    if (it) { setPath(it.path); setOpen((o) => new Set([...o, ...it.path.map((_, k) => pathKey(it.path.slice(0, k + 1)))])); setCurrent(it); }
+  }, [params, items]);
 
-  const isAllSelected = filteredInvoices.length > 0 && selectedIds.size === filteredInvoices.length;
-  const toggleSelect    = (invId: string) => { const s = new Set(selectedIds); s.has(invId) ? s.delete(invId) : s.add(invId); setSelectedIds(s); };
-  const toggleSelectAll = () => setSelectedIds(isAllSelected ? new Set() : new Set(filteredInvoices.map(i => i.id)));
-  const hasFilters = searchTerm || statusFilter !== "all" || dateRange.from || dateRange.to;
-
-  // ── download — Server-side merge via proxy with pdf-merger-js ──────────────────
-  const buildInvoicePdf = async (invoice: Invoice): Promise<Uint8Array | null> => {
-    const { PDFDocument } = await import("pdf-lib");
-    
-    const expenseData = {
-      displayNumber: invoice.displayNumber,
-      supplier: invoice.supplier,
-      supplierNumber: invoice.supplierNumber || "",
-      date: (invoice.invoiceDate || invoice.createdAt).toISOString(),
-      type: invoice.documentType,
-      items: invoice.items.map(it => ({
-        baseAmount: it.baseAmount,
-        vatRate: it.vatRate,
-        vatAmount: it.vatAmount,
-        subAccountCode: it.subAccountCode,
-        subAccountDescription: it.subAccountDescription,
-      })),
-      baseAmount: invoice.baseAmount,
-      vatAmount: invoice.vatAmount,
-      irpfRate: invoice.items[0]?.irpfRate ?? 0,
-      irpfAmount: invoice.irpfAmount,
-      totalAmount: invoice.totalAmount,
-      status: invoice.status,
-      paidAt: invoice.paidAt?.toISOString() || null,
-      paymentMethod: invoice.paymentMethod || null,
-      paymentReference: invoice.paymentReference || null,
-    };
-
-    // Use server-side merge via proxy (uses pdf-merger-js which handles complex PDFs better)
-    if (invoice.attachmentUrl) {
-      const proxyUrl = `/api/storage-proxy?url=${encodeURIComponent(invoice.attachmentUrl)}&expense=${encodeURIComponent(JSON.stringify(expenseData))}`;
-      console.log("[DocCenter] fetching merged PDF from proxy...");
-      const resp = await fetch(proxyUrl);
-      if (!resp.ok) {
-        console.error("[DocCenter] proxy failed:", resp.status);
-        return null;
+  // Árbol de carpetas (alfabético)
+  const tree = useMemo(() => {
+    const folders = new Map<string, { path: string[]; count: number; warnings: number }>();
+    TOP.forEach((t) => folders.set(t, { path: [t], count: 0, warnings: 0 }));
+    for (const it of items) {
+      for (let k = 1; k <= it.path.length; k++) {
+        const p = it.path.slice(0, k);
+        const f = folders.get(pathKey(p)) || { path: p, count: 0, warnings: 0 };
+        f.count++; if (it.warnings.length) f.warnings++;
+        folders.set(pathKey(p), f);
       }
-      
-      let result = new Uint8Array(await resp.arrayBuffer());
-      console.log("[DocCenter] got merged PDF:", result.length, "bytes");
-
-      // If there's also a receipt, append it client-side
-      if (invoice.receiptUrl) {
-        try {
-          const rResp = await fetch(`/api/storage-proxy?url=${encodeURIComponent(invoice.receiptUrl)}`);
-          if (rResp.ok) {
-            const rContentType = rResp.headers.get("content-type") || "";
-            const rBytes = new Uint8Array(await rResp.arrayBuffer());
-            
-            // Use pdf-lib to append receipt (receipts are usually simple)
-            const final = await PDFDocument.load(result);
-            
-            if (rContentType.includes("pdf")) {
-              try {
-                const rDoc = await PDFDocument.load(rBytes, { ignoreEncryption: true });
-                const rPages = await final.copyPages(rDoc, rDoc.getPageIndices());
-                rPages.forEach(p => final.addPage(p));
-              } catch (e) {
-                console.warn("[DocCenter] couldn't append receipt PDF:", e);
-              }
-            } else {
-              // Image receipt
-              const img = rContentType.includes("png") ? await final.embedPng(rBytes) : await final.embedJpg(rBytes);
-              const { width, height } = img.scale(1);
-              const scale = Math.min(555 / width, 800 / height, 1);
-              const page = final.addPage([595.28, 841.89]);
-              page.drawImage(img, { x: 20, y: 841.89 - 20 - height * scale, width: width * scale, height: height * scale });
-            }
-            result = new Uint8Array(await final.save());
-          }
-        } catch (e) { console.warn("[DocCenter] receipt failed:", e); }
-      }
-
-      return result;
     }
+    return folders;
+  }, [items]);
+  const childrenOf = (p: string[]) => Array.from(tree.values()).filter((f) => f.path.length === p.length + 1 && pathKey(f.path.slice(0, p.length)) === pathKey(p)).sort((a, b) => byName(a.path[a.path.length - 1], b.path[b.path.length - 1]));
 
-    // No attachment → generate banner only via POST endpoint
-    const resp = await fetch("/api/invoice-banner", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(expenseData),
-    });
-    if (!resp.ok) return null;
-    return new Uint8Array(await resp.arrayBuffer());
-  };
+  // Contenido de la carpeta actual (o resultados de búsqueda en todo el hub)
+  const searching = !!q.trim() || type !== "all" || onlyWarnings;
+  const rows = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return items
+      .filter((it) => (searching ? pathKey(it.path).startsWith(pathKey(path)) : pathKey(it.path) === pathKey(path)))
+      .filter((it) => type === "all" || it.type === type)
+      .filter((it) => !onlyWarnings || it.warnings.length > 0)
+      .filter((it) => {
+        if (!t) return true;
+        const v = field === "number" ? it.number : field === "name" ? it.title : field === "status" ? it.status : `${it.number} ${it.title} ${it.status} ${it.fileName}`;
+        return v.toLowerCase().includes(t);
+      })
+      .sort((a, b) => byName(a.fileName, b.fileName));
+  }, [items, path, q, field, type, onlyWarnings, searching]);
+  const subfolders = searching ? [] : childrenOf(path);
 
-  const triggerDownload = (bytes: Uint8Array, fileName: string) => {
-    const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
-  };
+  // Vista previa
+  useEffect(() => {
+    if (!current || !project) { setPreview(null); return; }
+    let cancelled = false;
+    setPreviewing(true);
+    renderHubItem(current, project, projectId, permissions.userName || "—")
+      .then(({ bytes, missing, fingerprint }) => {
+        if (cancelled) return;
+        if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+        const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+        previewUrl.current = url;
+        setPreview({ url, missing, fingerprint });
+      })
+      .catch((e) => { console.error(e); if (!cancelled) setPreview(null); })
+      .finally(() => { if (!cancelled) setPreviewing(false); });
+    return () => { cancelled = true; };
+  }, [current, project, projectId, permissions.userName]);
 
-  const downloadSingle = async (invoice: Invoice) => {
+  const logDownload = (count: number, what: string) =>
+    addDoc(collection(db, `projects/${projectId}/logs`), {
+      type: "hub_download", message: `Descarga del hub: ${what}`, count, actorId: permissions.userId, actorName: permissions.userName, createdAt: serverTimestamp(),
+    }).catch(() => {});
+
+  const downloadOne = async (it: HubItem) => {
+    if (!project) return;
+    setProgress({ done: 0, total: 1 });
     try {
-      setDownloading(true);
-      const bytes = await buildInvoicePdf(invoice);
-      if (bytes) triggerDownload(bytes, `${invoice.displayNumber}.pdf`);
-    } catch (e) { console.error(e); }
-    finally { setDownloading(false); }
+      const { bytes, missing } = await renderHubItem(it, project, projectId, permissions.userName || "—");
+      saveBlob(bytes, it.fileName, "application/pdf");
+      logDownload(1, it.fileName);
+      if (missing.length) showToast("error", `No se pudo añadir: ${missing.join(", ")}`);
+    } catch { showToast("error", "No se pudo generar el documento"); }
+    finally { setProgress(null); }
   };
 
-  const downloadMultiple = async (list: Invoice[]) => {
-    if (list.length === 0) return;
+  const downloadZip = async (unsorted: HubItem[], zipName: string) => {
+    if (!project || !unsorted.length) return;
+    const list = [...unsorted].sort((a, b) => byName([...a.path, a.fileName].join("/"), [...b.path, b.fileName].join("/")));
+    setProgress({ done: 0, total: list.length });
+    const files: Record<string, Uint8Array> = {};
+    const manifest: string[][] = [["Ruta", "Número", "Tipo", "Estado", "Versión", "Fecha", "Base imponible", "Total", "SHA-256", "Originales no incluidos"]];
+    const root = `${project.code} · ${project.name}`.replace(/[\\/:*?"<>|]+/g, " ");
     try {
-      setDownloading(true);
-      setDlProgress({ current: 0, total: list.length });
       for (let i = 0; i < list.length; i++) {
-        setDlProgress({ current: i + 1, total: list.length });
-        const bytes = await buildInvoicePdf(list[i]);
-        if (bytes) triggerDownload(bytes, `${list[i].displayNumber}.pdf`);
-        if (i < list.length - 1) await new Promise(r => setTimeout(r, 400));
+        const it = list[i];
+        const { bytes, missing } = await renderHubItem(it, project, projectId, permissions.userName || "—");
+        const rel = [...it.path, it.fileName].join("/");
+        files[`${root}/${rel}`] = bytes;
+        manifest.push([rel, it.number, it.typeLabel, it.status, it.version, day(it.date), it.base.toFixed(2).replace(".", ","), it.total.toFixed(2).replace(".", ","), await sha256(bytes), missing.join(" | ")]);
+        setProgress({ done: i + 1, total: list.length });
       }
-    } catch (e) { console.error(e); }
-    finally { setDownloading(false); setDlProgress({ current: 0, total: 0 }); }
+      const csv = manifest.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+      files[`${root}/MANIFEST.csv`] = new TextEncoder().encode("﻿" + csv);
+      saveBlob(zipSync(files, { level: 6 }), zipName, "application/zip");
+      logDownload(list.length, zipName);
+    } catch (e) { console.error(e); showToast("error", "No se pudo preparar el ZIP"); }
+    finally { setProgress(null); }
   };
 
-  const downloadSelected = () => downloadMultiple(filteredInvoices.filter(inv => selectedIds.has(inv.id)));
+  if (permLoading) return <PageLoading />;
+  if (!permissions.hasAccountingAccess) return <NoAccess backHref={`/project/${projectId}`} />;
 
-  const downloadBySupplier = (supplierId: string) =>
-    downloadMultiple(filteredInvoices.filter(inv => (inv.supplierId || inv.supplier) === supplierId));
+  const gaps = permissions.canViewAllPOs ? [...numberingGaps(used.PO, "PO"), ...numberingGaps(used.INV, "INV")] : [];
+  const warnings = items.filter((i) => i.warnings.length).length;
+  const folderItems = items.filter((it) => pathKey(it.path).startsWith(pathKey(path)));
+  const selectedItems = items.filter((i) => selected.has(i.id));
+  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allShown = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
-  // ── loading / access ─────────────────────────────────────────────────
-  if (permissionsLoading || loading) return (
-    <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
-      <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-    </div>
-  );
-
-  if (permissionsError || !permissions.hasAccountingAccess) return (
-    <div className={cx("min-h-screen bg-white flex items-center justify-center", inter.className)}>
-      <div className="text-center max-w-md">
-        <div className="hidden">
-          <ShieldAlert size={28} className="text-red-500" />
-        </div>
-        <h2 className="text-[14px] font-semibold text-slate-900 mb-2">Acceso denegado</h2>
-        <p className="text-slate-500 mb-6">No tienes permisos para acceder a esta sección</p>
-        <Link href={`/project/${id}/accounting`}
-          className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-          <ArrowLeft size={16} /> Volver
-        </Link>
+  const TreeNode = ({ p, depth }: { p: string[]; depth: number }) => {
+    const key = pathKey(p);
+    const f = tree.get(key);
+    const kids = childrenOf(p);
+    const isOpen = open.has(key);
+    const active = pathKey(path) === key;
+    return (
+      <div>
+        <button
+          onClick={() => { setPath(p); setCurrent(null); if (kids.length) setOpen((o) => { const n = new Set(o); if (n.has(key) && active) n.delete(key); else n.add(key); return n; }); }}
+          className={`flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-[13px] ${active ? "bg-[#F1F1F3] font-medium text-slate-900" : "text-slate-600 hover:bg-[#F7F7F8] hover:text-slate-900"}`}
+          style={{ paddingLeft: 6 + depth * 14 }}
+        >
+          {kids.length ? (isOpen ? <ChevronDown size={12} className="flex-shrink-0 text-slate-400" /> : <ChevronRight size={12} className="flex-shrink-0 text-slate-400" />) : <span className="w-3" />}
+          {isOpen && kids.length ? <FolderOpen size={14} className="flex-shrink-0 text-slate-400" /> : <Folder size={14} className="flex-shrink-0 text-slate-400" />}
+          <span className="flex-1 truncate">{p[p.length - 1]}</span>
+          {f && f.warnings > 0 && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />}
+          <span className="flex-shrink-0 text-[11px] tabular-nums text-slate-400">{f?.count || 0}</span>
+        </button>
+        {isOpen && kids.map((k) => <TreeNode key={pathKey(k.path)} p={k.path} depth={depth + 1} />)}
       </div>
-    </div>
-  );
-
-  const FilterDropdown = ({ open, onToggle, label, children }: {
-    open: boolean; onToggle: () => void; label: string; children: React.ReactNode;
-  }) => (
-    <div className="relative">
-      <button onClick={onToggle}
-        className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 transition-colors min-w-[160px]">
-        <span className="text-slate-700 flex-1 text-left">{label}</span>
-        <ChevronDown size={13} className={cx("text-slate-400 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={onToggle} />
-          <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-64 overflow-y-auto" match="min" gap={6}>
-            {children}
-          </AnchoredPanel>
-        </>
-      )}
-    </div>
-  );
-
-  const DDOpt = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button onClick={onClick}
-      className={cx("w-full text-left px-4 py-1.5 text-[13px] transition-colors whitespace-nowrap",
-        active ? "bg-slate-100 text-slate-900 font-medium" : "text-slate-700 hover:bg-slate-50")}>
-      {children}
-    </button>
-  );
-
-  const DOC_STATE: Record<string, { label: string; dot: string; text: string }> = {
-    submitted: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
-    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
-    coded: { label: "Codificada", dot: "bg-violet-500", text: "text-violet-800" },
-    accounted: { label: "Contabilizada", dot: "bg-teal-500", text: "text-teal-800" },
-    paid: { label: "Pagada", dot: "bg-[#2F52E0]", text: "text-blue-800" },
-    overdue: { label: "Vencida", dot: "bg-red-500", text: "text-red-700" },
-    rejected: { label: "Rechazada", dot: "bg-red-500", text: "text-red-700" },
-    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500" },
-    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+    );
   };
-  const DOC_FIELDS: SearchField<"all" | "number" | "supplier" | "concept" | "amount">[] = [
-    { value: "all", label: "Buscar en todo", placeholder: "Número, proveedor o concepto" },
-    { value: "number", label: "Nº documento o PO", placeholder: "Ej. FRA-0012", mono: true },
-    { value: "supplier", label: "Proveedor", placeholder: "Nombre o NIF" },
-    { value: "concept", label: "Concepto", placeholder: "Ej. alquiler" },
-    { value: "amount", label: "Importe", placeholder: "1500 · >1000 · 500-2000", mono: true },
-  ];
-  const rows = filteredInvoices
-    .filter((inv) => supplierFilter === "all" || (inv.supplierId || inv.supplier) === supplierFilter)
-    .filter((inv) => !missingFiles || !inv.attachmentUrl || (!!inv.paidAt && !inv.receiptUrl))
-    .filter((inv) => !uncodedOnly || !inv.codedAt);
-  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
-  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
-  const filtersOn = !!(hasFilters || supplierFilter !== "all" || missingFiles || uncodedOnly);
+
+  const sourceHref = (it: HubItem) =>
+    it.source.kind === "po" ? `/project/${projectId}/accounting/pos/${it.source.id}`
+    : it.source.kind === "invoice" ? `/project/${projectId}/accounting/invoices/${it.source.id}`
+    : it.source.kind === "supplier" ? `/project/${projectId}/accounting/suppliers/${it.source.id}`
+    : `/project/${projectId}/accounting/box`;
 
   return (
     <Page>
+      {toast}
       <PageHeader
-        title={<>Centro de documentación <span className="text-[15px] font-normal text-slate-400">{invoices.length}</span></>}
+        title={<>Documentación <span className="text-[15px] font-normal text-slate-400">{items.length}</span></>}
         actions={
-          supplierFilter !== "all" ? (
-            <Button variant="secondary" onClick={() => downloadBySupplier(supplierFilter)} disabled={downloading}><Download size={14} /> Expedientes del proveedor</Button>
-          ) : undefined
+          <>
+            <IconButton label="Actualizar" onClick={load}><RefreshCw size={15} className={loading ? "animate-spin" : ""} /></IconButton>
+            {selectedItems.length > 0 ? (
+              <Button variant="primary" onClick={() => downloadZip(selectedItems, `${project?.code || "docs"}_seleccion_${selectedItems.length}.zip`)}><Download size={14} /> Descargar selección ({selectedItems.length})</Button>
+            ) : (
+              <Button variant="primary" disabled={!folderItems.length} onClick={() => downloadZip(folderItems, `${project?.code || "docs"}_${path.length ? path.join("_").replace(/\s+/g, "-") : "completo"}.zip`)}>
+                <Download size={14} /> {path.length ? `Descargar ${path[path.length - 1]}` : "Descargar todo"}
+              </Button>
+            )}
+          </>
         }
       />
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <SearchBar fields={DOC_FIELDS} field={docField} onField={setDocField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
-        <div className="flex flex-wrap items-center justify-end gap-3">
-        <div className="w-48">
-          <Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
-            <option value="all">Todos los proveedores</option>
-            {suppliers.map(([sid, name]) => <option key={sid} value={sid}>{name}</option>)}
-          </Select>
-        </div>
-        <div className="w-40">
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="all">Todos los estados</option>
-            {Object.entries(DOC_STATE).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
-          </Select>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Input type="date" value={dateRange.from} onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })} className="w-36" aria-label="Desde" />
-          <span>—</span>
-          <Input type="date" value={dateRange.to} onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })} className="w-36" aria-label="Hasta" />
-        </div>
-        </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
-        <Checkbox label="Falta algún archivo" checked={missingFiles} onChange={setMissingFiles} />
-        <Checkbox label="Sin codificar" checked={uncodedOnly} onChange={setUncodedOnly} />
-        {filtersOn && (
-          <button onClick={() => { setSearchTerm(""); setStatusFilter("all"); setDateRange({ from: "", to: "" }); setSupplierFilter("all"); setMissingFiles(false); setUncodedOnly(false); }} className="text-xs text-slate-500 hover:text-slate-900">Quitar filtros</button>
-        )}
-      </div>
-
-      <div className="mt-4">
-        {rows.length === 0 ? (
-          <EmptyState title={invoices.length ? "Sin resultados" : "Sin documentos"} />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                  <th scope="col" className="w-10 py-2 pl-4"><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todo" className="h-3.5 w-3.5 accent-slate-900" /></th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Documento</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Archivos</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Codificación</th>
-                  <th scope="col" className="w-20 py-2 pr-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((invoice) => {
-                  const sel = selectedIds.has(invoice.id);
-                  const sc = DOC_STATE[invoice.displayState] ?? DOC_STATE.submitted;
-                  return (
-                    <tr key={invoice.id} className={`border-b border-slate-100 last:border-0 ${sel ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
-                      <td className="py-1.5 pl-4"><input type="checkbox" checked={sel} onChange={() => toggleSelect(invoice.id)} aria-label={`Seleccionar ${invoice.displayNumber}`} className="h-3.5 w-3.5 accent-slate-900" /></td>
-                      <td className="whitespace-nowrap px-3 py-1.5">
-                        <span className="block font-mono text-xs font-medium">{invoice.displayNumber}</span>
-                        <span className="block text-xs text-slate-500">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</span>
-                      </td>
-                      <td className="max-w-[280px] px-3 py-1.5">
-                        <span className="block truncate">{invoice.supplier}</span>
-                        {invoice.supplierTaxId && <span className="block font-mono text-[11px] text-slate-500">{invoice.supplierTaxId}</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs font-medium">{fmtMoney(invoice.totalAmount, invoice.currency)}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
-                        <span className={`inline-flex items-center gap-1.5 ${sc.text}`}><span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />{sc.label}</span>
-                        {invoice.paidAt && <span className="ml-1.5 text-slate-500">{fmtDate(invoice.paidAt)}</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
-                        <span className={invoice.attachmentUrl ? "text-slate-700" : "text-red-700"}>{invoice.attachmentUrl ? "Factura" : "Sin factura"}</span>
-                        <span className="text-slate-300"> · </span>
-                        <span className={invoice.receiptUrl ? "text-slate-700" : invoice.paidAt ? "text-amber-800" : "text-slate-400"}>{invoice.receiptUrl ? "Justificante" : "Sin justificante"}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-xs">
-                        {invoice.codedAt ? <span className="text-slate-700">{[invoice.codedByName, fmtDate(invoice.codedAt)].filter(Boolean).join(" · ")}</span> : <span className="text-slate-400">Sin codificar</span>}
-                      </td>
-                      <td className="py-1.5 pr-3">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <IconButton label="Vista previa" onClick={() => setPreviewInvoice(invoice)} className="-my-1"><Eye size={14} /></IconButton>
-                          <IconButton label="Descargar expediente" onClick={() => downloadSingle(invoice)} disabled={downloading} className="-my-1"><Download size={14} /></IconButton>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Barra de selección */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px] shadow-lg">
-          <span>{selectedIds.size} {selectedIds.size === 1 ? "documento" : "documentos"}</span>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Deseleccionar</Button>
-          <Button variant="primary" size="sm" onClick={downloadSelected} disabled={downloading}>
-            {downloading ? <><Spinner className="h-3.5 w-3.5" /> {dlProgress.current}/{dlProgress.total}</> : <><Download size={13} /> Descargar expedientes</>}
-          </Button>
+      {(warnings > 0 || gaps.length > 0) && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">
+          {warnings > 0 && <button onClick={() => { setOnlyWarnings(true); setPath([]); }} className="flex items-center gap-1.5 hover:text-slate-900"><AlertTriangle size={13} className="text-amber-500" /> {warnings} documento{warnings > 1 ? "s" : ""} con avisos (sin original, proformas, pagadas sin justificante)</button>}
+          {gaps.length > 0 && <span className="flex items-center gap-1.5" title={gaps.join(", ")}><Hash size={13} className="text-red-500" /> Faltan números en la secuencia: {gaps.slice(0, 6).join(", ")}{gaps.length > 6 ? "…" : ""}</span>}
         </div>
       )}
 
-      {/* Vista previa del expediente */}
-      <Modal
-        open={!!previewInvoice}
-        onClose={() => setPreviewInvoice(null)}
-        title={previewInvoice ? `Expediente ${previewInvoice.displayNumber}` : ""}
-        width="max-w-2xl"
-        footer={previewInvoice ? (
-          <>
-            <Button variant="ghost" onClick={() => setPreviewInvoice(null)}>Cerrar</Button>
-            <Button variant="primary" onClick={() => { downloadSingle(previewInvoice); setPreviewInvoice(null); }} disabled={downloading}><Download size={13} /> Descargar expediente</Button>
-          </>
-        ) : undefined}
-      >
-        {previewInvoice && (
-          <div className="flex flex-col gap-4 text-[13px]">
-            <div>
-              <p className="font-medium text-slate-900">{previewInvoice.supplier}</p>
-              {previewInvoice.supplierTaxId && <p className="font-mono text-xs text-slate-500">{previewInvoice.supplierTaxId}</p>}
+      <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: "220px minmax(0,1fr) 380px" }}>
+        {/* Árbol */}
+        <nav className="min-w-0">
+          <button onClick={() => { setPath([]); setCurrent(null); }} className={`mb-1 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[13px] ${!path.length ? "bg-[#F1F1F3] font-medium text-slate-900" : "text-slate-600 hover:bg-[#F7F7F8]"}`}>
+            <FolderOpen size={14} className="text-slate-400" /> <span className="flex-1 truncate">{project ? `${project.code}` : "Proyecto"}</span>
+            <span className="text-[11px] tabular-nums text-slate-400">{items.length}</span>
+          </button>
+          {TOP.map((t) => <TreeNode key={t} p={[t]} depth={0} />)}
+          <div className="mt-6 space-y-1.5 border-t border-slate-100 pt-4">
+            {(["po", "invoice", "proforma", "budget", "guarantee", "box", "supplier"] as DocTypeKey[]).map((k) => (
+              <div key={k} className="flex items-center gap-2 text-[11px] text-slate-500"><span className="h-2 w-2 rounded-sm" style={{ background: DOC_TYPES[k].hex }} />{DOC_TYPES[k].label}</div>
+            ))}
+          </div>
+        </nav>
+
+        {/* Lista */}
+        <section className="min-w-0">
+          <div className="flex items-center gap-1 text-[13px] text-slate-500">
+            <button onClick={() => setPath([])} className="hover:text-slate-900">{project?.code || "Proyecto"}</button>
+            {path.map((seg, k) => (<span key={k} className="flex items-center gap-1"><ChevronRight size={12} className="text-slate-300" /><button onClick={() => setPath(path.slice(0, k + 1))} className={k === path.length - 1 ? "font-medium text-slate-900" : "hover:text-slate-900"}>{seg}</button></span>))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <SearchBar fields={FIELDS} field={field} onField={setField} value={q} onChange={setQ} count={searching ? rows.length : undefined} />
+            <div className="flex items-center gap-3">
+              <div className="w-40"><Select value={type} onChange={(e) => setType(e.target.value as typeof type)}><option value="all">Todos los tipos</option>{(Object.keys(DOC_TYPES) as DocTypeKey[]).map((k) => <option key={k} value={k}>{DOC_TYPES[k].label}</option>)}</Select></div>
+              <Checkbox checked={onlyWarnings} onChange={setOnlyWarnings} label="Con avisos" />
             </div>
-            {previewInvoice.items?.length > 0 && (
-              <div className="overflow-hidden rounded-lg border border-slate-200">
-                <table className="tbl w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                      <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Cuenta</th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">Concepto</th>
-                      <th scope="col" className="w-16 px-3 py-2 text-right font-medium">IVA</th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewInvoice.items.map((item, i) => (
-                      <tr key={i} className="border-b border-slate-100 last:border-0">
-                        <td className="px-3 py-1.5 font-mono text-xs">{item.subAccountCode || "—"}</td>
-                        <td className="px-3 py-1.5">{item.description || item.subAccountDescription}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs text-slate-500">{item.vatRate} %</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs">{fmtMoney(item.baseAmount, previewInvoice.currency)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </div>
+
+          {loading ? <div className="mt-10 flex justify-center"><Spinner /></div> : !subfolders.length && !rows.length ? (
+            <div className="mt-4"><EmptyState title={searching ? "Ningún documento coincide" : "Carpeta vacía"} /></div>
+          ) : (
+            <table className="tbl mt-4 w-full table-fixed text-[13px]">
+              <thead>
+                <tr className="text-left">
+                  <th className="w-9 py-2 pl-3"><input type="checkbox" checked={allShown} onChange={() => setSelected((s) => { const n = new Set(s); rows.forEach((r) => (allShown ? n.delete(r.id) : n.add(r.id))); return n; })} aria-label="Seleccionar todo" /></th>
+                  <th className="px-2">Nombre</th>
+                  <th className="w-28 px-2">Fecha</th>
+                  <th className="w-28 px-2 text-right">Base</th>
+                  <th className="w-12 px-2">Ver.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subfolders.map((f) => (
+                  <tr key={pathKey(f.path)} onClick={() => { setPath(f.path); setOpen((o) => new Set([...o, pathKey(f.path)])); }} className="cursor-pointer hover:bg-[#FAFAFA]">
+                    <td className="py-1.5 pl-3" />
+                    <td className="px-2"><span className="flex items-center gap-2 font-medium text-slate-900"><Folder size={14} className="text-slate-400" />{f.path[f.path.length - 1]}<span className="text-xs font-normal text-slate-400">{f.count}</span></span></td>
+                    <td className="px-2" /><td className="px-2" /><td className="px-2" />
+                  </tr>
+                ))}
+                {rows.map((it) => (
+                  <tr key={it.id} onClick={() => setCurrent(it)} className={`cursor-pointer ${current?.id === it.id ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                    <td className="py-1.5 pl-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} aria-label={`Seleccionar ${it.fileName}`} /></td>
+                    <td className="px-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-5 flex-shrink-0 items-end justify-center rounded-[3px] pb-0.5 text-[7px] font-bold text-white" style={{ background: DOC_TYPES[it.type].hex }}>PDF</span>
+                        <div className="min-w-0">
+                          <div className="truncate text-slate-900"><span className="font-mono text-[12px]">{it.number}</span>{it.title ? <span className="text-slate-700"> · {it.title}</span> : null}</div>
+                          <div className="truncate text-[11px] text-slate-500">
+                            <span style={{ color: DOC_TYPES[it.type].hex }}>{it.typeLabel}</span> · {it.status}{searching && <span className="text-slate-400"> · {it.path.join(" / ")}</span>}
+                            {it.warnings.length > 0 && <span className="text-amber-700"> · {it.warnings.join(" · ")}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 text-slate-600">{day(it.date)}</td>
+                    <td className="px-2 text-right font-mono tabular-nums text-slate-900">{eur(it.base)}</td>
+                    <td className="px-2 font-mono text-[11px] text-slate-500">{it.version}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* Vista previa y metadatos */}
+        <aside className="min-w-0">
+          <div className="sticky top-[76px]">
+            {!current ? (
+              <div className="flex aspect-[210/297] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 text-center">
+                <FileText size={22} className="text-slate-300" />
+                <p className="mt-2 text-[13px] text-slate-500">Elige un documento para verlo</p>
               </div>
-            )}
-            <dl className="ml-auto grid w-64 grid-cols-2 gap-y-1">
-              <dt className="text-slate-500">Base</dt><dd className="text-right font-mono">{fmtMoney(previewInvoice.baseAmount, previewInvoice.currency)}</dd>
-              <dt className="text-slate-500">IVA</dt><dd className="text-right font-mono">{fmtMoney(previewInvoice.vatAmount, previewInvoice.currency)}</dd>
-              {previewInvoice.irpfAmount > 0 && (<><dt className="text-slate-500">IRPF</dt><dd className="text-right font-mono">−{fmtMoney(previewInvoice.irpfAmount, previewInvoice.currency)}</dd></>)}
-              <dt className="border-t border-slate-200 pt-1 font-medium">Total</dt><dd className="border-t border-slate-200 pt-1 text-right font-mono font-semibold">{fmtMoney(previewInvoice.totalAmount, previewInvoice.currency)}</dd>
-            </dl>
-            {(previewInvoice.codedAt || (previewInvoice.status === "paid" && previewInvoice.paidAt)) && (
-              <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
-                {previewInvoice.codedAt && <p>Codificada por {previewInvoice.codedByName} el {fmtDateTime(previewInvoice.codedAt)}{previewInvoice.accountingEntry ? ` · asiento ${previewInvoice.accountingEntry}` : ""}</p>}
-                {previewInvoice.status === "paid" && previewInvoice.paidAt && (
-                  <p>Pagada el {fmtDateTime(previewInvoice.paidAt)}{previewInvoice.paymentMethod ? ` · ${PAYMENT_METHODS[previewInvoice.paymentMethod] || previewInvoice.paymentMethod}` : ""}{previewInvoice.paymentReference ? ` · ref. ${previewInvoice.paymentReference}` : ""}</p>
+            ) : (
+              <>
+                <div className="relative aspect-[210/297] overflow-hidden rounded-lg border border-slate-200 bg-[#F4F4F5]">
+                  {preview && !previewing ? <iframe title="Vista previa" src={`${preview.url}#toolbar=0&navpanes=0&view=FitH`} className="h-full w-full" /> : <div className="flex h-full items-center justify-center"><Spinner /></div>}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <Button variant="primary" className="flex-1" onClick={() => downloadOne(current)}><Download size={14} /> Descargar PDF</Button>
+                  <Link href={sourceHref(current)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-[13px] text-slate-700 hover:bg-[#F7F7F8]"><ExternalLink size={13} /> Origen</Link>
+                </div>
+                <dl className="mt-4 space-y-2 text-[12px]">
+                  {[
+                    ["Archivo", current.fileName],
+                    ["Carpeta", current.path.join(" / ")],
+                    ["Tipo", current.typeLabel],
+                    ["Estado", current.status],
+                    ["Versión", current.version],
+                    ["Base imponible", eur(current.base)],
+                    ["Total", eur(current.total)],
+                    ["Documentos reales", current.originals.length ? current.originals.map((o) => o.label).join(", ") : "—"],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-4"><dt className="flex-shrink-0 text-slate-500">{k}</dt><dd className="truncate text-right text-slate-900" title={v}>{v}</dd></div>
+                  ))}
+                  {preview?.fingerprint && <div><dt className="text-slate-500">Huella del contenido (SHA-256)</dt><dd className="mt-0.5 break-all font-mono text-[10.5px] text-slate-600">{preview.fingerprint}</dd></div>}
+                </dl>
+                {(current.warnings.length > 0 || (preview?.missing.length || 0) > 0) && (
+                  <div className="mt-4 rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2 text-xs text-amber-900">
+                    {[...current.warnings, ...(preview?.missing || []).map((m) => `No se pudo adjuntar: ${m}`)].map((w) => <p key={w}>{w}</p>)}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
-        )}
+        </aside>
+      </div>
+
+      <Modal open={!!progress} onClose={() => {}} title="Preparando documentos">
+        <div className="flex flex-col gap-3">
+          <p className="text-[13px] text-slate-600">Generando {progress?.done || 0} de {progress?.total || 0}: carátula, aprobaciones y documentos reales.</p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-slate-800 transition-all" style={{ width: `${progress ? (progress.done / Math.max(1, progress.total)) * 100 : 0}%` }} /></div>
+        </div>
       </Modal>
     </Page>
   );
+}
+
+export default function DocumentCenterPage() {
+  return <Suspense fallback={<PageLoading />}><HubInner /></Suspense>;
 }

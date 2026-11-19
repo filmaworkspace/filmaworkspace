@@ -11,7 +11,6 @@ import {
   addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, Timestamp, updateDoc, deleteDoc, where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import jsPDF from "jspdf";
 
 import { db, storage } from "@/lib/firebase";
 import {
@@ -68,7 +67,6 @@ interface MovementForm {
   advanceId: string;
   settleLeftover: "return" | "keep";
   file: File | null;
-  printVoucher: boolean;
   fundingSource: "now" | "treasury";
   forecastId: string;
   /** Tickets que llegan del enlace público: se adjuntan todos al movimiento. */
@@ -78,7 +76,7 @@ interface MovementForm {
 
 const emptyForm = (kind: FormKind): MovementForm => ({
   kind, date: todayISO(), personName: "", personDepartment: "", supplier: "", supplierTaxId: "", documentType: "ticket",
-  description: "", reference: "", amount: "", lines: [emptyLine()], advanceId: "", settleLeftover: "return", file: null, printVoucher: kind === "advance",
+  description: "", reference: "", amount: "", lines: [emptyLine()], advanceId: "", settleLeftover: "return", file: null,
   fundingSource: "now", forecastId: "", attachments: [], fromFormId: "",
 });
 
@@ -310,7 +308,6 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
         if (amount <= 0) throw new Error("Indica el importe del anticipo");
         if (amount > balance + 0.004) throw new Error(`No hay suficiente efectivo: en caja quedan ${money(balance)} €`);
         const { number } = await createMovement({ ...base, type: "advance", amount, personName: form.personName.trim(), personDepartment: form.personDepartment, description: base.description || "Anticipo a justificar", ...att });
-        if (form.printVoucher) printVoucher({ number, date: form.date, personName: form.personName.trim(), amount, description: base.description || "Anticipo a justificar", kind: "Anticipo a justificar" });
       }
 
       if (form.kind === "expense") {
@@ -393,7 +390,6 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
       lines: tickets.map((t) => ({ ...emptyLine(), description: [t.supplier, t.description].filter(Boolean).join(" · "), baseAmount: t.amount, vatRate: 0, vatAmount: 0 })),
       attachments: tickets.filter((t) => t.fileUrl).map((t) => ({ url: t.fileUrl, name: t.fileName || t.supplier || "ticket" })),
       fromFormId: f.id,
-      printVoucher: false,
     });
   };
 
@@ -447,27 +443,6 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
     } catch (e: any) { onToast("error", e?.message || "No se pudo registrar el arqueo"); }
     finally { setSaving(false); }
   };
-
-  // ── Vale en PDF ────────────────────────────────────────────────────────────
-  function printVoucher(v: { number: string; date: string; personName?: string; amount: number; description: string; kind: string }) {
-    const pdf = new jsPDF({ unit: "mm", format: "a5", orientation: "landscape" });
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9); pdf.setTextColor(110);
-    pdf.text(projectName || "Proyecto", 14, 14);
-    pdf.text(current ? `${current.name} · custodio ${current.custodianName}` : "", 14, 19);
-    pdf.setTextColor(20); pdf.setFontSize(16);
-    pdf.text(`Vale de caja ${v.number}`, 14, 32);
-    pdf.setFontSize(10);
-    const rowsPdf: [string, string][] = [
-      ["Tipo", v.kind], ["Fecha", v.date.split("-").reverse().join("/")], ["Persona", v.personName || "—"], ["Concepto", v.description],
-    ];
-    rowsPdf.forEach(([k, val], i) => { pdf.setTextColor(110); pdf.text(k, 14, 44 + i * 7); pdf.setTextColor(20); pdf.text(val, 44, 44 + i * 7); });
-    pdf.setFontSize(20); pdf.text(`${money(v.amount)} €`, 196, 32, { align: "right" });
-    pdf.setDrawColor(200); pdf.line(14, 112, 84, 112); pdf.line(126, 112, 196, 112);
-    pdf.setFontSize(8); pdf.setTextColor(110);
-    pdf.text("Entrega (cajero-pagador)", 14, 117); pdf.text("Recibe", 126, 117);
-    pdf.save(`Vale_${v.number}.pdf`);
-  }
 
   const exportLedger = () => {
     const q = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
@@ -700,7 +675,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                                           </label>
                                         )}
                                         {(m.type === "advance" || m.type === "return" || m.type === "reimbursement" || m.type === "expense") && (
-                                          <MenuItem onClick={() => { close(); printVoucher({ number: m.number, date: m.date, personName: m.personName || m.supplier, amount: m.amount, description: m.description, kind: MOVEMENT_LABEL[m.type] }); }}>Imprimir vale</MenuItem>
+                                          <MenuItem onClick={() => { close(); window.location.href = `/project/${projectId}/accounting/document-center?doc=cash:${m.id}`; }}>Ver vale en documentación</MenuItem>
                                         )}
                                         {m.type === "advance" && advanceOutstanding(m, floatMovements) > 0.004 && (
                                           <>
@@ -964,7 +939,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
               </div>
             )}
             {form.kind !== "return" && fileInput}
-            {form.kind === "advance" && <Checkbox label="Descargar vale en PDF para firmar" checked={form.printVoucher} onChange={(v) => setForm({ ...form, printVoucher: v })} />}
+            {form.kind === "advance" && <p className="text-xs text-slate-500">El vale para firmar estará en Documentación → Box → Cash.</p>}
           </div>
         )}
       </Modal>
