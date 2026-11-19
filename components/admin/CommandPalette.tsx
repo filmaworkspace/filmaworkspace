@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity, BarChart3, Briefcase, Building2, CornerDownLeft, Eye, HeadphonesIcon, Home, Mail, Megaphone, Plus, Search, Settings, Users, Wrench,
+  Activity, BarChart3, Receipt, Briefcase, Building2, CornerDownLeft, Eye, HeadphonesIcon, Home, Mail, Megaphone, Plus, Search, Settings, Users, Wrench,
 } from "lucide-react";
 import { inter } from "@/lib/fonts";
 import { useAdminData } from "./AdminData";
@@ -61,6 +61,7 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
     const actions: Item[] = [
       { id: "a-project", group: "Acciones", label: "Crear proyecto", icon: Plus, keywords: "nuevo proyecto", run: go("/admindashboard/projects?new=1") },
       { id: "a-account", group: "Acciones", label: "Crear cuenta (productora)", icon: Plus, keywords: "nueva productora", run: go("/admindashboard/accounts?new=1") },
+      { id: "a-bill", group: "Acciones", label: "Facturación", hint: "Presupuestos y facturas", icon: Receipt, keywords: "facturas presupuestos cobros", run: go("/admindashboard/accounts/billing") },
       { id: "a-ann", group: "Acciones", label: "Publicar un aviso", icon: Megaphone, keywords: "nuevo aviso banner comunicado", run: go("/admindashboard/announcements?new=banner") },
       { id: "a-changelog", group: "Acciones", label: "Publicar novedades", icon: Megaphone, keywords: "changelog que hay de nuevo", run: go("/admindashboard/announcements?new=changelog") },
       { id: "a-mail", group: "Acciones", label: "Enviar un comunicado por email", icon: Mail, keywords: "difusion broadcast", run: go("/admindashboard/announcements?new=email") },

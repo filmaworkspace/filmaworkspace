@@ -33,7 +33,8 @@ export function AccountFormModal({ open, onClose, account, projects, producers, 
   onSaved: (id: string) => void;
 }) {
   const editing = !!account;
-  const blank = { name: "", plan: "", accounting: true, team: true, budgeting: false, maxProjects: "", maxUsers: "", renewalAt: "", contactName: "", contactEmail: "", contactPhone: "", taxId: "" };
+  const blank = { name: "", plan: "", accounting: true, team: true, budgeting: false, maxProjects: "", maxUsers: "", renewalAt: "", contactName: "", contactEmail: "", contactPhone: "", taxId: "",
+    bName: "", bAddress: "", bPostal: "", bCity: "", bProvince: "", bCountry: "España", bEmail: "" };
   const [f, setF] = useState(blank);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,8 @@ export function AccountFormModal({ open, onClose, account, projects, producers, 
       maxProjects: account.maxProjects ? String(account.maxProjects) : "", maxUsers: account.maxUsers ? String(account.maxUsers) : "",
       renewalAt: toDateInput(account.renewalAt), contactName: account.contactName || "", contactEmail: account.contactEmail || "",
       contactPhone: account.contactPhone || "", taxId: account.taxId || "",
+      bName: account.billing?.name || "", bAddress: account.billing?.address || "", bPostal: account.billing?.postalCode || "",
+      bCity: account.billing?.city || "", bProvince: account.billing?.province || "", bCountry: account.billing?.country || "España", bEmail: account.billing?.email || "",
     } : blank);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, account]);
@@ -61,7 +64,8 @@ export function AccountFormModal({ open, onClose, account, projects, producers, 
         name: f.name.trim(), plan: f.plan || null, modules,
         maxProjects: f.maxProjects ? Number(f.maxProjects) : null, maxUsers: f.maxUsers ? Number(f.maxUsers) : null,
         renewalAt: f.renewalAt ? Timestamp.fromDate(new Date(`${f.renewalAt}T12:00:00`)) : null,
-        contactName: f.contactName.trim(), contactEmail: f.contactEmail.trim(), contactPhone: f.contactPhone.trim(), taxId: f.taxId.trim(),
+        contactName: f.contactName.trim(), contactEmail: f.contactEmail.trim(), contactPhone: f.contactPhone.trim(), taxId: f.taxId.trim().toUpperCase(),
+        billing: { name: f.bName.trim(), address: f.bAddress.trim(), postalCode: f.bPostal.trim(), city: f.bCity.trim(), province: f.bProvince.trim(), country: f.bCountry.trim() || "España", email: f.bEmail.trim() },
         ...(account ? {} : { createdAt: serverTimestamp() }),
       }, { merge: true });
       if (account) {
@@ -102,6 +106,20 @@ export function AccountFormModal({ open, onClose, account, projects, producers, 
           <Field label="NIF / CIF"><Input value={f.taxId} onChange={(e) => setF({ ...f, taxId: e.target.value })} className="font-mono" /></Field>
           <Field label="Email de contacto"><Input value={f.contactEmail} onChange={(e) => setF({ ...f, contactEmail: e.target.value })} /></Field>
           <Field label="Teléfono"><Input value={f.contactPhone} onChange={(e) => setF({ ...f, contactPhone: e.target.value })} /></Field>
+        </div>
+        <div className="border-t border-slate-100 pt-4">
+          <p className="mb-3 text-[13px] font-medium text-slate-900">Datos de facturación</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Razón social" className="col-span-2"><Input value={f.bName} onChange={(e) => setF({ ...f, bName: e.target.value })} placeholder={f.name || "Nombre legal de la empresa"} /></Field>
+            <Field label="Dirección fiscal" className="col-span-2"><Input value={f.bAddress} onChange={(e) => setF({ ...f, bAddress: e.target.value })} placeholder="Calle, número, piso" /></Field>
+            <div className="col-span-2 grid grid-cols-[110px_1fr_1fr] gap-3">
+              <Field label="C. P."><Input value={f.bPostal} onChange={(e) => setF({ ...f, bPostal: e.target.value })} /></Field>
+              <Field label="Ciudad"><Input value={f.bCity} onChange={(e) => setF({ ...f, bCity: e.target.value })} /></Field>
+              <Field label="Provincia"><Input value={f.bProvince} onChange={(e) => setF({ ...f, bProvince: e.target.value })} /></Field>
+            </div>
+            <Field label="País"><Input value={f.bCountry} onChange={(e) => setF({ ...f, bCountry: e.target.value })} /></Field>
+            <Field label="Email para facturas"><Input value={f.bEmail} onChange={(e) => setF({ ...f, bEmail: e.target.value })} placeholder={f.contactEmail || "administracion@…"} /></Field>
+          </div>
         </div>
         {error && <p className="text-xs text-red-700">{error}</p>}
       </div>

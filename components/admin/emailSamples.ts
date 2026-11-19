@@ -7,6 +7,7 @@ import { resetPasswordHtml } from "@/lib/emails/reset-password";
 import { verifyCodeHtml } from "@/lib/emails/verify-code";
 import { broadcastHtml } from "@/lib/emails/broadcast";
 import { adminDigestHtml } from "@/lib/emails/admin-digest";
+import { billingDocumentHtml } from "@/lib/emails/billing-document";
 
 const URL = "https://filmaworkspace.com/ejemplo";
 
@@ -18,6 +19,8 @@ export const EMAIL_SAMPLES: { id: string; label: string; html: () => string }[] 
   { id: "reset-password", label: "Restablecer contraseña", html: () => resetPasswordHtml({ name: "Lucía Martín", resetUrl: URL }) },
   { id: "verify-code", label: "Código de verificación", html: () => verifyCodeHtml({ name: "Lucía Martín", code: "482913" }) },
   { id: "broadcast", label: "Comunicado", html: () => broadcastHtml({ content: "Hola:\n\nEste fin de semana mejoramos la velocidad de Contabilidad. No tienes que hacer nada.\n\nGracias." }) },
+  { id: "billing-invoice", label: "Factura de Filma", html: () => billingDocumentHtml({ kind: "invoice", number: "F2026-0001", clientName: "Lumen Films Producciones S.L.", issuerName: "Filma Workspace S.L.", rows: [["Fecha", "19/11/2026"], ["Proyecto", "Kilómetro cero"], ["Total", "617,10 €"], ["Vencimiento", "19/12/2026"]] }) },
+  { id: "billing-quote", label: "Presupuesto de Filma", html: () => billingDocumentHtml({ kind: "quote", number: "P2026-0001", clientName: "Lumen Films Producciones S.L.", issuerName: "Filma Workspace S.L.", rows: [["Proyecto", "Kilómetro cero"], ["Importe", "510,00 € + IVA al mes"], ["Válido hasta", "19/12/2026"]], message: "Te mandamos la propuesta que hablamos ayer." }) },
   { id: "admin-digest", label: "Resumen diario (admin)", html: () => adminDigestHtml({ date: "Miércoles, 18 de noviembre", rows: [["Usuarios nuevos", "3"], ["Proyectos nuevos", "1"], ["Tickets abiertos", "2"], ["Emails enviados", "41"], ["Errores sin revisar", "0"]], attention: ["1 ticket de soporte sin asignar"], url: URL }) },
 ];
 

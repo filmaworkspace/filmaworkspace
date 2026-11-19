@@ -21,6 +21,8 @@ export interface EmailPayload {
   text?: string;
   from?: string;
   tags?: { name: string; value: string }[];
+  /** Adjuntos además de la cabecera (p. ej. el PDF de una factura), en base64. */
+  attachments?: { filename: string; content: string; contentType?: string }[];
 }
 
 const templateOf = (p: EmailPayload) => p.tags?.find((t) => t.name === "type")?.value || "otro";
@@ -60,7 +62,7 @@ async function writeLog(entries: ReturnType<typeof logEntry>[]) {
 /** Envía un email (cabecera incrustada) y lo registra. Devuelve lo mismo que Resend. */
 export async function sendEmail(p: EmailPayload, opts?: { idempotencyKey?: string }, meta?: Record<string, unknown>) {
   const res = await resend.emails.send(
-    { from: p.from || EMAIL_FROM, to: p.to, subject: p.subject, html: p.html, text: p.text || "", tags: p.tags, attachments: emailAttachments() },
+    { from: p.from || EMAIL_FROM, to: p.to, subject: p.subject, html: p.html, text: p.text || "", tags: p.tags, attachments: [...emailAttachments(), ...(p.attachments || [])] },
     opts?.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined,
   );
   await writeLog([logEntry(p, { id: res.data?.id, error: res.error?.message }, meta)]);

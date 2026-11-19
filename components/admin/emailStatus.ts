@@ -22,4 +22,6 @@ export const TEMPLATE_LABEL: Record<string, string> = {
   "verify-code": "Código de verificación",
   "broadcast": "Comunicado",
   "admin-digest": "Resumen diario (admin)",
+  "billing-invoice": "Factura de Filma",
+  "billing-quote": "Presupuesto de Filma",
 };

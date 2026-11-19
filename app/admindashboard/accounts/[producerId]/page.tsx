@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 import { ArrowLeft, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -16,6 +16,9 @@ import { healthLabel, useAdminData } from "@/components/admin/AdminData";
 import { AccountFormModal } from "@/components/admin/AccountFormModal";
 import { accountActivity } from "@/components/admin/accountRisk";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { useBilling, invoiceState } from "@/components/admin/billing/useBilling";
+import { NewDocModal } from "@/components/admin/billing/NewDocModal";
+import { countsAsBilled, eur, fmtDay, invoiceTotals, monthName, QUOTE_STATUS, quoteGrandTotal } from "@/lib/billing";
 import { BlockTitle, MiniEmpty, fmtDate, HealthMeter, PHASE_DOT, ROLE_LABEL, RowBar, timeAgo } from "@/components/admin/ui";
 
 interface Note { id: string; text: string; authorName: string; createdAt: Timestamp | null }
@@ -29,7 +32,10 @@ export default function AccountPage() {
   const [toast, showToast] = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [note, setNote] = useState("");
-  const [editOpen, setEditOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const [editOpen, setEditOpen] = useState(searchParams.get("edit") === "1");
+  const billing = useBilling(producerId);
+  const [newDoc, setNewDoc] = useState<null | "quote" | "invoice">(null);
   const [addUser, setAddUser] = useState(false);
   const [userToAdd, setUserToAdd] = useState("");
   const [del, setDel] = useState(false);
@@ -139,6 +145,47 @@ export default function AccountPage() {
           </section>
 
           <section>
+            <BlockTitle count={billing.quotes.length + billing.invoices.length} action={
+              <span className="flex gap-2">
+                <Button size="sm" onClick={() => setNewDoc("quote")}><Plus size={13} /> Presupuesto</Button>
+                <Button size="sm" onClick={() => setNewDoc("invoice")}><Plus size={13} /> Factura</Button>
+              </span>
+            }>Presupuestos y facturas</BlockTitle>
+            {billing.quotes.length === 0 && billing.invoices.length === 0 ? <MiniEmpty>Sin presupuestos ni facturas</MiniEmpty> : (
+              <table className="tbl w-full table-fixed text-[13px]">
+                <tbody>
+                  {billing.quotes.map((x) => {
+                    const t = x.status === "draft" ? invoiceTotals(x.lines) : x;
+                    const grand = quoteGrandTotal({ ...x, ...t });
+                    const billed = billing.invoices.filter((i) => i.quoteId === x.id && countsAsBilled(i)).reduce((sum, i) => sum + i.baseAmount, 0);
+                    const st = QUOTE_STATUS[x.status];
+                    return (
+                      <tr key={x.id} onClick={() => router.push(`/admindashboard/accounts/billing/quotes/${x.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={st.tone} />{x.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
+                        <td className="px-3"><div className="truncate text-slate-900">Presupuesto · {x.projectName}</div><div className="truncate text-xs text-slate-500">{x.billingMode === "monthly" ? `${eur(t.baseAmount)}/mes · ${x.months} meses` : `Pago único · ${eur(t.baseAmount)}`}</div></td>
+                        <td className="w-40 px-3 text-right text-xs text-slate-500">{x.status === "draft" ? "" : `Facturado ${grand.base > 0 ? Math.min(100, Math.round((billed / grand.base) * 100)) : 0} %`}</td>
+                        <td className="w-28 px-3 text-slate-600">{st.label}</td>
+                      </tr>
+                    );
+                  })}
+                  {billing.invoices.map((i) => {
+                    const st = invoiceState(i);
+                    const t = i.status === "draft" ? invoiceTotals(i.lines) : i;
+                    return (
+                      <tr key={i.id} onClick={() => router.push(`/admindashboard/accounts/billing/invoices/${i.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={st.tone} />{i.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
+                        <td className="px-3"><div className="truncate text-slate-900">{i.kind === "rectifying" ? "Rectificativa" : "Factura"} · {i.projectName || "—"}</div><div className="truncate text-xs text-slate-500">{[fmtDay(i.issueDate), i.periodMonth && monthName(i.periodMonth), i.quoteNumber].filter(Boolean).join(" · ")}</div></td>
+                        <td className="w-40 px-3 text-right font-mono tabular-nums text-slate-900">{eur(t.totalAmount)}</td>
+                        <td className="w-28 px-3 text-slate-600">{st.label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+
+          <section>
             <BlockTitle count={notes.length}>Notas internas</BlockTitle>
             <div className="flex gap-2">
               <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Llamada, acuerdo, incidencia… (solo lo ven los admins)" className="flex-1"
@@ -194,6 +241,7 @@ export default function AccountPage() {
         </aside>
       </div>
 
+      <NewDocModal open={!!newDoc} onClose={() => setNewDoc(null)} kind={newDoc || "invoice"} settings={billing.settings} quotes={billing.quotes} invoices={billing.invoices} producerId={producerId} />
       <AccountFormModal open={editOpen} account={a} projects={projects} producers={producers} onClose={() => setEditOpen(false)} onSaved={() => { showToast("success", "Cuenta guardada"); reload(); }} />
 
       <Modal open={addUser} onClose={() => setAddUser(false)} title="Añadir usuario a la cuenta"

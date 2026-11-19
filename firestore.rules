@@ -892,6 +892,43 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── Facturación de Filma a sus cuentas (admindashboard → Cuentas) ───────
+    // Un borrador se edita libremente; una vez emitido (número asignado) solo
+    // cambia su estado: cobrada, enviada o anulada con su rectificativa. Las
+    // rectificativas se crean ya emitidas. Solo se borran borradores.
+    match /billingInvoices/{invoiceId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && (
+        request.resource.data.status == 'draft' ||
+        (request.resource.data.status == 'issued' && request.resource.data.kind == 'rectifying' &&
+         request.resource.data.get('rectifies', null) != null)
+      );
+      allow update: if isAdmin() && (
+        resource.data.status == 'draft' ||
+        (resource.data.status == 'issued' &&
+         request.resource.data.status in ['issued', 'voided'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+           ['status', 'paid', 'paidAt', 'sentAt', 'sentTo', 'voidReason', 'voidedAt', 'voidedBy', 'rectifiedBy', 'updatedAt'])) ||
+        (resource.data.status == 'voided' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sentAt', 'sentTo', 'updatedAt']))
+      );
+      allow delete: if isAdmin() && resource.data.status == 'draft';
+    }
+
+    // Presupuestos: igual, un borrador se edita; enviado solo cambia de estado.
+    match /billingQuotes/{quoteId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.status == 'draft';
+      allow update: if isAdmin() && (
+        resource.data.status == 'draft' ||
+        (resource.data.status != 'draft' &&
+         request.resource.data.status in ['sent', 'accepted', 'rejected'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+           ['status', 'acceptedAt', 'rejectedAt', 'decisionNote', 'sentAt', 'sentTo', 'updatedAt']))
+      );
+      allow delete: if isAdmin() && resource.data.status == 'draft';
+    }
+
     // Avisos dentro de la app y novedades (admindashboard → Avisos).
     match /announcements/{announcementId} {
       allow read: if isAdmin() || (isSignedIn() && (

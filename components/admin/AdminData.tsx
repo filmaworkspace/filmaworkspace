@@ -60,6 +60,8 @@ export interface AdminProducer {
   contactEmail?: string;
   contactPhone?: string;
   taxId?: string;
+  /** Datos de facturación (razón social y dirección fiscal). */
+  billing?: { name?: string; address?: string; postalCode?: string; city?: string; province?: string; country?: string; email?: string };
 }
 export interface AdminInvitation { id: string; email: string; projectId: string; createdAt: Timestamp | null }
 
@@ -166,7 +168,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         return {
           id: d.id, name: x.name || "Sin nombre", createdAt: ts(x.createdAt), plan: x.plan, modules: x.modules,
           maxProjects: x.maxProjects ?? null, maxUsers: x.maxUsers ?? null, renewalAt: ts(x.renewalAt),
-          contactName: x.contactName, contactEmail: x.contactEmail, contactPhone: x.contactPhone, taxId: x.taxId,
+          contactName: x.contactName, contactEmail: x.contactEmail, contactPhone: x.contactPhone, taxId: x.taxId, billing: x.billing || {},
         };
       }).sort((a, b) => a.name.localeCompare(b.name));
 

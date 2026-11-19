@@ -2,7 +2,7 @@
 // congelados y las colecciones nuevas (registros, avisos, notas de cuentas).
 // Se ejecuta junto a test.mjs (npm test).
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, addDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import fs from "fs";
 
 const env = await initializeTestEnvironment({
@@ -28,6 +28,9 @@ await env.withSecurityRulesDisabled(async (c) => {
   await setDoc(doc(db, "announcements/all1"), { kind: "banner", active: true, audienceAll: true, audienceUserIds: [] });
   await setDoc(doc(db, "announcements/pm1"), { kind: "banner", active: true, audienceAll: false, audienceUserIds: ["pm"] });
   await setDoc(doc(db, "producers/prod1"), { name: "Prod" });
+  await setDoc(doc(db, "billingInvoices/fIssued"), { status: "issued", kind: "standard", number: "F2026-0001", totalAmount: 121, lines: [] });
+  await setDoc(doc(db, "billingInvoices/fDraft"), { status: "draft", kind: "standard", number: null, totalAmount: 0, lines: [] });
+  await setDoc(doc(db, "billingQuotes/pSent"), { status: "sent", number: "P2026-0001", baseAmount: 100 });
 });
 
 const as = (uid, claims = {}) => env.authenticatedContext(uid, { email: `${uid}@x.com`, ...claims }).firestore();
@@ -81,6 +84,23 @@ await t("admin crea avisos", true, () => setDoc(doc(as("admin"), "announcements/
 console.log("notas de cuentas");
 await t("admin escribe notas", true, () => addDoc(collection(as("admin"), "producers/prod1/notes"), { text: "llamar" }));
 await t("usuario NO lee notas", false, () => getDocs(collection(as("pm"), "producers/prod1/notes")));
+
+console.log("facturación");
+await t("usuario NO lee facturas de Filma", false, () => getDoc(doc(as("pm"), "billingInvoices/fIssued")));
+await t("admin crea un borrador", true, () => setDoc(doc(as("admin"), "billingInvoices/fNew"), { status: "draft", kind: "standard", lines: [] }));
+await t("admin NO crea una factura ya emitida", false, () => setDoc(doc(as("admin"), "billingInvoices/fX"), { status: "issued", kind: "standard", number: "F2026-0099" }));
+await t("admin edita un borrador", true, () => updateDoc(doc(as("admin"), "billingInvoices/fDraft"), { notes: "x", lines: [{ id: "a" }] }));
+await t("admin NO cambia el importe de una emitida", false, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { totalAmount: 1 }));
+await t("admin NO cambia el número de una emitida", false, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { number: "F2026-0002" }));
+await t("admin marca cobrada una emitida", true, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { paid: true, paidAt: "2026-11-19" }));
+await t("admin NO devuelve a borrador una emitida", false, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { status: "draft" }));
+await t("admin NO borra una emitida", false, () => deleteDoc(doc(as("admin"), "billingInvoices/fIssued")));
+await t("admin crea la rectificativa emitida", true, () => setDoc(doc(as("admin"), "billingInvoices/fIssued-R"), { status: "issued", kind: "rectifying", number: "R2026-0001", rectifies: { id: "fIssued", number: "F2026-0001" } }));
+await t("admin anula la emitida", true, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { status: "voided", voidReason: "error", rectifiedBy: { id: "fIssued-R", number: "R2026-0001" } }));
+await t("admin NO reactiva una anulada", false, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { status: "issued" }));
+await t("admin borra un borrador", true, () => deleteDoc(doc(as("admin"), "billingInvoices/fDraft")));
+await t("admin acepta un presupuesto enviado", true, () => updateDoc(doc(as("admin"), "billingQuotes/pSent"), { status: "accepted" }));
+await t("admin NO cambia el importe de un presupuesto enviado", false, () => updateDoc(doc(as("admin"), "billingQuotes/pSent"), { baseAmount: 1 }));
 
 console.log(`\n${pass} ok, ${fail} fallos`);
 await env.cleanup();

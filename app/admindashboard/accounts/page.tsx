@@ -6,7 +6,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Receipt } from "lucide-react";
 import { Button, EmptyState, IconButton, Menu, MenuItem, Page, PageHeader, PageLoading, useToast } from "@/components/ds";
 import SearchBar, { SearchField } from "@/components/SearchBar";
 import { AdminProducer, useAdminData } from "@/components/admin/AdminData";
@@ -82,6 +82,7 @@ function AccountsInner() {
             <Menu trigger={(t) => <IconButton label="Más" onClick={t}><MoreHorizontal size={15} /></IconButton>}>
               {(close) => <MenuItem onClick={() => { close(); exportCsv(); }}>Exportar CSV</MenuItem>}
             </Menu>
+            <Button onClick={() => router.push("/admindashboard/accounts/billing")}><Receipt size={14} /> Facturación</Button>
             <Button variant="primary" onClick={() => setForm({ open: true, account: null })}><Plus size={14} /> Nueva cuenta</Button>
           </>
         }
