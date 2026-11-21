@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, RefObject } from "react";
@@ -127,8 +128,11 @@ export default function AccountingUsersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditAccessModal, setShowEditAccessModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const [errorMessage, setErrorState] = useState("");
+  // Se guarda (para la pantalla de sin acceso) y además se avisa.
+  const setErrorMessage = (m: string) => { setErrorState(m); if (m) appToast.error(m); };
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -241,7 +245,7 @@ export default function AccountingUsersPage() {
         }).filter((inv: any) => inv.permissions?.accounting === true);
         setPendingInvitations(invitationsData);
         setLoading(false);
-      } catch (error) { console.error("Error cargando datos:", error); setErrorMessage("Error al cargar los datos"); setLoading(false); }
+      } catch (error) { console.error("Error cargando datos:", error); setErrorMessage("No se ha podido cargar los datos"); setLoading(false); }
     };
     loadData();
   }, [userId, id, router]);
@@ -262,26 +266,26 @@ export default function AccountingUsersPage() {
   }, [inviteForm.email]);
 
   const handleSendInvitation = async () => {
-    if (!id || !inviteForm.email.trim() || !inviteForm.name.trim()) { setErrorMessage("Email y nombre son obligatorios"); setTimeout(() => setErrorMessage(""), 3000); return; }
-    if (inviteForm.roleType === "department" && (!inviteForm.department || !inviteForm.position)) { setErrorMessage("Debes seleccionar departamento y posición"); setTimeout(() => setErrorMessage(""), 3000); return; }
-    if (inviteForm.roleType === "project" && !inviteForm.role) { setErrorMessage("Debes seleccionar un rol de proyecto"); setTimeout(() => setErrorMessage(""), 3000); return; }
+    if (!id || !inviteForm.email.trim() || !inviteForm.name.trim()) { setErrorMessage("Email y nombre son obligatorios"); return; }
+    if (inviteForm.roleType === "department" && (!inviteForm.department || !inviteForm.position)) { setErrorMessage("Debes seleccionar departamento y posición"); return; }
+    if (inviteForm.roleType === "project" && !inviteForm.role) { setErrorMessage("Debes seleccionar un rol de proyecto"); return; }
     setSaving(true); setErrorMessage("");
     try {
       const email = inviteForm.email.trim().toLowerCase();
       const existingMember = accountingMembers.find((m) => m.email === email);
-      if (existingMember) { setErrorMessage("Este usuario ya tiene acceso a contabilidad"); setSaving(false); setTimeout(() => setErrorMessage(""), 3000); return; }
+      if (existingMember) { setErrorMessage("Este usuario ya tiene acceso a contabilidad"); setSaving(false); return; }
       const memberWithoutAccounting = members.find((m) => m.email === email && !m.permissions.accounting);
       if (memberWithoutAccounting) {
         await updateDoc(doc(db, `projects/${id}/members`, memberWithoutAccounting.userId), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel, boxAccess: inviteForm.boxAccess });
         await updateDoc(doc(db, `userProjects/${memberWithoutAccounting.userId}/projects`, id as string), { "permissions.accounting": true, accountingAccessLevel: inviteForm.accountingAccessLevel, boxAccess: inviteForm.boxAccess });
-        setSuccessMessage(`Permiso de contabilidad añadido a ${memberWithoutAccounting.name}`); setTimeout(() => setSuccessMessage(""), 3000);
+        setSuccessMessage(`Permiso de contabilidad añadido a ${memberWithoutAccounting.name}`);
         const membersRef = collection(db, `projects/${id}/members`);
         const membersSnap = await getDocs(membersRef);
         const membersData: Member[] = membersSnap.docs.map((memberDoc) => { const data = memberDoc.data(); return { userId: memberDoc.id, name: data.name, email: data.email, role: data.role, department: data.department, position: data.position, permissions: data.permissions || { config: false, accounting: false, team: false }, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false, addedAt: data.addedAt, addedBy: data.addedBy, addedByName: data.addedByName }; });
         setMembers(membersData); setAccountingMembers(membersData.filter((m) => m.permissions.accounting)); setShowInviteModal(false); resetForm(); setSaving(false); return;
       }
       const existingInvite = pendingInvitations.find((inv) => inv.invitedEmail === email);
-      if (existingInvite) { setErrorMessage("Ya existe una invitación pendiente para este email"); setSaving(false); setTimeout(() => setErrorMessage(""), 3000); return; }
+      if (existingInvite) { setErrorMessage("Ya existe una invitación pendiente para este email"); setSaving(false); return; }
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("email", "==", email));
       const usersSnap = await getDocs(q);
@@ -309,13 +313,13 @@ export default function AccountingUsersPage() {
         }),
       }).catch(console.error);
 
-      setSuccessMessage(`Invitación enviada correctamente a ${inviteForm.name}`); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage(`Invitación enviada correctamente a ${inviteForm.name}`);
       const invitationsRef = collection(db, "invitations");
       const invQuery = query(invitationsRef, where("projectId", "==", id), where("status", "==", "pending"));
       const invitationsSnap = await getDocs(invQuery);
       const invitationsData: PendingInvitation[] = invitationsSnap.docs.map((invDoc) => { const data = invDoc.data(); return { id: invDoc.id, invitedEmail: data.invitedEmail, invitedName: data.invitedName, roleType: data.roleType || "project", role: data.role, department: data.department, position: data.position, status: data.status, createdAt: data.createdAt, invitedBy: data.invitedBy, invitedByName: data.invitedByName, permissions: data.permissions, accountingAccessLevel: data.accountingAccessLevel || "user", boxAccess: data.boxAccess || false }; }).filter((inv: any) => inv.permissions?.accounting === true);
       setPendingInvitations(invitationsData); resetForm(); setShowInviteModal(false);
-    } catch (error) { console.error("Error enviando invitación:", error); setErrorMessage("Error al enviar la invitación"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
+    } catch (error) { console.error("Error enviando invitación:", error); setErrorMessage("No se ha podido enviar la invitación"); } finally { setSaving(false); }
   };
 
   const ACCESS_LEVEL_RANK: Record<string, number> = { visitor: 1, user: 2, accounting: 3, accounting_extended: 4 };
@@ -336,13 +340,11 @@ export default function AccountingUsersPage() {
         setIsAccountingExtended(newAccessLevel === "accounting_extended");
       }
       setSuccessMessage("Nivel de acceso actualizado correctamente");
-      setTimeout(() => setSuccessMessage(""), 3000);
       setShowEditAccessModal(false);
       setEditingMember(null);
     } catch (error) {
       console.error("Error actualizando acceso:", error);
-      setErrorMessage("Error al actualizar el nivel de acceso");
-      setTimeout(() => setErrorMessage(""), 3000);
+      setErrorMessage("No se ha podido actualizar el nivel de acceso");
     } finally {
       setSaving(false);
     }
@@ -363,8 +365,8 @@ export default function AccountingUsersPage() {
       "¿Estás seguro de que quieres cancelar esta invitación?",
       async () => {
         setConfirmDialog(null);
-        try { await deleteDoc(doc(db, "invitations", invitationId)); setPendingInvitations(pendingInvitations.filter((inv) => inv.id !== invitationId)); setSuccessMessage("Invitación cancelada"); setTimeout(() => setSuccessMessage(""), 3000); }
-        catch (error) { console.error("Error cancelando invitación:", error); setErrorMessage("Error al cancelar la invitación"); setTimeout(() => setErrorMessage(""), 3000); }
+        try { await deleteDoc(doc(db, "invitations", invitationId)); setPendingInvitations(pendingInvitations.filter((inv) => inv.id !== invitationId)); setSuccessMessage("Invitación cancelada"); }
+        catch (error) { console.error("Error cancelando invitación:", error); setErrorMessage("No se ha podido cancelar la invitación"); }
       },
       { danger: true, confirmLabel: "Cancelar invitación" }
     );
@@ -382,8 +384,8 @@ export default function AccountingUsersPage() {
           await updateDoc(doc(db, `userProjects/${member.userId}/projects`, id as string), { "permissions.accounting": false, accountingAccessLevel: null, boxAccess: null });
           setAccountingMembers(accountingMembers.filter((m) => m.userId !== member.userId));
           setMembers(members.map((m) => (m.userId === member.userId ? { ...m, permissions: { ...m.permissions, accounting: false }, accountingAccessLevel: undefined, boxAccess: undefined } : m)));
-          setSuccessMessage("Acceso eliminado correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
-        } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("Error al eliminar el acceso"); setTimeout(() => setErrorMessage(""), 3000); } finally { setSaving(false); }
+          setSuccessMessage("Acceso eliminado correctamente");
+        } catch (error) { console.error("Error eliminando acceso:", error); setErrorMessage("No se ha podido eliminar el acceso"); } finally { setSaving(false); }
       },
       { danger: true, confirmLabel: "Quitar acceso" }
     );
@@ -699,19 +701,6 @@ export default function AccountingUsersPage() {
         <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
       </Modal>
 
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
-          <CheckCircle2 size={15} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && hasAccountingAccess && (
-        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-red-600 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
-          <AlertCircle size={15} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} aria-label="Cerrar" className="ml-1 rounded p-0.5 hover:bg-white/20"><X size={13} /></button>
-        </div>
-      )}
     </Page>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -284,13 +286,13 @@ export default function Dashboard() {
       setReloadTrigger((t) => t + 1);
     } catch (error) {
       console.error("Error aceptando invitación:", error);
-      alert(error instanceof Error && error.message ? `Error al aceptar la invitación: ${error.message}` : "Error al aceptar la invitación");
+      appToast.error(error, { fallback: "No se ha podido aceptar la invitación" });
       setProcessingInvite(null);
     }
   };
 
   const handleRejectInvitation = async (invitationId: string) => {
-    if (!confirm("¿Estás seguro de que deseas rechazar esta invitación?")) return;
+    if (!(await confirmDialog({ title: "¿Rechazar la invitación?", confirmLabel: "Rechazar", danger: true }))) return;
     setProcessingInvite(invitationId);
     try {
       await updateDoc(doc(db, "invitations", invitationId), { status: "rejected", respondedAt: new Date() });
@@ -298,7 +300,7 @@ export default function Dashboard() {
       setProcessingInvite(null);
     } catch (error) {
       console.error("Error rechazando invitación:", error);
-      alert("Error al rechazar la invitación");
+      appToast.error("No se ha podido rechazar la invitación");
       setProcessingInvite(null);
     }
   };
@@ -353,7 +355,7 @@ export default function Dashboard() {
           coverPath={project.coverPath}
           editable={hasConfig}
           onChange={(cover) => updateProjectCover(project.id, cover)}
-          onError={(msg) => alert(msg)}
+          onError={(msg) => appToast.error(msg)}
           className={`aspect-[16/7] ${archived ? "grayscale" : ""}`}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />

@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
@@ -59,7 +60,6 @@ export default function GuideEditorPage() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingBlockId, setUploadingBlockId] = useState<string | null>(null);
 
@@ -75,10 +75,7 @@ export default function GuideEditorPage() {
   const [blocks, setBlocks] = useState<GuideBlock[]>([]);
   const [existing, setExisting] = useState<Guide | null>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   useEffect(() => {
     if (!userLoading && !hasAccess) router.push("/dashboard");
@@ -149,7 +146,7 @@ export default function GuideEditorPage() {
       const url = await getDownloadURL(fileRef);
       updateBlock(blockId, { url } as Partial<GuideBlock>);
     } catch {
-      showToast("error", "Error al subir la imagen");
+      showToast("error", "No se ha podido subir la imagen");
     } finally {
       setUploadingBlockId(null);
     }
@@ -166,7 +163,7 @@ export default function GuideEditorPage() {
       const url = await getDownloadURL(fileRef);
       setCoverImageUrl(url);
     } catch {
-      showToast("error", "Error al subir la portada");
+      showToast("error", "No se ha podido subir la portada");
     } finally {
       setUploadingCover(false);
     }
@@ -216,7 +213,7 @@ export default function GuideEditorPage() {
       if (isNew) router.replace(`/admindashboard/guides/${docIdRef.current}`);
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al guardar la guía");
+      showToast("error", "No se ha podido guardar la guía");
     } finally {
       setSaving(false);
     }
@@ -239,13 +236,6 @@ export default function GuideEditorPage() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white`}>
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
-        </div>
-      )}
 
       {/* Top bar */}
       <div className="mt-[53px] sticky top-[53px] z-30 bg-white border-b border-slate-200">

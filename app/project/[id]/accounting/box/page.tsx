@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import CashBox from "@/components/box/CashBox";
@@ -378,7 +380,6 @@ export default function BoxesPage() {
   const [mainTab, setMainTab] = useState<MainTab>("tarjetas");
   const [departments, setDepartments] = useState<string[]>([]);
   const [subAccounts, setSubAccounts] = useState<SubAccount[]>([]);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   // Búsqueda dentro de un sobre de tarjeta
   const [envSearch, setEnvSearch] = useState("");
@@ -557,10 +558,7 @@ export default function BoxesPage() {
   const accountSelectorRef = useRef<HTMLDivElement>(null);
 
   // Utils
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
   const fmt = (n: number) =>
     new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0);
   const fmtDate = (date: Date | any) => {
@@ -706,7 +704,7 @@ export default function BoxesPage() {
 
     } catch (e) {
       console.error(e);
-      showToast("error", "Error al cargar datos");
+      showToast("error", "No se ha podido cargar datos");
     } finally {
       setLoading(false);
     }
@@ -816,7 +814,7 @@ export default function BoxesPage() {
       showToast("success", "Gasto actualizado");
       closeDrawer();
       loadData();
-    } catch { showToast("error", "Error al guardar"); } finally { setDrawerSaving(false); }
+    } catch { showToast("error", "No se ha podido guardar"); } finally { setDrawerSaving(false); }
   };
 
   // Resolve: only for resolvable conflicts (missing_document)
@@ -831,7 +829,7 @@ export default function BoxesPage() {
       showToast("success", "Incidencia resuelta");
       closeDrawer();
       loadData();
-    } catch { showToast("error", "Error al resolver incidencia"); } finally { setDrawerSaving(false); }
+    } catch { showToast("error", "No se ha podido resolver incidencia"); } finally { setDrawerSaving(false); }
   };
 
   // Annotate: for non-resolvable conflicts — saves note + timestamp but keeps conflictType
@@ -849,7 +847,7 @@ export default function BoxesPage() {
       showToast("success", "Incidencia anotada para cuadre");
       closeDrawer();
       loadData();
-    } catch { showToast("error", "Error al anotar incidencia"); } finally { setDrawerSaving(false); }
+    } catch { showToast("error", "No se ha podido anotar incidencia"); } finally { setDrawerSaving(false); }
   };
 
   const handleCreateBox = async () => {
@@ -867,7 +865,7 @@ export default function BoxesPage() {
       setShowCreateBoxModal(false);
       setBoxForm({ name: "", code: "", department: "" });
       loadData();
-    } catch { showToast("error", "Error al crear caja"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido crear caja"); } finally { setSaving(false); }
   };
 
   const handleEditBox = async () => {
@@ -882,7 +880,7 @@ export default function BoxesPage() {
       showToast("success", "Caja actualizada");
       setShowEditBoxModal(false);
       loadData();
-    } catch { showToast("error", "Error al actualizar"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido actualizar"); } finally { setSaving(false); }
   };
 
   const canDeleteBox = (box: Box) =>
@@ -903,7 +901,7 @@ export default function BoxesPage() {
       setShowDeleteBoxModal(false);
       setSelectedBox(null);
       loadData();
-    } catch { showToast("error", "Error al eliminar caja"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido eliminar caja"); } finally { setSaving(false); }
   };
 
   const handleCreateEnvelope = async () => {
@@ -925,7 +923,7 @@ export default function BoxesPage() {
       showToast("success", `Sobre ${displayNumber} creado`);
       setShowCreateEnvelopeModal(false);
       loadData();
-    } catch { showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido crear sobre"); } finally { setSaving(false); }
   };
 
   const canDeleteEnvelope = (envelope: Envelope) =>
@@ -943,7 +941,7 @@ export default function BoxesPage() {
       setShowDeleteEnvelopeModal(null);
       if (selectedEnvelope?.id === envelope.id) setSelectedEnvelope(null);
       loadData();
-    } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido eliminar sobre"); } finally { setSaving(false); }
   };
 
   // ── Parser XLSX ──────────────────────────────────────────────────────────────
@@ -1102,7 +1100,7 @@ export default function BoxesPage() {
       setImportPreview(result);
     } catch (err: any) {
       console.error("[parsePleoExcel] Error:", err);
-      showToast("error", err?.message ? `Error: ${err.message}` : "Error al leer el archivo");
+      showToast("error", errorText(err, "No se ha podido leer el archivo"));
       setImportFile(null);
       setImportPreview([]);
     }
@@ -1190,7 +1188,7 @@ export default function BoxesPage() {
       setImportFile(null);
       setImportPreview([]);
       loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al importar"); } finally { setImporting(false); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido importar"); } finally { setImporting(false); }
   };
 
   const handleImportReceipts = async () => {
@@ -1229,7 +1227,7 @@ export default function BoxesPage() {
       loadData();
     } catch (e) {
       console.error(e);
-      showToast("error", "Error al subir recibos");
+      showToast("error", "No se ha podido subir recibos");
     } finally {
       setUploadingReceipts(false);
     }
@@ -1249,7 +1247,7 @@ export default function BoxesPage() {
       }
       showToast("success", "Gasto revisado");
       loadData();
-    } catch { showToast("error", "Error al revisar"); }
+    } catch { showToast("error", "No se ha podido revisar"); }
   };
 
   // helpers for card expense list
@@ -1371,7 +1369,7 @@ export default function BoxesPage() {
       setCardExpensesList([]);
       loadData();
     } catch (e: any) {
-      showToast("error", e?.message ?? "Error al añadir gasto");
+      showToast("error", errorText(e, "No se ha podido añadir el gasto"));
     } finally { setManualExpenseSaving(false); }
   };
 
@@ -1391,7 +1389,7 @@ export default function BoxesPage() {
       await batch.commit();
       showToast("success", "Sobre cerrado");
       loadData();
-    } catch { showToast("error", "Error al cerrar sobre"); }
+    } catch { showToast("error", "No se ha podido cerrar sobre"); }
   };
 
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -1423,7 +1421,7 @@ export default function BoxesPage() {
         prefilled: { requesterName: boxFormRequesterName.trim() },
       });
       setGeneratedBoxResult({ url: `${window.location.origin}/form/${docRef.id}`, pin });
-    } catch (e) { console.error(e); showToast("error", "Error al generar el formulario"); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido generar el formulario"); }
     finally { setGeneratingBoxForm(false); }
   };
 
@@ -1525,7 +1523,7 @@ export default function BoxesPage() {
       setVolcarExpenseData([]);
       showToast("success", `${submission.expenses.length} gasto${submission.expenses.length !== 1 ? "s" : ""} volcado${submission.expenses.length !== 1 ? "s" : ""} al sobre`);
       await loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al volcar los gastos"); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido volcar los gastos"); }
     finally { setVolcandoFormId(null); }
   };
 
@@ -1557,7 +1555,7 @@ export default function BoxesPage() {
       setShowCreateTransferEnvelopeModal(false);
       setTransferEnvelopeForm(emptyTransferEnvelopeForm);
       loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al crear sobre"); } finally { setSaving(false); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido crear sobre"); } finally { setSaving(false); }
   };
 
   // Un sobre puede recibir varios anticipos a lo largo del tiempo (p. ej. 500€
@@ -1589,7 +1587,7 @@ export default function BoxesPage() {
       setShowAddAdvanceModal(false);
       setAdvanceForm({ amount: "", method: "bank", date: new Date().toISOString().slice(0, 10), iban: "", proofFile: null });
       loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al añadir el anticipo"); } finally { setAddingAdvance(false); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido añadir el anticipo"); } finally { setAddingAdvance(false); }
   };
 
   const canDeleteTransferEnvelope = (envelope: TransferEnvelope) => envelope.status !== "settled";
@@ -1606,7 +1604,7 @@ export default function BoxesPage() {
       setShowDeleteTransferEnvelopeModal(null);
       if (selectedTransferEnvelope?.id === envelope.id) setSelectedTransferEnvelope(null);
       loadData();
-    } catch { showToast("error", "Error al eliminar sobre"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido eliminar sobre"); } finally { setSaving(false); }
   };
 
   const computeExpenseTotal = (exp: { items: Array<{ baseAmount: number; vatRate: number }>; irpfRate: number }) => {
@@ -1711,7 +1709,7 @@ export default function BoxesPage() {
       setShowAddExpenseModal(false);
       setExpensesList([]);
       loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al añadir gastos"); } finally { setSaving(false); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido añadir gastos"); } finally { setSaving(false); }
   };
 
   const handleDeleteExpense = async (expense: TransferExpense) => {
@@ -1726,7 +1724,7 @@ export default function BoxesPage() {
       });
       showToast("success", "Gasto eliminado");
       loadData();
-    } catch { showToast("error", "Error al eliminar gasto"); }
+    } catch { showToast("error", "No se ha podido eliminar gasto"); }
   };
 
   // Calcula quién liquida a quién: si el gasto no supera el anticipo, la
@@ -1766,7 +1764,7 @@ export default function BoxesPage() {
       setShowSettleModal(false);
       setSettleForm({ reference: "", proofFile: null });
       loadData();
-    } catch (e) { console.error(e); showToast("error", "Error al liquidar"); } finally { setSaving(false); }
+    } catch (e) { console.error(e); showToast("error", "No se ha podido liquidar"); } finally { setSaving(false); }
   };
 
   // Derived Data
@@ -1828,12 +1826,6 @@ export default function BoxesPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {toast.message}
-        </div>
-      )}
 
       {/* Header */}
       <div className="mt-[53px]">

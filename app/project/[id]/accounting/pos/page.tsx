@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -405,7 +406,7 @@ export default function POsPage() {
   const handleEditDraft = (po: PO) => {
     const perms = getPOPermissions(po);
     if (!perms.canEdit) {
-      alert("No tienes permisos para editar esta PO");
+      appToast.error("No tienes permisos para editar esta PO");
       return;
     }
     closeMenu();
@@ -415,7 +416,7 @@ export default function POsPage() {
   const handleCreateInvoice = (po: PO) => {
     const perms = getPOPermissions(po);
     if (!perms.canCreateInvoice) {
-      alert("No tienes permisos para crear facturas en esta PO");
+      appToast.error("No tienes permisos para crear facturas en esta PO");
       return;
     }
     closeMenu();
@@ -451,7 +452,7 @@ export default function POsPage() {
       await loadData();
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al cerrar la PO");
+      appToast.error("No se ha podido cerrar la PO");
     } finally {
       setProcessing(false);
     }
@@ -489,7 +490,7 @@ export default function POsPage() {
       await loadData();
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al reabrir la PO");
+      appToast.error("No se ha podido reabrir la PO");
     } finally {
       setProcessing(false);
     }
@@ -525,7 +526,7 @@ export default function POsPage() {
       await loadData();
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al anular la PO");
+      appToast.error("No se ha podido anular la PO");
     } finally {
       setProcessing(false);
     }
@@ -549,7 +550,7 @@ export default function POsPage() {
       router.push(`/project/${id}/accounting/pos/${selectedPO.id}/edit`);
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al modificar la PO");
+      appToast.error("No se ha podido modificar la PO");
     } finally {
       setProcessing(false);
     }

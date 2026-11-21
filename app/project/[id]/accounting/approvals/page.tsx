@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { Button, EmptyState, Field, IconButton, Modal, Page, PageHeader, PageLoading, Textarea } from "@/components/ds";
@@ -229,8 +231,9 @@ export default function ApprovalsPage() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
   const [approvalComment, setApprovalComment] = useState("");
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -438,7 +441,7 @@ export default function ApprovalsPage() {
       setFilteredApprovals(approvals);
       setUserStats(prev => ({ ...prev, pendingCount: approvals.length }));
       setLoading(false);
-    } catch (error: any) { setErrorMessage(`Error: ${error.message}`); setLoading(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); setLoading(false); }
   };
 
   // POs/facturas que este usuario puede leer (lib/accountingScope). Con alcance
@@ -635,10 +638,9 @@ export default function ApprovalsPage() {
       if (allStepsComplete && (approval.type === "po" || approval.type === "invoice")) await afterApprovalComplete(approval.projectId, approval.type, docData, at);
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== approval.id));
       setSuccessMessage(allStepsComplete ? `${approval.displayNumber} aprobado` : "Aprobación registrada");
-      setTimeout(() => setSuccessMessage(""), 3000);
       setApprovalComment(""); setShowCommentInput(false);
       if (currentIndex >= filteredApprovals.length - 1) setCurrentIndex(Math.max(0, currentIndex - 1));
-    } catch (error: any) { setErrorMessage(`Error: ${error.message}`); setTimeout(() => setErrorMessage(""), 5000); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
   };
 
   const handleReject = async () => {
@@ -689,10 +691,9 @@ export default function ApprovalsPage() {
       
       setPendingApprovals(pendingApprovals.filter((a) => a.id !== selectedApproval.id));
       setSuccessMessage(`${selectedApproval.displayNumber} rechazado`);
-      setTimeout(() => setSuccessMessage(""), 3000);
       setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null);
       if (currentIndex >= filteredApprovals.length - 1) setCurrentIndex(Math.max(0, currentIndex - 1));
-    } catch (error: any) { setErrorMessage(`Error: ${error.message}`); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
   };
 
   const handleRequestInfo = async () => {
@@ -707,10 +708,9 @@ export default function ApprovalsPage() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) { const comments = docSnap.data().comments || []; comments.push({ id: `info-request-${Date.now()}`, userId, userName, text: infoRequestMessage.trim(), createdAt: Timestamp.now(), type: "info_request" }); await updateDoc(docRef, { comments, infoRequested: true, infoRequestedBy: userId, infoRequestedAt: Timestamp.now() }); }
       setSuccessMessage("Solicitud de información enviada");
-      setTimeout(() => setSuccessMessage(""), 3000);
       setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null);
       loadPendingApprovals();
-    } catch (error: any) { setErrorMessage(`Error: ${error.message}`); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
   };
 
   const currentApproval = filteredApprovals[currentIndex];
@@ -1145,21 +1145,6 @@ export default function ApprovalsPage() {
         </Field>
       </Modal>
 
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle size={16} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
-        </div>
-      )}
     </Page>
   );
 }

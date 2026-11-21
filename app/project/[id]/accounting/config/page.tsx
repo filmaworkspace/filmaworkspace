@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { DEFAULT_LEDGER_SETTINGS, normalizeSettings, type LedgerSettings } from "@/lib/budgetLedger";
@@ -253,8 +255,11 @@ export default function AccountingConfigPage() {
   const [projectEpisodes, setProjectEpisodes] = useState<number>(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const [errorMessage, setErrorState] = useState("");
+  // Se guarda (para la pantalla de sin acceso) y además se avisa.
+  const setErrorMessage = (m: string) => { setErrorState(m); if (m) appToast.error(m); };
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -517,7 +522,7 @@ export default function AccountingConfigPage() {
 
       setLoading(false);
     } catch (error: any) {
-      setErrorMessage(`Error: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido completar"));
       setLoading(false);
     }
   };
@@ -572,9 +577,8 @@ export default function AccountingConfigPage() {
       };
       await setDoc(doc(db, `projects/${id}/config`, "project"), dataToSave);
       setSuccessMessage("Configuración del proyecto guardada");
-      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setErrorMessage("Error al guardar configuración del proyecto");
+      setErrorMessage("No se ha podido guardar configuración del proyecto");
     } finally {
       setSaving(false);
     }
@@ -593,9 +597,8 @@ export default function AccountingConfigPage() {
       setCompanyData(companyForm);
       setEditingCompany(false);
       setSuccessMessage("Datos fiscales guardados");
-      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setErrorMessage("Error al guardar datos fiscales");
+      setErrorMessage("No se ha podido guardar datos fiscales");
     } finally {
       setSavingCompany(false);
     }
@@ -637,9 +640,8 @@ export default function AccountingConfigPage() {
       setShowBankAccountModal(false);
       setEditingBankAccount(null);
       setBankAccountForm(emptyBankAccount);
-      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setErrorMessage("Error al guardar cuenta");
+      setErrorMessage("No se ha podido guardar cuenta");
     } finally {
       setSavingBankAccount(false);
     }
@@ -665,9 +667,8 @@ export default function AccountingConfigPage() {
           await deleteDoc(doc(db, `projects/${id}/config/company/bankAccounts`, accountId));
           setBankAccounts(bankAccounts.filter(a => a.id !== accountId));
           setSuccessMessage("Cuenta eliminada");
-          setTimeout(() => setSuccessMessage(""), 3000);
         } catch {
-          setErrorMessage("Error al eliminar");
+          setErrorMessage("No se ha podido eliminar");
         }
       },
       { danger: true, confirmLabel: "Eliminar" }
@@ -837,10 +838,8 @@ export default function AccountingConfigPage() {
       });
       
       setSuccessMessage("Configuración guardada");
-      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (e: any) {
-      setErrorMessage(`Error: ${e.message}`);
-      setTimeout(() => setErrorMessage(""), 5000);
+      setErrorMessage(errorText(e, "No se ha podido completar"));
     } finally {
       setSaving(false);
     }
@@ -1014,9 +1013,6 @@ export default function AccountingConfigPage() {
         />
       </div>
 
-      {(successMessage || (errorMessage && hasAccess)) && (
-        <p className={`mt-4 text-[13px] ${errorMessage ? "text-red-700" : "text-slate-600"}`}>{errorMessage || successMessage}</p>
-      )}
 
       {/* ── Empresa ─────────────────────────────────────────────────────── */}
       {tab === "company" && (

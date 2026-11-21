@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -539,7 +540,7 @@ export default function PayrollPage() {
     try {
       const formSnap = await getDoc(doc(db, "forms", formId));
       if (!formSnap.exists() || formSnap.data().status !== "submitted") {
-        alert("Este formulario todavía no ha sido completado.");
+        appToast.error("Este formulario todavía no ha sido completado.");
         return;
       }
       const entries = (formSnap.data().response?.entries || {}) as Record<string, Record<string, Record<string,boolean>>>;

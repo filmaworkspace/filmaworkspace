@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -227,8 +229,9 @@ export default function SuppliersPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "valid" | "expiring" | "expired" | "closed">("all");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -333,7 +336,7 @@ export default function SuppliersPage() {
       }) as Supplier[];
       setSuppliers(suppliersData);
     } catch (error: any) {
-      setErrorMessage(`Error cargando datos: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido cargar datos"));
     } finally {
       setLoading(false);
     }
@@ -466,12 +469,11 @@ export default function SuppliersPage() {
       };
       await addDoc(collection(db, `projects/${id}/suppliers`), newSupplier);
       setSuccessMessage("Proveedor creado correctamente");
-      setTimeout(() => setSuccessMessage(""), 3000);
       resetForm();
       setShowModal(false);
       await loadData();
     } catch (error: any) {
-      setErrorMessage(`Error creando proveedor: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido crear proveedor"));
     } finally {
       setSaving(false);
     }
@@ -544,12 +546,11 @@ export default function SuppliersPage() {
       updatedData.certificates = { bankOwnership: bankOwnershipUpdate, contractorsCertificate: contractorsCertUpdate };
       await updateDoc(doc(db, `projects/${id}/suppliers`, selectedSupplier.id), updatedData);
       setSuccessMessage("Proveedor actualizado correctamente");
-      setTimeout(() => setSuccessMessage(""), 3000);
       resetForm();
       setShowModal(false);
       await loadData();
     } catch (error: any) {
-      setErrorMessage(`Error actualizando proveedor: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido actualizar proveedor"));
     } finally {
       setSaving(false);
     }
@@ -567,7 +568,6 @@ export default function SuppliersPage() {
   const handleDeleteSupplier = async (supplier: Supplier) => {
     if (supplier.hasAssignedPOs || supplier.hasAssignedInvoices) {
       setErrorMessage("No se puede eliminar un proveedor con POs o facturas asignadas");
-      setTimeout(() => setErrorMessage(""), 5000);
       return;
     }
     openConfirm(
@@ -578,10 +578,9 @@ export default function SuppliersPage() {
         try {
           await deleteDoc(doc(db, `projects/${id}/suppliers`, supplier.id));
           setSuccessMessage("Proveedor eliminado");
-          setTimeout(() => setSuccessMessage(""), 3000);
           await loadData();
         } catch (error: any) {
-          setErrorMessage(`Error eliminando proveedor: ${error.message}`);
+          setErrorMessage(errorText(error, "No se ha podido eliminar proveedor"));
         }
       },
       { danger: true, confirmLabel: "Eliminar" }
@@ -1016,21 +1015,6 @@ export default function SuppliersPage() {
       </Modal>
 
       {/* Toast notifications */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white animate-in slide-in-from-bottom-2">
-          <CheckCircle size={16} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white animate-in slide-in-from-bottom-2">
-          <AlertCircle size={16} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
-        </div>
-      )}
 
       {/* Confirmación */}
       <Modal

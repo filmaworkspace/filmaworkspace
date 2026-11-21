@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
@@ -243,7 +244,8 @@ export default function EditInvoicePage() {
   const [loading, setLoading] = useState(true);
   const [docUpdatedAt, setDocUpdatedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [accessDenied, setAccessDenied] = useState(false);
@@ -795,7 +797,7 @@ export default function EditInvoicePage() {
       setTimeout(() => router.push(`/project/${id}/accounting/invoices/${invoiceId}`), 1500);
     } catch (error: any) {
       console.error("Error saving invoice:", error);
-      alert(`Error: ${error.message}`);
+      appToast.error(error);
     } finally {
       setSaving(false);
     }
@@ -918,12 +920,6 @@ export default function EditInvoicePage() {
       {/* Main Content */}
       <main className="px-6 sm:px-10 py-8">
         <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => { autosave.discard(); window.location.reload(); }} />
-        {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
-            <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-[13px] text-emerald-700 font-medium">{successMessage}</span>
-          </div>
-        )}
 
         {isAdminCorrection && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">

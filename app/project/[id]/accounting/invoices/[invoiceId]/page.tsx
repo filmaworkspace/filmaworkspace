@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -335,7 +337,6 @@ export default function InvoiceDetailPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [showOriginalDoc, setShowOriginalDoc] = useState(false);
   
@@ -376,7 +377,7 @@ export default function InvoiceDetailPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const showToast = (type: "success" | "error", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(a || 0);
   const formatDate = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "long", year: "numeric" }).format(d) : "-";
   const formatDateTime = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d) : "-";
@@ -391,7 +392,7 @@ export default function InvoiceDetailPage() {
       const r = await repairDoc(projectId, "invoice", invoiceId, { uid: permissions.userId || "", name: permissions.userName || "" });
       showToast("success", r.changed ? "Flujo reparado" : "No había nada que reparar");
       await loadData();
-    } catch (e: any) { showToast("error", "No se pudo reparar: " + (e?.message || "")); }
+    } catch (e: any) { showToast("error", errorText(e, "No se ha podido reparar el flujo")); }
   };
 
   const loadData = async () => {
@@ -607,7 +608,7 @@ export default function InvoiceDetailPage() {
       showToast("success", "Factura codificada correctamente");
       setCodingMode(false);
       await loadData();
-    } catch (error) { console.error("Error:", error); showToast("error", "Error al guardar"); } finally { setSaving(false); }
+    } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido guardar"); } finally { setSaving(false); }
   };
 
   const verifyPassword = async (): Promise<boolean> => {
@@ -639,7 +640,7 @@ export default function InvoiceDetailPage() {
       setCancellationReason("");
       await loadData();
     } catch (e) { 
-      showToast("error", "Error al anular"); 
+      showToast("error", "No se ha podido anular"); 
     } finally { 
       setProcessing(false); 
     }
@@ -774,7 +775,7 @@ export default function InvoiceDetailPage() {
       showToast("success", isFullReturn ? "Fianza devuelta completamente" : "Devolución parcial registrada");
     } catch (error) {
       console.error("Error registering return:", error);
-      showToast("error", "Error al registrar la devolución");
+      showToast("error", "No se ha podido registrar la devolución");
     } finally {
       setProcessingReturn(false);
     }
@@ -837,7 +838,7 @@ export default function InvoiceDetailPage() {
       showToast("success", "Documento reemplazado correctamente");
     } catch (error) {
       console.error("Error replacing document:", error);
-      showToast("error", "Error al reemplazar el documento");
+      showToast("error", "No se ha podido reemplazar el documento");
     } finally {
       setReplacingDocument(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -884,7 +885,6 @@ export default function InvoiceDetailPage() {
   if (codingMode) {
     return (
       <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-        {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-[13px] font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
         
         {/* Coding Header */}
         <div className="px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 bg-slate-900 text-white">
@@ -1273,7 +1273,6 @@ export default function InvoiceDetailPage() {
   // Normal Detail View
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 left-4 z-50"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"} text-white text-[13px] font-medium`}>{toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}{toast.message}</div></div>}
       
       <div className="mt-[53px]">
         <div className="px-6 pt-8 sm:px-10">

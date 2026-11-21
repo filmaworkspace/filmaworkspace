@@ -6,6 +6,10 @@
 import { useEffect, useRef, useState } from "react";
 import { dismissToast, subscribeConfirm, subscribeToasts, type ConfirmRequest, type ToastItem, type ToastKind } from "@/lib/toast";
 import { inter } from "@/lib/fonts";
+import { coverGradient } from "@/lib/projectCover";
+
+// Degradado de la plataforma (portada del login y emails), en vertical para el filo.
+const EDGE = coverGradient();
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -33,8 +37,10 @@ function ToastCard({ t }: { t: ToastItem }) {
       role={t.kind === "error" ? "alert" : "status"}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="pointer-events-auto flex w-[360px] max-w-full animate-[toastIn_.18s_ease-out] items-center gap-2.5 rounded-lg border border-[#E4E4E7] bg-white px-3 py-2.5 text-[13px] text-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.08),0_1px_2px_rgba(15,23,42,0.06)] motion-reduce:animate-none"
+      className="pointer-events-auto relative flex w-[360px] max-w-full animate-[toastIn_.18s_ease-out] items-center gap-2.5 overflow-hidden rounded-lg border border-[#E4E4E7] bg-white py-2.5 pl-4 pr-3 text-[13px] text-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.08),0_1px_2px_rgba(15,23,42,0.06)] motion-reduce:animate-none"
     >
+      {/* Filo con el degradado de la plataforma */}
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ background: EDGE }} />
       <span className="shrink-0"><Icon kind={t.kind} /></span>
       <span className="min-w-0 flex-1 font-medium">
         {t.message}

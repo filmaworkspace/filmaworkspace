@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
@@ -73,7 +75,6 @@ export default function ProfilePage() {
   const { user, isLoading, updateUserName } = useUser();
 
   const [saving, setSaving]   = useState(false);
-  const [toast, setToast]     = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [activeTab, setActiveTab]       = useState<"account" | "projects">("account");
   const [activeSection, setActiveSection] = useState<"profile" | "security">("profile");
 
@@ -86,10 +87,7 @@ export default function ProfilePage() {
   const [projectFilter, setProjectFilter] = useState<"all" | "active" | "archived" | "favorites">("active");
   const [projectMenuOpen, setProjectMenuOpen] = useState<string | null>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   useEffect(() => {
     if (user) {
@@ -165,7 +163,7 @@ export default function ProfilePage() {
       updateUserName(formData.name.trim());
       showToast("success", "Perfil actualizado");
     } catch (err: any) {
-      showToast("error", err.message);
+      showToast("error", errorText(err));
     } finally {
       setSaving(false);
     }
@@ -188,7 +186,7 @@ export default function ProfilePage() {
       if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         showToast("error", "Contraseña actual incorrecta");
       } else {
-        showToast("error", err.message);
+        showToast("error", errorText(err));
       }
     } finally {
       setSaving(false);
@@ -210,7 +208,7 @@ export default function ProfilePage() {
       setProjects(projects.map(p => p.projectId === projectId ? { ...p, archived: newArchived } : p));
       showToast("success", project.archived ? "Proyecto restaurado" : "Proyecto archivado");
     } catch {
-      showToast("error", "Error al actualizar");
+      showToast("error", "No se ha podido actualizar");
     }
     setProjectMenuOpen(null);
   };
@@ -223,7 +221,7 @@ export default function ProfilePage() {
       await updateDoc(doc(db, `userProjects/${user.uid}/projects`, projectId), { favorite: !project.favorite });
       setProjects(projects.map(p => p.projectId === projectId ? { ...p, favorite: !p.favorite } : p));
     } catch {
-      showToast("error", "Error al actualizar");
+      showToast("error", "No se ha podido actualizar");
     }
   };
 
@@ -233,7 +231,7 @@ export default function ProfilePage() {
       await signOut(auth);
       router.push("/");
     } catch {
-      showToast("error", "Error al cerrar sesión");
+      showToast("error", "No se ha podido cerrar sesión");
     }
   };
 
@@ -284,14 +282,6 @@ export default function ProfilePage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* Aviso */}
-      {toast && (
-        <div className={`fixed bottom-6 left-6 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
-          toast.type === "success" ? "bg-slate-900" : "bg-red-600"
-        }`}>
-          {toast.type === "success" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {toast.message}
-        </div>
-      )}
 
       <main className={ui.page}>
 

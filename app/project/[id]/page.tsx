@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
@@ -308,7 +309,7 @@ export default function ProjectOverviewPage() {
           coverPath={project.coverPath}
           editable={userPermissions.config}
           onChange={(cover) => setProject((prev) => (prev ? { ...prev, coverUrl: cover.url, coverPath: cover.path } : prev))}
-          onError={(msg) => alert(msg)}
+          onError={(msg) => appToast.error(msg)}
           className="h-[clamp(220px,24vw,340px)] rounded-2xl"
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />

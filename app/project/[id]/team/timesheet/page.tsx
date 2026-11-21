@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -218,10 +220,7 @@ export default function ControlHorarioPage() {
     setSelectedDate(y === new Date().getFullYear() && m === new Date().getMonth() ? today() : ymd(y, m, 1));
   };
 
-  const showToast = (type: "success" | "error", msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -354,7 +353,7 @@ export default function ControlHorarioPage() {
       showToast("success", `Enviado a ${body.sent} personas`);
       await loadDays();
     } catch (e: any) {
-      showToast("error", e.message || "Error al enviar");
+      showToast("error", errorText(e, "No se ha podido enviar"));
     } finally {
       setSending(false);
     }
@@ -374,7 +373,7 @@ export default function ControlHorarioPage() {
       showToast("success", `Reenviado a ${body.sent} personas`);
       await loadDays();
     } catch (e: any) {
-      showToast("error", e.message || "Error al reenviar");
+      showToast("error", errorText(e, "No se ha podido reenviar"));
     } finally {
       setSending(false);
     }
@@ -393,7 +392,7 @@ export default function ControlHorarioPage() {
       if (!res.ok) throw new Error(body.error);
       showToast("success", "Reenviado");
     } catch (e: any) {
-      showToast("error", e.message || "Error");
+      showToast("error", errorText(e, "No se ha podido completar"));
     } finally {
       setSending(false);
     }
@@ -446,7 +445,7 @@ export default function ControlHorarioPage() {
       setReviewState((s) => ({ ...s, [r.uid]: "sent" }));
       setTimeout(() => setReviewState((s) => { const n = { ...s }; delete n[r.uid]; return n; }), 3000);
     } catch (e: any) {
-      showToast("error", e.message || "Error al enviar");
+      showToast("error", errorText(e, "No se ha podido enviar"));
       setReviewState((s) => { const n = { ...s }; delete n[r.uid]; return n; });
     }
   };
@@ -551,7 +550,7 @@ export default function ControlHorarioPage() {
       setShowConfig(false);
       showToast("success", "Configuración guardada");
     } catch (e: any) {
-      showToast("error", e.message);
+      showToast("error", errorText(e));
     } finally {
       setSaving(false);
     }
@@ -575,7 +574,7 @@ export default function ControlHorarioPage() {
       setShowSchedules(false);
       showToast("success", "Jornadas guardadas");
     } catch (e: any) {
-      showToast("error", e.message);
+      showToast("error", errorText(e));
     } finally {
       setSaving(false);
     }
@@ -1504,14 +1503,6 @@ export default function ControlHorarioPage() {
       )}
 
       {/* Toast */}
-      {toast && (
-        <div className={`fixed bottom-6 left-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg z-50 text-[13px] font-medium ${
-          toast.type === "success" ? "bg-white border border-slate-200 text-slate-900" : "bg-red-600 text-white"
-        }`}>
-          {toast.type === "success" ? <CheckCircle size={16} style={{ color: G }} /> : <AlertCircle size={16} />}
-          {toast.msg}
-        </div>
-      )}
     </div>
   );
 }

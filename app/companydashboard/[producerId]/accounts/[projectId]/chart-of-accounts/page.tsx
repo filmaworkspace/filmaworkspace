@@ -1,4 +1,6 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from "react";
@@ -163,7 +165,7 @@ export default function ChartOfAccountsPage() {
   const isCompanyUser = contextUser?.companyId === producerId;
   const hasAccess     = isAdmin || isCompanyUser;
 
-  const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 2500); };
+  const showToast = (msg: string, ok = true) => { if (ok) appToast.success(msg); else appToast.error(msg); };
 
   useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [contextUser, userLoading]);
   useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess]);
@@ -237,7 +239,7 @@ export default function ChartOfAccountsPage() {
     const inUse = invoices.some(i => i.items.some((it: any) => it.subAccountCode === code) || i.journalLines?.some(l => l.code === code))
       || manuals.some(m => m.lines.some(l => l.code === code));
     if (inUse) { showToast("No se puede eliminar — cuenta con movimientos", false); return; }
-    if (!confirm(`¿Eliminar la cuenta ${code}?`)) return;
+    if (!(await confirmDialog({ title: `¿Eliminar la cuenta ${code}?`, confirmLabel: "Eliminar", danger: true }))) return;
     await savePlan(plan.filter(a => a.code !== code));
   };
 
@@ -255,11 +257,6 @@ export default function ChartOfAccountsPage() {
 
   return (
     <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
-      {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 ${toast.ok ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
-          {toast.ok ? "✓" : "✗"} {toast.msg}
-        </div>
-      )}
 
       {/* Modal */}
       {showModal && (

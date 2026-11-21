@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { Button, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, Segmented, Select } from "@/components/ds";
@@ -229,7 +230,6 @@ export default function PaymentsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -247,10 +247,7 @@ export default function PaymentsPage() {
   const invoiceFilterRef = useRef<HTMLDivElement>(null);
   const invoiceSortRef = useRef<HTMLDivElement>(null);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -371,7 +368,7 @@ export default function PaymentsPage() {
       }
     } catch (error) {
       console.error("Error loading data:", error);
-      showToast("error", "Error al cargar los datos");
+      showToast("error", "No se ha podido cargar los datos");
     } finally {
       setLoading(false);
     }
@@ -509,7 +506,7 @@ export default function PaymentsPage() {
       setNewForecast({ name: "", paymentDate: "", type: "remesa" });
       showToast("success", "Previsión creada");
       loadData();
-    } catch (error) { console.error("Error:", error); showToast("error", "Error al crear la previsión"); }
+    } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido crear la previsión"); }
   };
 
   const handleAddPaymentToForecast = async (forecastId: string, invoice?: Invoice) => {
@@ -536,7 +533,7 @@ export default function PaymentsPage() {
       setShowAddPaymentModal(false); setSelectedForecastId(null);
       setNewPayment({ type: "invoice", invoiceId: "", supplier: "", description: "", amount: 0, partialAmount: 0 });
       showToast("success", "Pago añadido"); loadData();
-    } catch (error) { console.error("Error:", error); showToast("error", "Error al añadir el pago"); }
+    } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido añadir el pago"); }
   };
 
   const handleRemovePaymentItem = async (forecastId: string, itemId: string) => {
@@ -652,12 +649,6 @@ export default function PaymentsPage() {
 
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
-      {toast && (
-        <div className={cx("fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2", toast.type === "success" ? "bg-[#F1F1F3] text-slate-900" : "bg-red-600 text-white")}>
-          {toast.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-          {toast.message}
-        </div>
-      )}
 
       <main className="px-6 pb-24 pt-[85px] sm:px-10">
         <PageHeader

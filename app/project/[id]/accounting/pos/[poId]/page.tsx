@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -264,9 +265,9 @@ export default function PODetailPage() {
   const handleRepairFlow = async () => {
     try {
       const r = await repairDoc(projectId, "po", poId, { uid: permissions.userId || "", name: permissions.userName || "" });
-      alert(r.changed ? "Flujo reparado" : "No había nada que reparar");
+      if (r.changed) appToast.success("Flujo reparado"); else appToast.info("No había nada que reparar");
       await loadData();
-    } catch (e: any) { alert("No se pudo reparar: " + (e?.message || "")); }
+    } catch (e: any) { appToast.error(e, { fallback: "No se ha podido reparar el flujo" }); }
   };
 
   const loadData = async () => {
@@ -446,10 +447,10 @@ export default function PODetailPage() {
       });
       
       setShowActionsMenu(false);
-      alert("Documento reemplazado correctamente");
+      appToast.success("Documento reemplazado");
     } catch (error) {
       console.error("Error replacing document:", error);
-      alert("Error al reemplazar el documento");
+      appToast.error("No se ha podido reemplazar el documento");
     } finally {
       setReplacingDocument(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -490,7 +491,7 @@ export default function PODetailPage() {
       resetModals();
       await loadData();
     } catch (error) {
-      alert("Error al cerrar la PO");
+      appToast.error("No se ha podido cerrar la PO");
     } finally {
       setProcessing(false);
     }
@@ -517,7 +518,7 @@ export default function PODetailPage() {
       resetModals();
       await loadData();
     } catch (error) {
-      alert("Error al reabrir la PO");
+      appToast.error("No se ha podido reabrir la PO");
     } finally {
       setProcessing(false);
     }
@@ -543,7 +544,7 @@ export default function PODetailPage() {
       resetModals();
       await loadData();
     } catch (error) {
-      alert("Error al anular la PO");
+      appToast.error("No se ha podido anular la PO");
     } finally {
       setProcessing(false);
     }
@@ -578,7 +579,7 @@ export default function PODetailPage() {
       await loadData();
     } catch (error) {
       console.error("Error closing item:", error);
-      alert("Error al cerrar el item");
+      appToast.error("No se ha podido cerrar el item");
     } finally {
       setProcessing(false);
     }
@@ -613,7 +614,7 @@ export default function PODetailPage() {
       await loadData();
     } catch (error) {
       console.error("Error reopening item:", error);
-      alert("Error al reabrir el item");
+      appToast.error("No se ha podido reabrir el item");
     } finally {
       setProcessing(false);
     }
@@ -627,7 +628,7 @@ export default function PODetailPage() {
       setShowModifyModal(false);
       router.push(`/project/${projectId}/accounting/pos/${po.id}/edit`);
     } catch (error) {
-      alert("Error al modificar la PO");
+      appToast.error("No se ha podido modificar la PO");
     } finally {
       setProcessing(false);
     }

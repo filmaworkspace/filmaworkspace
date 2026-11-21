@@ -92,7 +92,7 @@ export default function ConfigDepartments() {
         const membersSnap = await getDocs(collection(db, `projects/${id}/members`));
         setMembers(membersSnap.docs.map((d) => ({ userId: d.id, name: d.data().name, email: d.data().email, department: d.data().department, position: d.data().position })));
         setLoading(false);
-      } catch { showToast("error", "Error al cargar"); setLoading(false); }
+      } catch { showToast("error", "No se ha podido cargar"); setLoading(false); }
     };
     loadData();
   }, [userId, id, router]);
@@ -112,7 +112,7 @@ export default function ConfigDepartments() {
       setNewDepartment("");
       setShowAddForm(false);
       showToast("success", "Departamento creado");
-    } catch { showToast("error", "Error al crear"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido crear"); } finally { setSaving(false); }
   };
 
   const handleRemoveDepartment = async (dept: string) => {
@@ -123,7 +123,7 @@ export default function ConfigDepartments() {
       await updateDoc(doc(db, "projects", id as string), { departments: arrayRemove(dept) });
       setDepartments(departments.filter((d) => d !== dept));
       showToast("success", "Departamento eliminado");
-    } catch { showToast("error", "Error"); } finally { setSaving(false); setConfirmDelete(null); setActiveMenu(null); }
+    } catch { showToast("error", "No se ha podido completar"); } finally { setSaving(false); setConfirmDelete(null); setActiveMenu(null); }
   };
 
   if (loading) return <PageLoading />;

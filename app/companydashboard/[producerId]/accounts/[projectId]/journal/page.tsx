@@ -1,4 +1,6 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -371,7 +373,7 @@ export default function JournalPage() {
   const isAdmin       = contextUser?.role === "admin";
   const isCompanyUser = contextUser?.companyId === producerId;
   const hasAccess     = isAdmin || isCompanyUser;
-  const showToast     = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
+  const showToast = (msg: string) => { appToast.success(msg); };
 
   useEffect(() => { if (!userLoading && !hasAccess) router.push("/dashboard"); }, [contextUser, userLoading]);
   useEffect(() => { if (producerId && projectId && hasAccess) loadData(); }, [producerId, projectId, hasAccess]);
@@ -477,7 +479,7 @@ export default function JournalPage() {
   };
 
   const deleteManual = async (id: string) => {
-    if (!confirm("¿Eliminar este asiento?")) return;
+    if (!(await confirmDialog({ title: "¿Eliminar este asiento?", confirmLabel: "Eliminar", danger: true }))) return;
     await deleteDoc(doc(db, `projects/${projectId}/manualEntries`, id));
     showToast("Asiento eliminado"); await loadData();
   };
@@ -605,7 +607,6 @@ export default function JournalPage() {
 
   return (
     <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2"><CheckCircle size={14} />{toast}</div>}
 
       {/* ══ MODAL: Asiento manual ══════════════════════════════════════════════════ */}
       {activeModal === "entry" && (

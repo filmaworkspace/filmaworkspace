@@ -163,7 +163,7 @@ export default function ConfigUsers() {
           position: d.data().position
         })));
         setLoading(false);
-      } catch { showToast("error", "Error al cargar"); setLoading(false); }
+      } catch { showToast("error", "No se ha podido cargar"); setLoading(false); }
     };
     loadData();
   }, [userId, id, router]);
@@ -243,7 +243,7 @@ export default function ConfigUsers() {
       const invSnap = await getDocs(query(collection(db, "invitations"), where("projectId", "==", id), where("status", "==", "pending")));
       setPendingInvitations(invSnap.docs.map((d) => ({ id: d.id, invitedEmail: d.data().invitedEmail, invitedName: d.data().invitedName, roleType: d.data().roleType || "project", role: d.data().role, department: d.data().department, position: d.data().position })));
       closeModal();
-    } catch { showToast("error", "Error al enviar"); } finally { setSaving(false); }
+    } catch { showToast("error", "No se ha podido enviar"); } finally { setSaving(false); }
   };
 
   const handleCancelInvitation = async (invId: string) => {
@@ -251,7 +251,7 @@ export default function ConfigUsers() {
       await deleteDoc(doc(db, "invitations", invId));
       setPendingInvitations(pendingInvitations.filter((i) => i.id !== invId));
       showToast("success", "Invitación cancelada");
-    } catch { showToast("error", "Error"); }
+    } catch { showToast("error", "No se ha podido completar"); }
   };
 
   const handleRemoveMember = async (memberId: string) => {
@@ -261,7 +261,7 @@ export default function ConfigUsers() {
       await deleteDoc(doc(db, `userProjects/${memberId}/projects`, id as string));
       setMembers(members.filter((m) => m.userId !== memberId));
       showToast("success", "Usuario eliminado");
-    } catch { showToast("error", "Error"); } finally { setSaving(false); setActiveMenu(null); }
+    } catch { showToast("error", "No se ha podido completar"); } finally { setSaving(false); setActiveMenu(null); }
   };
 
   const openEditPermissions = (member: Member) => {
@@ -288,7 +288,7 @@ export default function ConfigUsers() {
       showToast("success", "Permisos actualizados");
       setEditingMember(null);
     } catch { 
-      showToast("error", "Error al actualizar permisos"); 
+      showToast("error", "No se ha podido actualizar permisos"); 
     } finally { 
       setSaving(false); 
     }

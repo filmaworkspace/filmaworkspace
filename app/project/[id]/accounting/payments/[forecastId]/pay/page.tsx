@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -147,7 +148,6 @@ export default function PaymentPayPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
   const [suppliers, setSuppliers] = useState<Record<string, SupplierData>>({});
-  const [toast, setToast] = useState<{ type: "success" | "error" | "warning"; message: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [showSepaModal, setShowSepaModal] = useState(false);
   const [sepaDate, setSepaDate] = useState(new Date().toISOString().split("T")[0]);
@@ -159,7 +159,7 @@ export default function PaymentPayPage() {
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (type: "success" | "error" | "warning", message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 4000); };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
   const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(a || 0);
   const formatDate = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(d) : "-";
 
@@ -199,7 +199,7 @@ export default function PaymentPayPage() {
         });
         setSuppliers(suppliersMap);
         setLoading(false);
-      } catch (error) { console.error("Error:", error); showToast("error", "Error al cargar datos"); setLoading(false); }
+      } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido cargar datos"); setLoading(false); }
     };
     loadData();
   }, [permissions.userId, id, forecastId, router, permissionsLoading]);
@@ -334,7 +334,7 @@ export default function PaymentPayPage() {
       } else {
         showToast("success", `${itemIds.length} pago(s) completado(s)`);
       }
-    } catch (error) { console.error("Error:", error); showToast("error", "Error al procesar pagos"); } finally { setSaving(false); }
+    } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido procesar pagos"); } finally { setSaving(false); }
   };
 
   const handleUndoPayment = async (itemId: string) => {
@@ -450,7 +450,7 @@ export default function PaymentPayPage() {
       showToast("success", "Pago deshecho correctamente");
     } catch (error) { 
       console.error("Error:", error); 
-      showToast("error", "Error al deshacer pago"); 
+      showToast("error", "No se ha podido deshacer pago"); 
     } finally { 
       setSaving(false); 
     }
@@ -480,7 +480,7 @@ export default function PaymentPayPage() {
       showToast("success", "Justificante actualizado");
     } catch (error) { 
       console.error("Error:", error); 
-      showToast("error", "Error al actualizar justificante"); 
+      showToast("error", "No se ha podido actualizar justificante"); 
     } finally { 
       setSaving(false); 
     }
@@ -565,7 +565,6 @@ export default function PaymentPayPage() {
 
   return (
     <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 left-4 z-[60]"><div className={`flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-white text-[13px] font-medium ${toast.type === "success" ? "bg-slate-900" : toast.type === "error" ? "bg-red-600" : "bg-amber-500"}`}>{toast.type === "success" ? <CheckCircle2 size={16} /> : toast.type === "error" ? <AlertCircle size={16} /> : <AlertTriangle size={16} />}{toast.message}</div></div>}
 
       {/* Header */}
       <div className="bg-white border-b border-slate-200 text-slate-900 px-5 h-[53px] flex items-center justify-between fixed top-0 left-0 right-0 z-50">

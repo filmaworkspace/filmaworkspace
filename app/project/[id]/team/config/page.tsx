@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -280,8 +281,9 @@ export default function TeamConfigPage() {
 
   const [loading, setLoading]                   = useState(true);
   const [saving, setSaving]                     = useState(false);
-  const [successMessage, setSuccessMessage]     = useState("");
-  const [errorMessage, setErrorMessage]         = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
   const [activeSection, setActiveSection]       = useState("approvals");
 
   // Data
@@ -434,11 +436,9 @@ export default function TeamConfigPage() {
 
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(""), 2500);
   };
   const showError = (msg: string) => {
     setErrorMessage(msg);
-    setTimeout(() => setErrorMessage(""), 3000);
   };
 
   const handleSave = async () => {
@@ -1131,16 +1131,6 @@ const renderAccesos = () => (
       </div>
 
       {/* ── Toasts ─────────────────────────────────────────────────────────── */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle2 size={16} /> {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} /> {errorMessage}
-        </div>
-      )}
 
       {/* ── Main layout ────────────────────────────────────────────────────── */}
       <main className="px-6 sm:px-10 py-8">

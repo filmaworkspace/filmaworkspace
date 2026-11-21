@@ -1,4 +1,6 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -396,9 +398,7 @@ export default function CompanyAccountsPage() {
   const isCompanyUser = contextUser?.companyId === producerId;
   const hasAccess     = isAdmin || isCompanyUser;
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message }); setTimeout(() => setToast(null), 3500);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   const isInvoiceCoded = (inv: Invoice) =>
     inv.items?.length > 0 && inv.items.every(i => i.subAccountId);
@@ -443,7 +443,7 @@ export default function CompanyAccountsPage() {
           approvedAt: r.approvedAt?.toDate?.(),
         };
       }));
-    } catch (err) { console.error(err); showToast("error", "Error al cargar datos"); }
+    } catch (err) { console.error(err); showToast("error", "No se ha podido cargar datos"); }
     finally { setLoading(false); }
   };
 
@@ -480,7 +480,7 @@ export default function CompanyAccountsPage() {
     try {
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { journalLines: draftLines });
       showToast("success", "Asiento guardado"); setEditingLines(false); await loadData();
-    } catch (err) { console.error(err); showToast("error", "Error al guardar"); }
+    } catch (err) { console.error(err); showToast("error", "No se ha podido guardar"); }
     finally { setSaving(false); }
   };
 
@@ -507,19 +507,19 @@ export default function CompanyAccountsPage() {
       showToast("success", `Contabilizada — ${entryNumber}`);
       setEntryNumber(""); setEditingLines(false);
       await loadData(); goToNext();
-    } catch (err) { console.error(err); showToast("error", "Error al contabilizar"); }
+    } catch (err) { console.error(err); showToast("error", "No se ha podido contabilizar"); }
     finally { setSaving(false); }
   };
 
   const handleUnmarkAccounted = async () => {
-    if (!selectedInvoice || !confirm("¿Desmarcar como contabilizada?")) return;
+    if (!selectedInvoice || !(await confirmDialog({ title: "¿Desmarcar como contabilizada?", message: "Vuelve a poder editarse y deja de contar como contabilizada.", confirmLabel: "Desmarcar" }))) return;
     setSaving(true);
     try {
       // Limpiar track de contabilización; el lifecycle permanece "submitted".
       await updateDoc(doc(db, `projects/${projectId}/invoices`, selectedInvoice.id), { accounted: false, accountedAt: null, accountedBy: null, accountedByName: null, status: "submitted" });
       await syncBudget(projectId);
       showToast("success", "Factura desbloqueada"); setEditingLines(false); await loadData();
-    } catch (err) { console.error(err); showToast("error", "Error"); }
+    } catch (err) { console.error(err); showToast("error", "No se ha podido completar"); }
     finally { setSaving(false); }
   };
 
@@ -577,16 +577,6 @@ export default function CompanyAccountsPage() {
 
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium ${
-            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-          }`}>
-            {toast.type === "success" ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
-            {toast.message}
-          </div>
-        </div>
-      )}
 
       <div className="mt-[53px] flex">
         {/* ── TABLE SIDE ─────────────────────────────────────────────────── */}

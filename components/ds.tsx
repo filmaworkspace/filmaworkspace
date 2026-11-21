@@ -20,8 +20,9 @@
 //                     (también de los modales), nunca se cortan y se abren
 //                     hacia arriba si no caben abajo
 //   <EmptyState>
-//   useToast()        avisos breves abajo a la izquierda
+//   useToast()        avisos (lib/toast): abajo en el centro
 
+import { toast as appToast } from "@/lib/toast";
 import { Children, forwardRef, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2, X } from "lucide-react";
@@ -572,30 +573,14 @@ export function MenuItem({ onClick, danger, children }: { onClick: () => void; d
 export const MenuSeparator = () => <div className="my-1 border-t border-slate-100" />;
 
 // ─── Avisos ──────────────────────────────────────────────────────────────────
-type ToastState = { type: "success" | "error"; message: string } | null;
-
-/** Devuelve [elemento a pintar, función para mostrar un aviso]. */
-export function useToast(): [React.ReactNode, (type: "success" | "error", message: string) => void] {
-  const [toast, setToast] = useState<ToastState>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = useCallback((type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), 3000);
+// Compatibilidad: los avisos los pinta ya el sistema común (lib/toast +
+// components/Toaster). El primer valor queda vacío para no tocar cada página.
+export function useToast(): [React.ReactNode, (type: "success" | "error" | "warning" | "info", message: string) => void] {
+  const show = useCallback((type: "success" | "error" | "warning" | "info", message: string) => {
+    if (type === "error") appToast.error(message);
+    else appToast[type](message);
   }, []);
-  const node = toast ? (
-    <div
-      role="status"
-      className={cx(
-        "fixed bottom-5 left-5 z-[70] flex h-9 items-center gap-2 rounded-md px-3 text-[13px] font-medium text-white shadow-lg",
-        toast.type === "success" ? "bg-slate-900" : "bg-red-600",
-        inter.className,
-      )}
-    >
-      {toast.message}
-    </div>
-  ) : null;
-  return [node, show];
+  return [null, show];
 }
 
 /** Pantalla de "sin acceso". */

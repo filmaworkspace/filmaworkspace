@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -222,8 +223,9 @@ export default function NewPOPage() {
   const [nextPONumber, setNextPONumber] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
   const [approvalConfig, setApprovalConfig] = useState<ApprovalStep[]>([]);
 
   // Sistema de borradores (localStorage)
@@ -392,7 +394,6 @@ export default function NewPOPage() {
   const saveDraft = () => {
     if (!hasDraftableContent()) {
       setErrorMessage("No hay contenido para guardar");
-      setTimeout(() => setErrorMessage(""), 2000);
       return;
     }
 
@@ -409,7 +410,6 @@ export default function NewPOPage() {
     setDrafts(updatedDrafts);
     localStorage.setItem(`po_drafts_${id}`, JSON.stringify(updatedDrafts));
     setSuccessMessage("Borrador guardado");
-    setTimeout(() => setSuccessMessage(""), 2000);
     setShowDraftsPanel(false);
   };
 
@@ -419,7 +419,6 @@ export default function NewPOPage() {
     setNoSupplier(!!draft.noSupplier);
     setShowDraftsPanel(false);
     setSuccessMessage("Borrador cargado");
-    setTimeout(() => setSuccessMessage(""), 2000);
   };
 
   const deleteDraft = (draftId: string) => {
@@ -840,7 +839,7 @@ export default function NewPOPage() {
       !["application/pdf", "image/jpeg", "image/png"].includes(file.type) ||
       file.size > 10 * 1024 * 1024
     ) {
-      alert("Solo PDF o imágenes hasta 10MB");
+      appToast.error("Solo PDF o imágenes hasta 10MB");
       return;
     }
     setUploadedFile(file);
@@ -977,7 +976,7 @@ export default function NewPOPage() {
       );
       setTimeout(() => router.push("/project/" + id + "/accounting/pos"), 1500);
     } catch (error: any) {
-      alert("Error: " + error.message);
+      appToast.error(error);
     } finally {
       setSaving(false);
     }
@@ -1906,21 +1905,6 @@ export default function NewPOPage() {
       />
 
       {/* Toast notifications */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle size={16} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

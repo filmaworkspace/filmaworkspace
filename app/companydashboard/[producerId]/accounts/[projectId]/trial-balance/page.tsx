@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from "react";
@@ -166,7 +167,7 @@ export default function TrialBalancePage() {
     const rows: string[][] = [["Código", "Denominación", "Suma Debe", "Suma Haber", "Saldo Deudor", "Saldo Acreedor"]];
     filtered.forEach(r => rows.push([r.code, r.name, fmt(r.totalDebe), fmt(r.totalHaber), fmt(r.saldoDeudor), fmt(r.saldoAcreedor)]));
     rows.push(["", "TOTALES", fmt(totals.sumaDebe), fmt(totals.sumaHaber), fmt(totals.saldoDeudor), fmt(totals.saldoAcreedor)]);
-    exportCSV(rows, "balance_sumas_saldos.csv"); setToast("Balance exportado"); setTimeout(() => setToast(""), 2500);
+    exportCSV(rows, "balance_sumas_saldos.csv"); appToast.success("Balance exportado");
   };
 
   if (loading || userLoading) return (
@@ -177,7 +178,6 @@ export default function TrialBalancePage() {
 
   return (
     <div className={`min-h-screen bg-slate-50 ${inter.className}`}>
-      {toast && <div className="fixed bottom-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2"><CheckCircle size={14} />{toast}</div>}
 
       <div className="mt-16 p-6">
         <div className="flex items-center justify-between mb-5">

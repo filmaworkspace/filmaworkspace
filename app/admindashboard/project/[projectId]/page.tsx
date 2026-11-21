@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
@@ -227,7 +228,6 @@ export default function AdminProjectPage() {
     invitations: [],
   });
 
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Modal de confirmación genérico (igual que en /admindashboard): sustituye
@@ -300,10 +300,7 @@ export default function AdminProjectPage() {
     if (projectId && isAdmin) loadData();
   }, [projectId, isAdmin]);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   const generateShortId = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -450,7 +447,7 @@ export default function AdminProjectPage() {
       setLoading(false);
     } catch (error) {
       console.error("Error loading data:", error);
-      showToast("error", "Error al cargar los datos");
+      showToast("error", "No se ha podido cargar los datos");
       setLoading(false);
     }
   };
@@ -495,7 +492,7 @@ export default function AdminProjectPage() {
       showToast("success", `Email reenviado a ${form.email}`);
       await writeLog("form_reminder_sent", { targetEmail: form.email, formId: form.id, actorName: contextUser?.name || contextUser?.email || "Admin" });
     } catch {
-      showToast("error", "Error al reenviar el email");
+      showToast("error", "No se ha podido reenviar el email");
     }
   };
 
@@ -533,7 +530,7 @@ export default function AdminProjectPage() {
       showToast("success", `Mensaje enviado a ${members.length} miembro${members.length !== 1 ? "s" : ""}`);
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al enviar el mensaje");
+      showToast("error", "No se ha podido enviar el mensaje");
     } finally {
       setSaving(false);
     }
@@ -578,7 +575,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al actualizar");
+      showToast("error", "No se ha podido actualizar");
     } finally {
       setSaving(false);
     }
@@ -613,7 +610,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al programar el cierre");
+      showToast("error", "No se ha podido programar el cierre");
     } finally {
       setSaving(false);
     }
@@ -630,7 +627,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al cancelar");
+      showToast("error", "No se ha podido cancelar");
     } finally {
       setSaving(false);
     }
@@ -651,7 +648,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al eliminar miembro");
+      showToast("error", "No se ha podido eliminar miembro");
     } finally {
       setSaving(false);
     }
@@ -730,7 +727,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al enviar invitación");
+      showToast("error", "No se ha podido enviar invitación");
     } finally {
       setSaving(false);
     }
@@ -758,7 +755,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al actualizar permisos");
+      showToast("error", "No se ha podido actualizar permisos");
     } finally {
       setSaving(false);
     }
@@ -781,7 +778,7 @@ export default function AdminProjectPage() {
       showToast("success", "Departamento añadido");
       await loadData();
     } catch (error) {
-      showToast("error", "Error al añadir departamento");
+      showToast("error", "No se ha podido añadir departamento");
     } finally {
       setSaving(false);
     }
@@ -800,7 +797,7 @@ export default function AdminProjectPage() {
       showToast("success", "Departamento eliminado");
       await loadData();
     } catch (error) {
-      showToast("error", "Error al eliminar departamento");
+      showToast("error", "No se ha podido eliminar departamento");
     } finally {
       setSaving(false);
     }
@@ -878,7 +875,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al clonar el proyecto");
+      showToast("error", "No se ha podido clonar el proyecto");
     } finally {
       setSaving(false);
     }
@@ -911,7 +908,7 @@ export default function AdminProjectPage() {
       showToast("success", `${copied} proveedor${copied !== 1 ? "es" : ""} copiado${copied !== 1 ? "s" : ""}`);
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al copiar proveedores");
+      showToast("error", "No se ha podido copiar proveedores");
     } finally {
       setSaving(false);
     }
@@ -940,7 +937,7 @@ export default function AdminProjectPage() {
       await _doCopyBudget(false);
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al copiar presupuesto");
+      showToast("error", "No se ha podido copiar presupuesto");
       setSaving(false);
     }
   };
@@ -987,7 +984,7 @@ export default function AdminProjectPage() {
       showToast("success", "Presupuesto copiado correctamente");
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al copiar presupuesto");
+      showToast("error", "No se ha podido copiar presupuesto");
     } finally {
       setSaving(false);
     }
@@ -1011,7 +1008,7 @@ export default function AdminProjectPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      showToast("error", "Error al eliminar el presupuesto");
+      showToast("error", "No se ha podido eliminar el presupuesto");
     } finally {
       setDeletingBudget(false);
     }
@@ -1058,11 +1055,6 @@ export default function AdminProjectPage() {
   return (
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
-      {toast && (
-        <div role="status" className={`fixed bottom-5 left-5 z-[70] flex h-9 items-center gap-2 rounded-md px-3 text-[13px] font-medium text-white shadow-lg ${toast.type === "success" ? "bg-slate-900" : "bg-red-600"}`}>
-          {toast.message}
-        </div>
-      )}
 
       <main className="mx-auto px-6 pb-24 pt-[85px] sm:px-10">
         <Link href="/admindashboard/projects" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Proyectos</Link>

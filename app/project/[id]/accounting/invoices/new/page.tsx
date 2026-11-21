@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
@@ -305,8 +306,9 @@ export default function NewInvoicePage() {
   const [nextNumber, setNextNumber] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
 
   // Sistema de borradores (localStorage)
   interface Draft {
@@ -509,7 +511,6 @@ export default function NewInvoicePage() {
                        items.some(item => item.description || item.unitPrice > 0);
     if (!hasContent) {
       setErrorMessage("No hay contenido para guardar");
-      setTimeout(() => setErrorMessage(""), 2000);
       return;
     }
 
@@ -525,7 +526,6 @@ export default function NewInvoicePage() {
     setDrafts(updatedDrafts);
     localStorage.setItem(`invoice_drafts_${id}`, JSON.stringify(updatedDrafts));
     setSuccessMessage("Borrador guardado");
-    setTimeout(() => setSuccessMessage(""), 2000);
     setShowDraftsPanel(false);
   };
 
@@ -534,7 +534,6 @@ export default function NewInvoicePage() {
     setItems(draft.items);
     setShowDraftsPanel(false);
     setSuccessMessage("Borrador cargado");
-    setTimeout(() => setSuccessMessage(""), 2000);
   };
 
   const deleteDraft = (draftId: string) => {
@@ -1215,7 +1214,7 @@ export default function NewInvoicePage() {
   // Funciones de archivo
   const handleFileUpload = (file: File) => {
     if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-      alert("Solo PDF o imágenes hasta 10MB");
+      appToast.error("Solo PDF o imágenes hasta 10MB");
       return;
     }
     setUploadedFile(file);
@@ -1428,7 +1427,7 @@ export default function NewInvoicePage() {
         router.push("/project/" + id + "/accounting/invoices");
       }, 1500);
     } catch (err: any) {
-      alert("Error: " + err.message);
+      appToast.error(err);
     } finally {
       setSaving(false);
     }
@@ -2807,21 +2806,6 @@ export default function NewInvoicePage() {
       />
 
       {/* Toast notifications */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white">
-          <CheckCircle size={16} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white">
-          <AlertCircle size={16} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

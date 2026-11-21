@@ -1,4 +1,6 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useCanSeeBudget } from "@/hooks/useCanSeeBudget";
@@ -229,7 +231,8 @@ export default function EditPOPage() {
   const [poDepartment, setPODepartment] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [successMessage, setSuccessMessage] = useState("");
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
   const [approvalConfig, setApprovalConfig] = useState<ApprovalStep[]>([]);
   const [accessDenied, setAccessDenied] = useState(false);
 
@@ -630,7 +633,7 @@ export default function EditPOPage() {
 
   const handleFileUpload = (file: File) => {
     if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-      alert("Solo PDF o imágenes hasta 10MB"); return;
+      appToast.error("Solo PDF o imágenes hasta 10MB"); return;
     }
     setUploadedFile(file);
   };
@@ -645,7 +648,7 @@ export default function EditPOPage() {
 
   const savePO = async (sendForApproval: boolean) => {
     if (sendForApproval && !validateForm()) return;
-    if (poStatus !== "draft" && poStatus !== "rejected") { alert("Solo se pueden editar borradores o rechazadas"); return; }
+    if (poStatus !== "draft" && poStatus !== "rejected") { appToast.error("Solo se pueden editar borradores o rechazadas"); return; }
 
     setSaving(true);
     try {
@@ -755,7 +758,7 @@ export default function EditPOPage() {
       setSuccessMessage(poData.status === "approved" ? "PO aprobada automáticamente" : poData.status === "pending" ? "PO enviada para aprobación" : "Borrador guardado");
       setTimeout(() => router.push(`/project/${id}/accounting/pos`), 1500);
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      appToast.error(error);
     } finally {
       setSaving(false);
     }
@@ -928,12 +931,6 @@ export default function EditPOPage() {
 
       <main className="px-6 sm:px-10 py-8">
         <AutosaveNotice restoredAt={autosave.restoredAt} onDiscard={() => { autosave.discard(); window.location.reload(); }} />
-        {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
-            <CheckCircle size={18} className="text-emerald-600" />
-            <span className="text-[13px] text-emerald-700 font-medium">{successMessage}</span>
-          </div>
-        )}
 
         {!canEdit() && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
@@ -1123,11 +1120,11 @@ export default function EditPOPage() {
                             </div>
                           )}
                           <button 
-                            onClick={() => { 
+                            onClick={async () => { 
                               if (itemInvoiceStatus[index]?.hasAccountedInvoices) {
                                 return; // Bloqueado
                               }
-                              if (itemInvoiceStatus[index]?.hasInvoices && !confirm("Este item tiene facturas asignadas. ¿Deseas cambiar la cuenta analítica? Esto afectará a las facturas vinculadas.")) {
+                              if (itemInvoiceStatus[index]?.hasInvoices && !(await confirmDialog({ title: "¿Cambiar la cuenta del ítem?", message: "Tiene facturas vinculadas; también cambiará en ellas.", confirmLabel: "Cambiar" }))) {
                                 return;
                               }
                               setCurrentItemIndex(index); 
@@ -1169,11 +1166,11 @@ export default function EditPOPage() {
                         {episodesEnabled && totalEpisodes > 0 && (
                           <div>
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 if (itemInvoiceStatus[index]?.hasAccountedInvoices) {
                                   return; // Bloqueado
                                 }
-                                if (itemInvoiceStatus[index]?.hasInvoices && !confirm("Este item tiene facturas asignadas. ¿Deseas cambiar los capítulos? Esto afectará a las facturas vinculadas.")) {
+                                if (itemInvoiceStatus[index]?.hasInvoices && !(await confirmDialog({ title: "¿Cambiar los capítulos del ítem?", message: "Tiene facturas vinculadas; también cambiará en ellas.", confirmLabel: "Cambiar" }))) {
                                   return;
                                 }
                                 openEpisodeModal(index);

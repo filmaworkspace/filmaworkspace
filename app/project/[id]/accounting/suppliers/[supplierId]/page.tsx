@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
@@ -145,8 +147,9 @@ export default function SupplierDetailPage() {
   const [userDepartment, setUserDepartment] = useState("");
   const [userPosition, setUserPosition] = useState("");
   const [canVerify, setCanVerify] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -386,7 +389,7 @@ export default function SupplierDetailPage() {
       })));
 
     } catch (error: any) {
-      setErrorMessage(error.message);
+      setErrorMessage(errorText(error));
     } finally {
       setLoading(false);
     }
@@ -407,9 +410,8 @@ export default function SupplierDetailPage() {
       }
       await updateDoc(doc(db, `projects/${projectId}/suppliers`, supplierId), updates);
       setSuccessMessage(verified ? "Certificado verificado" : "Verificación eliminada");
-      setTimeout(() => setSuccessMessage(""), 3000);
       await loadData();
-    } catch (e: any) { setErrorMessage(e.message); }
+    } catch (e: any) { setErrorMessage(errorText(e)); }
   };
 
   const openConfirm = (
@@ -431,7 +433,7 @@ export default function SupplierDetailPage() {
         try {
           await deleteDoc(doc(db, `projects/${projectId}/suppliers`, supplierId));
           router.push(`/project/${projectId}/accounting/suppliers`);
-        } catch (e: any) { setErrorMessage(e.message); }
+        } catch (e: any) { setErrorMessage(errorText(e)); }
       },
       { danger: true, confirmLabel: "Eliminar" }
     );
@@ -448,11 +450,10 @@ export default function SupplierDetailPage() {
         bic: editForm.bic.trim().toUpperCase(),
       });
       setSuccessMessage("Datos actualizados");
-      setTimeout(() => setSuccessMessage(""), 3000);
       setEditingFiscal(false);
       await loadData();
     } catch (e: any) { 
-      setErrorMessage(e.message); 
+      setErrorMessage(errorText(e)); 
     } finally { 
       setSaving(false); 
     }
@@ -483,12 +484,11 @@ export default function SupplierDetailPage() {
       });
 
       setSuccessMessage("Relación con proveedor cerrada correctamente");
-      setTimeout(() => setSuccessMessage(""), 3000);
       setShowCloseModal(false);
       setCloseProjectData({ notes: "", signedLetterFile: null, signedLetterName: "" });
       await loadData();
     } catch (e: any) {
-      setErrorMessage(e.message);
+      setErrorMessage(errorText(e));
     } finally {
       setSaving(false);
     }
@@ -508,10 +508,9 @@ export default function SupplierDetailPage() {
             status: "active",
           });
           setSuccessMessage("Relación reabierta");
-          setTimeout(() => setSuccessMessage(""), 3000);
           await loadData();
         } catch (e: any) {
-          setErrorMessage(e.message);
+          setErrorMessage(errorText(e));
         } finally {
           setSaving(false);
         }
@@ -523,7 +522,6 @@ export default function SupplierDetailPage() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setSuccessMessage(`${label} copiado`);
-    setTimeout(() => setSuccessMessage(""), 2000);
   };
 
   const formatIBAN = (iban: string) => iban.replace(/\s/g, "").toUpperCase().match(/.{1,4}/g)?.join(" ") || iban;
@@ -1070,21 +1068,6 @@ export default function SupplierDetailPage() {
       </Modal>
 
       {/* Toast notifications */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-slate-900 text-white animate-in slide-in-from-bottom-2">
-          <CheckCircle size={16} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-md text-[13px] font-medium shadow-lg flex items-center gap-2 bg-red-600 text-white animate-in slide-in-from-bottom-2">
-          <AlertCircle size={16} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} className="ml-2 hover:bg-white/20 rounded p-0.5">
-            <X size={14} />
-          </button>
-        </div>
-      )}
 
       <Modal
         open={!!confirmDialog}

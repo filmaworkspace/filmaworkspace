@@ -1,4 +1,5 @@
 "use client";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Avisos globales de la app ───────────────────────────────────────────────
 // - Sesión "Ver como" (admin viendo la app como otro usuario, solo lectura).
@@ -68,7 +69,7 @@ export default function AppBanners({ isAuthPage, isMobilePage, isAdminDashboard 
       await signInWithCustomToken(auth, body.token);
       window.location.href = `/admindashboard/users/${targetUid}`;
     } catch (e) {
-      alert((e as Error).message);
+      appToast.error(e);
       setExiting(false);
     }
   };

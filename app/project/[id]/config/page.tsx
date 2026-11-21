@@ -1,4 +1,5 @@
 "use client";
+import { errorText } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
@@ -164,7 +165,7 @@ export default function ConfigGeneral() {
         setAllProducers(producersSnap.docs.map((d) => ({ id: d.id, name: d.data().name })));
         setLoading(false);
       } catch {
-        showToast("error", "Error al cargar los datos");
+        showToast("error", "No se ha podido cargar los datos");
         setLoading(false);
       }
     };
@@ -191,7 +192,7 @@ export default function ConfigGeneral() {
       setEditingProject(false);
       showToast("success", "Cambios guardados");
     } catch {
-      showToast("error", "Error al guardar");
+      showToast("error", "No se ha podido guardar");
     } finally {
       setSaving(false);
     }
@@ -227,7 +228,7 @@ export default function ConfigGeneral() {
       console.error("Error saving production data:", err);
       console.error("Error code:", err?.code);
       console.error("Error message:", err?.message);
-      showToast("error", err?.message || "Error al guardar datos de producción");
+      showToast("error", errorText(err, "No se ha podido guardar datos de producción"));
     } finally {
       setSavingProduction(false);
     }
@@ -250,7 +251,7 @@ export default function ConfigGeneral() {
       showToast("success", project.archived ? "Proyecto restaurado" : "Proyecto archivado");
       setShowActions(false);
     } catch {
-      showToast("error", "Error");
+      showToast("error", "No se ha podido completar");
     }
   };
 
@@ -272,7 +273,7 @@ export default function ConfigGeneral() {
       }
       router.push("/dashboard");
     } catch {
-      showToast("error", "Error al eliminar");
+      showToast("error", "No se ha podido eliminar");
     }
   };
 

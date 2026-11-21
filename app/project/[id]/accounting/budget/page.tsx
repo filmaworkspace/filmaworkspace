@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import React, { Fragment, useState, useEffect } from "react";
@@ -116,8 +118,9 @@ export default function BudgetPage() {
   const [view, setView] = useState<"all" | "risk">("all");
   const [searchField, setSearchField] = useState<"all" | "code" | "description">("all");
   const [showImportModal, setShowImportModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
+  // Los avisos van por lib/toast.
+  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
   const [userId, setUserId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -251,7 +254,7 @@ export default function BudgetPage() {
       setAccounts(accountsData);
       setExpandedAccounts(new Set(accountsData.map(a => a.id)));
     } catch (error: any) {
-      setErrorMessage(`Error cargando datos: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido cargar datos"));
     } finally {
       setLoading(false);
     }
@@ -290,9 +293,9 @@ export default function BudgetPage() {
     setSaving(true); setErrorMessage("");
     try {
       await addDoc(collection(db, `projects/${id}/accounts`), { code: formData.code.trim(), description: formData.description.trim(), createdAt: Timestamp.now(), createdBy: userId || "" });
-      setSuccessMessage("Cuenta creada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage("Cuenta creada correctamente");
       resetForm(); setShowModal(false); await loadData();
-    } catch (error: any) { setErrorMessage(`Error creando cuenta: ${error.message}`); } finally { setSaving(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido crear cuenta")); } finally { setSaving(false); }
   };
 
   const handleUpdateAccount = async () => {
@@ -301,9 +304,9 @@ export default function BudgetPage() {
     setSaving(true); setErrorMessage("");
     try {
       await updateDoc(doc(db, `projects/${id}/accounts`, selectedAccount.id), { code: formData.code.trim(), description: formData.description.trim() });
-      setSuccessMessage("Cuenta actualizada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage("Cuenta actualizada correctamente");
       resetForm(); setShowModal(false); await loadData();
-    } catch (error: any) { setErrorMessage(`Error actualizando cuenta: ${error.message}`); } finally { setSaving(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido actualizar cuenta")); } finally { setSaving(false); }
   };
 
   const handleCreateSubAccount = async () => {
@@ -319,13 +322,13 @@ export default function BudgetPage() {
       });
       setBudgetFigure(batch, id, subRef.id, { budgeted: formData.budgeted || 0, accountId: selectedAccount.id, code: formData.code.trim() });
       await batch.commit();
-      setSuccessMessage("Subcuenta creada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage("Subcuenta creada correctamente");
       resetForm(); setShowModal(false); await loadData();
-    } catch (error: any) { setErrorMessage(`Error creando subcuenta: ${error.message}`); } finally { setSaving(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido crear subcuenta")); } finally { setSaving(false); }
   };
 
   const handleUpdateSubAccount = async () => {
-    if (!selectedAccount || !selectedSubAccount) { setErrorMessage("Error: No se encontró la subcuenta"); return; }
+    if (!selectedAccount || !selectedSubAccount) { setErrorMessage("No se encontró la subcuenta"); return; }
     setSaving(true); setErrorMessage("");
     try {
       const batch = writeBatch(db);
@@ -334,9 +337,9 @@ export default function BudgetPage() {
       });
       setBudgetFigure(batch, id, selectedSubAccount.id, { budgeted: formData.budgeted || 0, accountId: selectedAccount.id, code: formData.code.trim() });
       await batch.commit();
-      setSuccessMessage("Subcuenta actualizada correctamente"); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage("Subcuenta actualizada correctamente");
       resetForm(); setShowModal(false); await loadData();
-    } catch (error: any) { setErrorMessage(`Error actualizando subcuenta: ${error.message}`); } finally { setSaving(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido actualizar subcuenta")); } finally { setSaving(false); }
   };
 
   const openConfirm = (
@@ -353,7 +356,6 @@ export default function BudgetPage() {
     if (!account) return;
     if (account.subAccounts.length > 0) {
       setErrorMessage("No se puede eliminar una cuenta que tiene subcuentas");
-      setTimeout(() => setErrorMessage(""), 5000);
       return;
     }
     openConfirm(
@@ -363,8 +365,8 @@ export default function BudgetPage() {
         setConfirmDialog(null);
         try {
           await deleteDoc(doc(db, `projects/${id}/accounts`, accountId));
-          setSuccessMessage("Cuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
-        } catch (error: any) { setErrorMessage(`Error eliminando cuenta: ${error.message}`); }
+          setSuccessMessage("Cuenta eliminada"); await loadData();
+        } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido eliminar cuenta")); }
       },
       { danger: true, confirmLabel: "Eliminar" }
     );
@@ -379,7 +381,6 @@ export default function BudgetPage() {
         setErrorMessage(
           `No se puede eliminar "${sub.description}": tiene importes comprometidos (${sub.committed > 0 ? formatCurrency(sub.committed) + " €" : "—"}), realizados (${sub.actual > 0 ? formatCurrency(sub.actual) + " €" : "—"}) o de caja (${sub.box > 0 ? formatCurrency(sub.box) + " €" : "—"}) asociados a POs o facturas.`
         );
-        setTimeout(() => setErrorMessage(""), 8000);
         return;
       }
     }
@@ -393,8 +394,8 @@ export default function BudgetPage() {
           batch.delete(doc(db, `projects/${id}/accounts/${accountId}/subaccounts`, subAccountId));
           deleteBudgetFigure(batch, id, subAccountId);
           await batch.commit();
-          setSuccessMessage("Subcuenta eliminada"); setTimeout(() => setSuccessMessage(""), 3000); await loadData();
-        } catch (error: any) { setErrorMessage(`Error eliminando subcuenta: ${error.message}`); }
+          setSuccessMessage("Subcuenta eliminada"); await loadData();
+        } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido eliminar subcuenta")); }
       },
       { danger: true, confirmLabel: "Eliminar" }
     );
@@ -414,9 +415,9 @@ export default function BudgetPage() {
       await updateDoc(doc(db, `projects/${id}/accounts`, trackingAccount.id), { trackingDepartments: trackingSel });
       setAccounts((prev) => prev.map((a) => (a.id === trackingAccount.id ? { ...a, trackingDepartments: trackingSel } : a)));
       setTrackingAccount(null);
-      setSuccessMessage("Seguimiento actualizado"); setTimeout(() => setSuccessMessage(""), 3000);
+      setSuccessMessage("Seguimiento actualizado");
     } catch (error: any) {
-      setErrorMessage(`Error guardando el seguimiento: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido guardar el seguimiento"));
     } finally {
       setSaving(false);
     }
@@ -787,7 +788,7 @@ export default function BudgetPage() {
       const fwb = parseFwbText(text);
       return flattenFwbToAccountRows(fwb, subaccountLevel);
     } catch (error: any) {
-      setErrorMessage(error?.message || "No se pudo leer el archivo .fwb");
+      setErrorMessage(errorText(error, "No se pudo leer el archivo .fwb"));
       return [];
     }
   };
@@ -918,7 +919,7 @@ export default function BudgetPage() {
       setImportStep("done");
       await loadData();
     } catch (error: any) {
-      setErrorMessage(`Error al importar: ${error.message}`);
+      setErrorMessage(errorText(error, "No se ha podido importar"));
       setImportStep("preview");
     } finally {
       setSaving(false);
@@ -1504,19 +1505,6 @@ export default function BudgetPage() {
       </Modal>
 
       {/* Avisos */}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
-          <CheckCircle size={15} />
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div className="fixed bottom-4 left-4 z-[80] flex items-center gap-2 rounded-md bg-red-600 px-3.5 py-2.5 text-[13px] text-white shadow-lg">
-          <AlertCircle size={15} />
-          {errorMessage}
-          <button onClick={() => setErrorMessage("")} aria-label="Cerrar" className="ml-1 rounded p-0.5 hover:bg-white/20"><X size={13} /></button>
-        </div>
-      )}
     </Page>
   );
 }

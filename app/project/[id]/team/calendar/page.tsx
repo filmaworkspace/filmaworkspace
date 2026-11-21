@@ -1,4 +1,5 @@
 "use client";
+import { confirmDialog } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -383,7 +384,7 @@ export default function CalendarPage() {
 
   const handleDelete = async (ev: CalendarEvent) => {
     if (ev.id.startsWith("auto-")) return;
-    if (!confirm(`¿Eliminar "${ev.title}"?`)) return;
+    if (!(await confirmDialog({ title: `¿Eliminar "${ev.title}"?`, confirmLabel: "Eliminar", danger: true }))) return;
     await deleteDoc(doc(db, `projects/${id}/calendarEvents`, ev.id));
     await loadEvents();
     setOpenMenuId(null);

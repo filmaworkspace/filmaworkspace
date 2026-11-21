@@ -1,4 +1,6 @@
 "use client";
+import { errorText } from "@/lib/toast";
+import { toast as appToast } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
@@ -46,15 +48,11 @@ export default function GuidesListPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Guide | null>(null);
   const [announceTarget, setAnnounceTarget] = useState<Guide | null>(null);
   const [announcing, setAnnouncing] = useState(false);
 
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -85,7 +83,7 @@ export default function GuidesListPage() {
       await updateDoc(doc(db, "guides", guide.id), { published: !guide.published });
       showToast("success", guide.published ? "Guía pasada a borrador" : "Guía publicada");
     } catch {
-      showToast("error", "Error al actualizar");
+      showToast("error", "No se ha podido actualizar");
     }
   };
 
@@ -116,7 +114,7 @@ export default function GuidesListPage() {
       showToast("success", `Aviso enviado a ${body.sent ?? emails.length} usuarios`);
       setAnnounceTarget(null);
     } catch (err: any) {
-      showToast("error", err.message || "Error al enviar el aviso");
+      showToast("error", errorText(err, "No se ha podido enviar el aviso"));
     } finally {
       setAnnouncing(false);
     }
@@ -128,7 +126,7 @@ export default function GuidesListPage() {
       showToast("success", "Guía eliminada");
       setConfirmDelete(null);
     } catch {
-      showToast("error", "Error al eliminar");
+      showToast("error", "No se ha podido eliminar");
     }
   };
 
@@ -159,13 +157,6 @@ export default function GuidesListPage() {
   return (
     <div className={`min-h-screen bg-white ${inter.className}`}>
       {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-md shadow-lg ${toast.type === "success" ? "bg-slate-900" : "bg-red-600"} text-white`}>
-            <span className="text-sm font-medium">{toast.message}</span>
-          </div>
-        </div>
-      )}
 
       <main className="mx-auto px-6 pb-24 pt-[85px] sm:px-10">
         <Link href="/admindashboard/support" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Soporte</Link>
