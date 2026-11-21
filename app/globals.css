@@ -132,3 +132,9 @@ table.tbl thead th:empty:not([class*="w-"]) {
 table.tbl thead th.text-right:not([class*="w-"]) {
   width: 8.5rem;
 }
+
+/* Avisos (components/Toaster) */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}

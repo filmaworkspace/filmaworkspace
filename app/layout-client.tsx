@@ -7,6 +7,7 @@ import { UserProvider } from "@/contexts/UserContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import ErrorReporter from "@/components/ErrorReporter";
 import AppBanners from "@/components/AppBanners";
+import Toaster from "@/components/Toaster";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -51,6 +52,7 @@ export default function ClientLayout({
       <MaintenanceGate isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard}>
         {children}
       </MaintenanceGate>
+      <Toaster />
     </UserProvider>
   );
 }
