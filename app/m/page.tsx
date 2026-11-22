@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
 import { toast, errorText } from "@/lib/toast";
@@ -89,10 +90,11 @@ export default function MobileHome() {
                 {data!.projects.map((p) => {
                   const n = approvals.filter((a) => a.projectId === p.id).length;
                   return (
-                    <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <span className="truncate text-[15px]">{p.name}</span>
+                    <Link key={p.id} href={`/m/p/${p.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-slate-50">
+                      <span className="min-w-0 flex-1 truncate text-[15px]">{p.name}</span>
                       {n > 0 && <span className="rounded-full bg-[#EEF1FD] px-2 py-0.5 text-[11px] font-medium text-[#2F52E0]">{n} pendiente{n === 1 ? "" : "s"}</span>}
-                    </div>
+                      <ChevronRight size={16} className="shrink-0 text-slate-300" />
+                    </Link>
                   );
                 })}
               </Card>

@@ -5,7 +5,7 @@
 // información. Al terminar pasa a la siguiente pendiente.
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { collection, doc, getDoc, getDocs, query, where, type DocumentData } from "firebase/firestore";
 import { ArrowLeft, FileText, MessageCircle } from "lucide-react";
@@ -27,6 +27,9 @@ interface Line { description: string; code: string; base: number }
 export default function MobileApprovalDetail() {
   const { projectId, kind, id } = useParams() as { projectId: string; kind: PendingKind; id: string };
   const router = useRouter();
+  // Desde un proyecto se vuelve al proyecto; si no, a la bandeja.
+  const backParam = useSearchParams().get("back");
+  const backHref = backParam?.startsWith("/m/") ? backParam : "/m/aprobaciones";
   const { user } = useUser();
   const { data, reload } = useMobileData();
   const [d, setD] = useState<DocumentData | null | undefined>(undefined);
@@ -82,7 +85,7 @@ export default function MobileApprovalDetail() {
 
   return (
     <div className="space-y-5 pb-20">
-      <Link href="/m/aprobaciones" className="-ml-1 inline-flex h-9 items-center gap-1 text-[13px] text-slate-500"><ArrowLeft size={16} /> Aprobaciones</Link>
+      <Link href={backHref} className="-ml-1 inline-flex h-9 items-center gap-1 text-[13px] text-slate-500"><ArrowLeft size={16} /> {backHref === "/m/aprobaciones" ? "Aprobaciones" : "Volver"}</Link>
 
       <div>
         <div className="flex items-baseline gap-2 text-[12px] text-slate-500">

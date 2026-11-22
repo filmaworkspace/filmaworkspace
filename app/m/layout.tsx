@@ -16,7 +16,7 @@ function BottomNav() {
   const { data } = useMobileData();
   const pending = data?.approvals.length || 0;
   const items = [
-    { href: "/m", label: "Inicio", icon: Home, active: pathname === "/m" },
+    { href: "/m", label: "Inicio", icon: Home, active: pathname === "/m" || pathname.startsWith("/m/p/") },
     { href: "/m/aprobaciones", label: "Aprobaciones", icon: CheckCircle2, active: pathname.startsWith("/m/aprobaciones"), badge: pending },
     { href: "/m/perfil", label: "Perfil", icon: User, active: pathname.startsWith("/m/perfil") },
   ];

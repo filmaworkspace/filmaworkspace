@@ -54,21 +54,22 @@ export function ApprovalRow({ a, showProject = true }: { a: PendingApprovalItem;
 
 const STATE_DOT: Record<MyDocItem["state"], string> = { rejected: "bg-red-500", pending: "bg-amber-500", draft: "bg-slate-300", approved: "bg-emerald-500" };
 
-/** Fila de un documento propio con su estado. */
-export function DocRow({ d }: { d: MyDocItem }) {
+/** Fila de un documento propio con su estado (abre el detalle). */
+export function DocRow({ d, showProject = true }: { d: MyDocItem; showProject?: boolean }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <Link href={`/m/aprobaciones/${d.projectId}/${d.kind}/${d.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-slate-50">
       <span className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[d.state]}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="font-mono text-[11px] text-slate-500">{d.number}</span>
-          <span className="truncate text-[11px] text-slate-400">{d.projectName}</span>
+          {showProject && <span className="truncate text-[11px] text-slate-400">{d.projectName}</span>}
         </div>
         <p className="truncate text-[14px] font-medium text-slate-900">{d.supplier}</p>
         <p className={`truncate text-xs ${d.state === "rejected" ? "text-red-600" : "text-slate-500"}`}>{d.detail}</p>
       </div>
       <p className="text-[14px] font-medium tabular-nums text-slate-900">{money(d.base)}</p>
-    </div>
+      <ChevronRight size={16} className="shrink-0 text-slate-300" />
+    </Link>
   );
 }
 
