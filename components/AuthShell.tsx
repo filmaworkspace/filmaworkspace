@@ -67,7 +67,8 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
       {/* Formulario */}
       <main className="flex flex-1 flex-col px-6 py-7 sm:px-10 lg:w-1/2 lg:flex-none">
-        <div>
+        {/* En móvil (sin panel visual) el logo va centrado; en escritorio, a la izquierda */}
+        <div className="flex justify-center lg:justify-start">
           <Image src="/logodark.svg" alt="Filma Workspace" width={120} height={24} className="h-auto w-[110px]" priority />
         </div>
 
