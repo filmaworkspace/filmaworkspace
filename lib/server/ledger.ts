@@ -14,6 +14,8 @@ export interface LedgerResult {
   /** Por id de subcuenta (lo que usan las pantallas). */
   bySubId: Record<string, { code: string; committed: number; actual: number; box: number }>;
   written: number;
+  /** Escrituras necesarias (también en simulación). */
+  changes: number;
 }
 
 export async function syncProjectLedger(projectId: string, opts: { write?: boolean } = {}): Promise<LedgerResult> {
@@ -61,5 +63,5 @@ export async function syncProjectLedger(projectId: string, opts: { write?: boole
       await batch.commit();
     }
   }
-  return { settings, ledger, bySubId, written: opts.write === false ? 0 : writes.length };
+  return { settings, ledger, bySubId, written: opts.write === false ? 0 : writes.length, changes: writes.length };
 }

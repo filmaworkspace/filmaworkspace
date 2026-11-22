@@ -56,6 +56,8 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
       { id: "s-emails", group: "Secciones", label: "Emails", icon: Mail, keywords: "correos rebotes", run: go("/admindashboard/emails") },
       { id: "s-ann", group: "Secciones", label: "Avisos", icon: Megaphone, keywords: "comunicados novedades changelog banner", run: go("/admindashboard/announcements") },
       { id: "s-system", group: "Secciones", label: "Sistema", icon: Settings, keywords: "errores seguridad auditoria cron flags", run: go("/admindashboard/system") },
+      { id: "s-data", group: "Secciones", label: "Datos", hint: "Recalcular presupuestos, reparar aprobaciones", icon: Wrench, keywords: "mantenimiento recalcular ledger presupuesto flujos aprobaciones reparar", run: go("/admindashboard/data") },
+      { id: "s-billing", group: "Secciones", label: "Facturación", icon: Receipt, keywords: "facturas presupuestos cobros", run: go("/admindashboard/accounts/billing") },
       { id: "s-metrics", group: "Secciones", label: "Métricas", icon: BarChart3, keywords: "embudo retencion cohortes", run: go("/admindashboard/metrics") },
     ];
     const actions: Item[] = [

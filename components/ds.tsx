@@ -23,7 +23,7 @@
 //   useToast()        avisos (lib/toast): abajo en el centro
 
 import { toast as appToast } from "@/lib/toast";
-import { Children, forwardRef, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Children, createContext, forwardRef, useContext, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2, X } from "lucide-react";
 import { inter } from "@/lib/fonts";
@@ -41,10 +41,16 @@ export const tokens = {
 } as const;
 
 // ─── Página ──────────────────────────────────────────────────────────────────
+// Margen superior de las páginas: el de la cabecera fija de la app. Pantallas
+// con su propio marco (el panel de admin) lo cambian.
+const PageTopContext = createContext("pt-[85px]");
+export const PageTopProvider = PageTopContext.Provider;
+
 export function Page({ children, width = "" }: { children: React.ReactNode; width?: string }) {
+  const top = useContext(PageTopContext);
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
-      <main className={cx("mx-auto px-6 pb-24 pt-[85px] sm:px-10", width)}>{children}</main>
+      <main className={cx("mx-auto px-6 pb-24 sm:px-10", top, width)}>{children}</main>
     </div>
   );
 }

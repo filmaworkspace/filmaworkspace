@@ -70,7 +70,7 @@ export default function MaintenanceGate({
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && !isMobilePage && <Header />}
+      {!isAuthPage && !isMobilePage && !isAdminDashboard && <Header />}
       <main className="flex flex-col flex-grow">{children}</main>
       {!isAuthPage && !isMobilePage && !isAdminDashboard && <Footer />}
 

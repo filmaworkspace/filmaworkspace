@@ -135,10 +135,7 @@ function SystemInner() {
   return (
     <Page>
       {toast}
-      <PageHeader title="Sistema" actions={<IconButton label="Actualizar" onClick={() => loadTab(tab, true)}><RefreshCw size={15} /></IconButton>} />
-      <div className="mt-6"><Pills value={tab} onChange={setTab} label="Sistema" options={TABS.map((t) => ({
-        ...t, count: t.value === "errors" && loaded.errors ? errors.filter((e) => !e.resolved).length : undefined,
-      }))} /></div>
+      <PageHeader title={TABS.find((t) => t.value === tab)?.label || "Sistema"} actions={<IconButton label="Actualizar" onClick={() => loadTab(tab, true)}><RefreshCw size={15} /></IconButton>} />
 
       {/* Estado */}
       {tab === "status" && (

@@ -238,7 +238,7 @@ export default function GuideEditorPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* Top bar */}
-      <div className="mt-[53px] sticky top-[53px] z-30 bg-white border-b border-slate-200">
+      <div className="sticky top-12 z-30 bg-white border-b border-slate-200">
         <div className="px-8 h-16 flex items-center justify-between">
           <Link href="/admindashboard/guides" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
             <ArrowLeft size={16} />

@@ -1,13 +1,15 @@
 "use client";
 
 // ─── Panel de administración: estructura común ───────────────────────────────
-// Datos compartidos (AdminDataProvider), ⌘K y control de acceso: admins ven
+// Menú lateral (AdminShell), datos compartidos (AdminDataProvider), ⌘K y
+// control de acceso: admins ven
 // todo; los agentes de soporte solo Soporte y Guías.
 
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { AdminDataProvider } from "@/components/admin/AdminData";
+import AdminShell from "@/components/admin/AdminShell";
 import CommandPalette, { useCommandPaletteHotkey } from "@/components/admin/CommandPalette";
 import { PageLoading } from "@/components/ds";
 
@@ -33,11 +35,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("admin:cmdk", open);
   }, []);
 
+  const openSearch = useCallback(() => setCmdk(true), []);
+
   if (isLoading || !user || (!isAdmin && !isAgent) || (isAgent && !agentAllowed)) return <PageLoading />;
 
   return (
     <AdminDataProvider>
-      {children}
+      <Suspense fallback={<PageLoading />}>
+        <AdminShell isAdmin={isAdmin} onSearch={openSearch}>{children}</AdminShell>
+      </Suspense>
       <CommandPalette open={cmdk} onClose={() => setCmdk(false)} isAdmin={isAdmin} />
     </AdminDataProvider>
   );

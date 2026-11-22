@@ -1056,7 +1056,7 @@ export default function AdminProjectPage() {
     <div className={"min-h-screen bg-white " + inter.className}>
       {/* Toast */}
 
-      <main className="mx-auto px-6 pb-24 pt-[85px] sm:px-10">
+      <main className="mx-auto px-6 pb-24 pt-8 sm:px-10">
         <Link href="/admindashboard/projects" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Proyectos</Link>
         <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">

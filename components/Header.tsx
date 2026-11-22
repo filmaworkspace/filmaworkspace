@@ -27,7 +27,6 @@ import {
   LogOut,
   Package,
   Receipt,
-  Search,
   Settings,
   Shield,
   User,
@@ -352,18 +351,6 @@ export default function Header() {
             </>
           )}
 
-          {isAdminSection && (() => {
-            // Navegación del panel de administración (los agentes de soporte
-            // solo ven Soporte y Guías).
-            const sub = pathname.replace(/^\/admindashboard\/?/, "").split("/")[0] || "";
-            const active = sub === "project" ? "projects" : sub;
-            const items = isAdmin
-              ? [["", "Inicio"], ["projects", "Proyectos"], ["users", "Usuarios"], ["accounts", "Cuentas"], ["support", "Soporte"], ["emails", "Emails"], ["announcements", "Avisos"], ["system", "Sistema"], ["metrics", "Métricas"]]
-              : [["support", "Soporte"], ["guides", "Guías"]];
-            return items.map(([key, label]) => (
-              <NavLink key={key} href={`/admindashboard${key ? `/${key}` : ""}`} isActive={active === key || (key === "support" && active === "guides" && isAdmin)}>{label}</NavLink>
-            ));
-          })()}
 
           {isConfigSection && projectId && (
             <>
@@ -396,15 +383,6 @@ export default function Header() {
 
         {/* Derecha */}
         <div className="relative flex items-center gap-1.5">
-          {isAdminSection && (
-            <button
-              onClick={() => window.dispatchEvent(new Event("admin:cmdk"))}
-              className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 px-2.5 text-xs text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-700"
-              title="Buscar y acciones (⌘K)"
-            >
-              <Search size={13} /> <kbd className="tabular-nums text-[10px]">⌘K</kbd>
-            </button>
-          )}
           {/* Cajas (BOX) */}
           {isAccountingSection && projectId && accountingAccess.box && (
             <Link href={`/project/${projectId}/accounting/box`} className={iconButton} title="Cajas">
