@@ -39,6 +39,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import ProjectCover from "@/components/ProjectCover";
+import PendingForYou from "@/components/PendingForYou";
 import { coverGradient } from "@/lib/projectCover";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -473,6 +474,9 @@ export default function Dashboard() {
             </div>
           </section>
         )}
+
+        {/* Pendiente de ti: aprobaciones y estado de tus documentos (también en móvil) */}
+        {userId && <PendingForYou uid={userId} projects={projects.map((p) => ({ id: p.id, name: p.name, archived: p.archived }))} />}
 
         {projects.length === 0 && invitations.length === 0 ? (
           /* Sin proyectos */

@@ -18,7 +18,8 @@ import { auth, db } from "@/lib/firebase";
 import { getScopedDocs, scopeFromMember, type DocScope } from "@/lib/accountingScope";
 import { loadBudgetFigures } from "@/lib/budgetFigures";
 import { ApprovalSteps } from "@/components/accounting/ApprovalFlow";
-import { afterApprovalComplete } from "@/lib/approvalActions";
+import { approveDoc, rejectDoc, requestInfo } from "@/lib/approvalOps";
+import type { PendingKind } from "@/lib/myPending";
 import { syncBudget } from "@/lib/ledgerClient";
 import { applyApproval, applyRejection, canApprove, stripUndefined, withNames } from "@/lib/approvalFlow";
 import {
@@ -594,123 +595,46 @@ export default function ApprovalsPage() {
   const canUserApprove = (docData: any, uId: string, _r?: string, _d?: string, _p?: string): boolean => canApprove(docData, uId);
 
 
+  // Operaciones comunes con el móvil (lib/approvalOps): transacción y presupuesto.
+  const kindOf = (a: PendingApproval): PendingKind => (a.type === "box" ? (a.boxType === "card" ? "card" : "transfer") : a.type);
+  const actor = () => ({ uid: userId || "", name: userName });
+  const dropFromQueue = (a: PendingApproval) => {
+    setPendingApprovals(pendingApprovals.filter((x) => x.id !== a.id));
+    if (currentIndex >= filteredApprovals.length - 1) setCurrentIndex(Math.max(0, currentIndex - 1));
+  };
+
   const handleApprove = async (approval: PendingApproval, withComment: boolean = false) => {
     if (withComment && !approvalComment.trim()) { setErrorMessage("Escribe un comentario"); return; }
     setShowApprovalModal(false);
     setProcessing(true);
     try {
-      let collectionName = approval.type === "po" ? "pos" : approval.type === "invoice" ? "invoices" : "";
-      
-      // Para sobres BOX, determinar la colección según boxType
-      if (approval.type === "box") {
-        collectionName = approval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
-      }
-      
-      const docRef = doc(db, `projects/${approval.projectId}/${collectionName}`, approval.documentId);
-      const at = Timestamp.now();
-      const comment = approvalComment.trim();
-      // Transacción: dos aprobaciones a la vez no se pisan, y solo una completa el flujo.
-      const { docData, result } = await runTransaction(db, async (tx) => {
-        const snap = await tx.get(docRef);
-        if (!snap.exists()) throw new Error("El documento ya no existe");
-        const d = snap.data();
-        if (approval.type === "po" && d.status !== "pending") throw new Error("La PO ya no está pendiente de aprobación");
-        if (approval.type === "invoice" && (d.approvedAt || d.status === "rejected" || d.approvalStatus === "rejected")) throw new Error("La factura ya no está pendiente de aprobación");
-        const r = applyApproval(d as any, userId!, userName, at);
-        const upd: any = { approvalSteps: stripUndefined(r.steps), currentApprovalStep: r.currentApprovalStep };
-        if (comment) upd.comments = [...(d.comments || []), { id: `comment-${Date.now()}`, userId, userName, text: comment, createdAt: at, type: "approval" }];
-        if (r.complete) {
-          upd.approvedAt = at; upd.approvedBy = userId; upd.approvedByName = userName;
-          if (approval.type === "po") {
-            const base = (d.items || []).reduce((t: number, it: any) => t + (it.baseAmount || (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)), 0) || d.baseAmount || 0;
-            upd.status = "approved"; upd.committedAmount = base; upd.remainingAmount = base; upd.previousCommittedItems = null;
-          } else if (approval.type === "invoice") {
-            upd.status = "submitted"; upd.approvalStatus = "approved";
-          } else if (approval.type === "box") {
-            upd.status = approval.boxType === "card" ? "reviewing" : "pending";
-          }
-        }
-        tx.update(docRef, upd);
-        return { docData: d, result: r };
-      });
-      const allStepsComplete = result.complete;
-      // Efectos de presupuesto (comprometer PO / realizar factura) una sola vez, al completarse.
-      if (allStepsComplete && (approval.type === "po" || approval.type === "invoice")) await afterApprovalComplete(approval.projectId, approval.type, docData, at);
-      setPendingApprovals(pendingApprovals.filter((a) => a.id !== approval.id));
-      setSuccessMessage(allStepsComplete ? `${approval.displayNumber} aprobado` : "Aprobación registrada");
+      const { complete } = await approveDoc(approval.projectId, kindOf(approval), approval.documentId, actor(), approvalComment);
+      dropFromQueue(approval);
+      setSuccessMessage(complete ? `${approval.displayNumber} aprobado` : "Aprobación registrada");
       setApprovalComment(""); setShowCommentInput(false);
-      if (currentIndex >= filteredApprovals.length - 1) setCurrentIndex(Math.max(0, currentIndex - 1));
-    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido aprobar")); } finally { setProcessing(false); }
   };
 
   const handleReject = async () => {
-    if (!selectedApproval || !rejectionReason.trim()) { setErrorMessage("Debes proporcionar un motivo"); return; }
+    if (!selectedApproval || !rejectionReason.trim()) { setErrorMessage("Escribe el motivo del rechazo"); return; }
     setProcessing(true);
     try {
-      let collectionName = selectedApproval.type === "po" ? "pos" : selectedApproval.type === "invoice" ? "invoices" : "";
-      
-      // Para sobres BOX, determinar la colección según boxType
-      if (selectedApproval.type === "box") {
-        collectionName = selectedApproval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
-      }
-      
-      const docRef = doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const docData = docSnap.data();
-        const oldStatus = docData.status || "pending";
-        
-      }
-      
-      // Determinar el nuevo status según el tipo
-      let newStatus = "rejected";
-      if (selectedApproval.type === "box") {
-        // Los sobres BOX vuelven a estado anterior (open para tarjetas, draft para transferencias)
-        newStatus = selectedApproval.boxType === "card" ? "open" : "draft";
-      }
-      
-      const rejectedAt = Timestamp.now();
-      const rejUpd: any = {
-        status: newStatus,
-        rejectedAt,
-        rejectedBy: userId,
-        rejectedByName: userName,
-        rejectionReason: rejectionReason.trim(),
-        // previousCommittedItems se conserva: si era la modificación de una PO
-        // aprobada, la versión aprobada sigue comprometida.
-      };
-      if (docSnap.exists() && (docSnap.data().approvalSteps || []).length) {
-        // El paso actual queda rechazado (con quién y cuándo) para el historial.
-        const r = applyRejection(docSnap.data() as any, userId!, userName, rejectedAt);
-        rejUpd.approvalSteps = stripUndefined(r.steps);
-      }
-      if (selectedApproval.type === "invoice") rejUpd.approvalStatus = "rejected";
-      await updateDoc(docRef, rejUpd);
-      if (selectedApproval.type !== "box") await syncBudget(selectedApproval.projectId);
-      
-      setPendingApprovals(pendingApprovals.filter((a) => a.id !== selectedApproval.id));
+      await rejectDoc(selectedApproval.projectId, kindOf(selectedApproval), selectedApproval.documentId, actor(), rejectionReason);
+      dropFromQueue(selectedApproval);
       setSuccessMessage(`${selectedApproval.displayNumber} rechazado`);
       setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null);
-      if (currentIndex >= filteredApprovals.length - 1) setCurrentIndex(Math.max(0, currentIndex - 1));
-    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido rechazar")); } finally { setProcessing(false); }
   };
 
   const handleRequestInfo = async () => {
     if (!selectedApproval || !infoRequestMessage.trim()) { setErrorMessage("Escribe qué información necesitas"); return; }
     setProcessing(true);
     try {
-      let collectionName = selectedApproval.type === "po" ? "pos" : selectedApproval.type === "invoice" ? "invoices" : "";
-      if (selectedApproval.type === "box") {
-        collectionName = selectedApproval.boxType === "card" ? "cardEnvelopes" : "transferEnvelopes";
-      }
-      const docRef = doc(db, `projects/${selectedApproval.projectId}/${collectionName}`, selectedApproval.documentId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) { const comments = docSnap.data().comments || []; comments.push({ id: `info-request-${Date.now()}`, userId, userName, text: infoRequestMessage.trim(), createdAt: Timestamp.now(), type: "info_request" }); await updateDoc(docRef, { comments, infoRequested: true, infoRequestedBy: userId, infoRequestedAt: Timestamp.now() }); }
+      await requestInfo(selectedApproval.projectId, kindOf(selectedApproval), selectedApproval.documentId, actor(), infoRequestMessage);
       setSuccessMessage("Solicitud de información enviada");
       setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null);
       loadPendingApprovals();
-    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido completar")); } finally { setProcessing(false); }
+    } catch (error: any) { setErrorMessage(errorText(error, "No se ha podido enviar")); } finally { setProcessing(false); }
   };
 
   const currentApproval = filteredApprovals[currentIndex];

@@ -32,17 +32,21 @@ export default function ClientLayout({
     pathname?.startsWith("/guias") ||
     pathname?.startsWith("/budgeting");
 
-  const isMobilePage = pathname === "/mobile";
+  // Versión móvil: rutas /m (y la antigua /mobile, que redirige a ella).
+  const isMobilePage = pathname === "/mobile" || pathname === "/m" || !!pathname?.startsWith("/m/");
   const isAdminDashboard = pathname?.startsWith("/admindashboard");
 
-  // Redirigir a /mobile si el usuario accede desde un dispositivo móvil
-  // y no está en una página de autenticación ni ya en /mobile.
+  // En el móvil se usa la versión móvil (/m). Los enlaces a aprobaciones
+  // (por ejemplo desde un email) van directos a la bandeja móvil; el resto de
+  // pantallas, al inicio móvil.
   useEffect(() => {
-    if (isAuthPage || isMobilePage) return;
-    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
-    if (isMobile) {
-      router.replace("/mobile");
-    }
+    if (isAuthPage) return;
+    if (pathname === "/mobile") { router.replace("/m"); return; }
+    if (isMobilePage) return;
+    if (window.innerWidth >= MOBILE_BREAKPOINT) return;
+    const appr = pathname?.match(/^\/project\/([^/]+)\/accounting\/approvals/);
+    router.replace(appr ? "/m/aprobaciones" : "/m");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return (

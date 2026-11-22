@@ -68,7 +68,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
     pathname.startsWith("/project") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/companydashboard") ||
-    pathname.startsWith("/budgeting");
+    pathname.startsWith("/budgeting") ||
+    pathname === "/m" ||
+    pathname.startsWith("/m/");
 
   const loadUserData = async (firebaseUser: FirebaseUser) => {
     try {
