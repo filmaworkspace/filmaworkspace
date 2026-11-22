@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore,storage --project demo-filma \"node test.mjs && node accounting.test.mjs && node admin.test.mjs && node storage.test.mjs\""
+    "test": "firebase emulators:exec --only firestore,storage --project demo-filma \"node test.mjs && node accounting.test.mjs && node admin.test.mjs && node storage.test.mjs\"",
+    "pretest": "cp ../../storage.rules ./storage.rules"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

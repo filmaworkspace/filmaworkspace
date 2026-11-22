@@ -1,0 +1,55 @@
+# Comprobaciones automáticas en cada cambio: tipos, pruebas de cálculo
+# (presupuesto, aprobaciones, importes) y pruebas de las reglas de seguridad
+# de Firestore y Storage en el emulador. Si algo falla, el cambio sale en rojo.
+name: Comprobaciones
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Tipos y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos (TypeScript)
+        run: npx tsc --noEmit -p .
+      - name: Pruebas (presupuesto, aprobaciones, importes)
+        run: npm test
+
+  rules:
+    name: Reglas de seguridad
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tests/firestore-rules
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # El emulador de Firebase necesita Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Caché del emulador
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-v1
+      - run: npm install --no-audit --no-fund
+      - name: Pruebas de reglas (Firestore y Storage)
+        run: npm test
