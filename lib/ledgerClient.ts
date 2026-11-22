@@ -14,30 +14,54 @@ export interface LedgerResponse {
   issues: LedgerIssue[];
 }
 
-const inflight = new Map<string, Promise<LedgerResponse | null>>();
+// Agrupación: varias peticiones seguidas del mismo proyecto (guardar varias
+// cosas, cambios en Caja…) se juntan en un solo recálculo, que se lanza
+// cuando hay una pausa corta (o como mucho a los 2 s). Si ya hay uno en
+// marcha, se hace otro al terminar para que el último vea el estado final.
+const QUIET_MS = 400;
+const MAX_WAIT_MS = 2000;
+interface Pending { timer: ReturnType<typeof setTimeout> | null; firstAt: number; waiters: ((r: LedgerResponse | null) => void)[] }
+const pending = new Map<string, Pending>();
+const running = new Map<string, Promise<LedgerResponse | null>>();
 
-export async function syncBudget(projectId: string): Promise<LedgerResponse | null> {
-  // Si ya hay una en curso, se encadena otra después (la última ve el estado final).
-  const prev = inflight.get(projectId);
-  const run = (async () => {
-    if (prev) await prev.catch(() => null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) return null;
-      const res = await fetch("/api/accounting/ledger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ projectId }),
-      });
-      if (!res.ok) { console.warn("syncBudget", res.status); return null; }
-      return (await res.json()) as LedgerResponse;
-    } catch (e) {
-      console.warn("syncBudget", e);
-      return null;
-    }
-  })();
-  inflight.set(projectId, run);
-  try { return await run; } finally { if (inflight.get(projectId) === run) inflight.delete(projectId); }
+async function callServer(projectId: string): Promise<LedgerResponse | null> {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return null;
+    const res = await fetch("/api/accounting/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ projectId }),
+    });
+    if (!res.ok) { console.warn("syncBudget", res.status); return null; }
+    return (await res.json()) as LedgerResponse;
+  } catch (e) {
+    console.warn("syncBudget", e);
+    return null;
+  }
+}
+
+function flush(projectId: string) {
+  const p = pending.get(projectId);
+  if (!p) return;
+  pending.delete(projectId);
+  if (p.timer) clearTimeout(p.timer);
+  const prev = running.get(projectId) || Promise.resolve(null);
+  const run = prev.catch(() => null).then(() => callServer(projectId));
+  running.set(projectId, run);
+  run.then((r) => { p.waiters.forEach((w) => w(r)); if (running.get(projectId) === run) running.delete(projectId); });
+}
+
+export function syncBudget(projectId: string): Promise<LedgerResponse | null> {
+  return new Promise((resolve) => {
+    const now = Date.now();
+    const p = pending.get(projectId) || { timer: null, firstAt: now, waiters: [] };
+    p.waiters.push(resolve);
+    if (p.timer) clearTimeout(p.timer);
+    const wait = Math.max(0, Math.min(QUIET_MS, MAX_WAIT_MS - (now - p.firstAt)));
+    p.timer = setTimeout(() => flush(projectId), wait);
+    pending.set(projectId, p);
+  });
 }
 
 /**

@@ -455,7 +455,16 @@ service cloud.firestore {
         allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /cardEnvelopes/{envelopeId} {
-        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        // Caja lo gestiona; quien figura como aprobador del sobre (aunque no
+        // sea de Caja) puede verlo y aprobarlo o rechazarlo, y nada más.
+        allow read: if canUseBox(projectId) || (inAccounting(projectId) && request.auth.uid in resource.data.approverIds);
+        allow create: if projectOpen(projectId) && (canUseBox(projectId));
+        allow update: if projectOpen(projectId) && (canUseBox(projectId) || (
+                         inAccounting(projectId) &&
+                         request.auth.uid in resource.data.get('approverIds', []) &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalSteps', 'currentApprovalStep', 'status', 'approvedAt', 'approvedBy', 'approvedByName', 'rejectedAt', 'rejectedBy', 'rejectedByName', 'rejectionReason', 'comments', 'infoRequested', 'infoRequestedBy', 'infoRequestedAt']) &&
+                         request.resource.data.status in ['pending_approval', 'reviewing', 'open', 'draft']
+                       ));
         allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /cardExpenses/{expenseId} {
@@ -468,7 +477,16 @@ service cloud.firestore {
         allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /transferEnvelopes/{envelopeId} {
-        allow read, create, update: if projectOpen(projectId) && (canUseBox(projectId));
+        // Caja lo gestiona; quien figura como aprobador del sobre (aunque no
+        // sea de Caja) puede verlo y aprobarlo o rechazarlo, y nada más.
+        allow read: if canUseBox(projectId) || (inAccounting(projectId) && request.auth.uid in resource.data.approverIds);
+        allow create: if projectOpen(projectId) && (canUseBox(projectId));
+        allow update: if projectOpen(projectId) && (canUseBox(projectId) || (
+                         inAccounting(projectId) &&
+                         request.auth.uid in resource.data.get('approverIds', []) &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalSteps', 'currentApprovalStep', 'status', 'approvedAt', 'approvedBy', 'approvedByName', 'rejectedAt', 'rejectedBy', 'rejectedByName', 'rejectionReason', 'comments', 'infoRequested', 'infoRequestedBy', 'infoRequestedAt']) &&
+                         request.resource.data.status in ['pending_approval', 'reviewing', 'open', 'draft']
+                       ));
         allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
       }
       match /transferExpenses/{expenseId} {

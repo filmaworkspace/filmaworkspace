@@ -39,7 +39,9 @@ export async function approveDoc(projectId: string, kind: PendingKind, id: strin
       } else if (kind === "invoice") {
         Object.assign(upd, { status: "submitted", approvalStatus: "approved" });
       } else {
-        upd.status = kind === "card" ? "reviewing" : "pending";
+        // Sobre aprobado: la tarjeta queda lista para cerrar ("reviewing") y la
+        // transferencia sigue abierta, lista para liquidar.
+        upd.status = kind === "card" ? "reviewing" : "draft";
       }
     }
     tx.update(ref, upd);

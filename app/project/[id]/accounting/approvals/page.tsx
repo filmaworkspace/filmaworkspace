@@ -353,7 +353,7 @@ export default function ApprovalsPage() {
 
       // Load Card Envelopes (sobres de tarjeta pendientes de aprobación)
       try {
-        const cardEnvSnap = await getDocs(query(collection(db, `projects/${id}/cardEnvelopes`), where("status", "==", "pending_approval")));
+        const cardEnvSnap = { docs: (await getDocs(query(collection(db, `projects/${id}/cardEnvelopes`), where("approverIds", "array-contains", userId)))).docs.filter((d) => d.data().status === "pending_approval") };
         for (const envDoc of cardEnvSnap.docs) {
           const d = envDoc.data();
           if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
@@ -361,7 +361,7 @@ export default function ApprovalsPage() {
             const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
             
             // Cargar gastos del sobre
-            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/cardExpenses`), where("envelopeId", "==", envDoc.id)));
+            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/cardExpenses`), where("envelopeId", "==", envDoc.id))).catch(() => ({ docs: [] as any[] }));
             const boxExpenses: BoxExpensePreview[] = expensesSnap.docs.map(expDoc => {
               const expData = expDoc.data();
               return {
@@ -399,7 +399,7 @@ export default function ApprovalsPage() {
 
       // Load Transfer Envelopes (sobres de transferencia pendientes de aprobación)
       try {
-        const transferEnvSnap = await getDocs(query(collection(db, `projects/${id}/transferEnvelopes`), where("status", "==", "pending_approval")));
+        const transferEnvSnap = { docs: (await getDocs(query(collection(db, `projects/${id}/transferEnvelopes`), where("approverIds", "array-contains", userId)))).docs.filter((d) => d.data().status === "pending_approval") };
         for (const envDoc of transferEnvSnap.docs) {
           const d = envDoc.data();
           if (canUserApprove(d, userId!, localUserRole, localUserDepartment, localUserPosition)) {
@@ -407,7 +407,7 @@ export default function ApprovalsPage() {
             const daysWaiting = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
             
             // Cargar gastos del sobre
-            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/transferExpenses`), where("envelopeId", "==", envDoc.id)));
+            const expensesSnap = await getDocs(query(collection(db, `projects/${id}/transferExpenses`), where("envelopeId", "==", envDoc.id))).catch(() => ({ docs: [] as any[] }));
             const boxExpenses: BoxExpensePreview[] = expensesSnap.docs.map(expDoc => {
               const expData = expDoc.data();
               return {

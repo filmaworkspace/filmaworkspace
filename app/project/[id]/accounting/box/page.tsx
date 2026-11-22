@@ -5,6 +5,8 @@ import { toast as appToast } from "@/lib/toast";
 // ─── Framework ────────────────────────────────────────────────────────────────
 import CashBox from "@/components/box/CashBox";
 import { syncBudget } from "@/lib/ledgerClient";
+import { sendEnvelopeToApproval } from "@/lib/boxApproval";
+import { PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
 import { Button, EmptyState, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Segmented, buttonClass } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
@@ -109,7 +111,15 @@ interface Envelope {
   boxCode: string;
   number: number;
   displayNumber: string;
-  status: "open" | "reviewing" | "closed";
+  status: "open" | "reviewing" | "closed" | "pending_approval";
+  // Aprobación (lib/boxApproval)
+  approvedAt?: unknown;
+  approvalBase?: number;
+  rejectionReason?: string;
+  rejectedByName?: string;
+  approvalSteps?: any[];
+  currentApprovalStep?: number;
+
   totalBase: number;
   totalVat: number;
   totalAmount: number;
@@ -205,7 +215,15 @@ interface TransferEnvelope {
   number: number;
   displayNumber: string;
   paymentDate: string;
-  status: "draft" | "settled";
+  status: "draft" | "settled" | "pending_approval";
+  // Aprobación (lib/boxApproval)
+  approvedAt?: unknown;
+  approvalBase?: number;
+  rejectionReason?: string;
+  rejectedByName?: string;
+  approvalSteps?: any[];
+  currentApprovalStep?: number;
+
   // Persona del sobre (un sobre = una persona)
   personName: string;
   personDepartment?: string;
@@ -276,6 +294,14 @@ interface SubAccount {
   accountCode: string;
   accountDescription: string;
 }
+
+
+// Estado visible de un sobre de tarjeta (incluye la aprobación).
+const cardEnvState = (e: { status: string; approvedAt?: unknown }) =>
+  e.status === "open" ? { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" }
+  : e.status === "pending_approval" ? { l: "En aprobación", d: "bg-[#2F52E0]", t: "text-[#2F52E0]" }
+  : e.status === "reviewing" ? (e.approvedAt ? { l: "Aprobado", d: "bg-emerald-500", t: "text-emerald-800" } : { l: "En revisión", d: "bg-slate-400", t: "text-slate-600" })
+  : { l: "Cerrado", d: "bg-emerald-500", t: "text-emerald-800" };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1377,6 +1403,17 @@ export default function BoxesPage() {
     const envExpenses = expenses.filter(e => e.envelopeId === envelope.id);
     const pending = envExpenses.filter(e => e.status === "pending").length;
     if (pending > 0) return showToast("error", `${pending} gastos sin revisar`);
+    // Si hay niveles de aprobación de sobres, primero se aprueba (lib/boxApproval).
+    try {
+      setSaving(true);
+      const dept = boxes.find((b) => b.id === envelope.boxId)?.department;
+      if (await sendEnvelopeToApproval(projectId, "card", envelope as any, dept, { uid: userId || "", name: userName })) {
+        showToast("success", `${envelope.displayNumber} enviado a aprobación`);
+        setSelectedEnvelope({ ...envelope, status: "pending_approval", approvedAt: undefined, rejectionReason: undefined });
+        loadData();
+        return;
+      }
+    } catch (e) { showToast("error", errorText(e, "No se ha podido enviar a aprobación")); return; } finally { setSaving(false); }
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, `projects/${projectId}/cardEnvelopes`, envelope.id), {
@@ -2023,8 +2060,8 @@ export default function BoxesPage() {
                           <span className="block truncate text-[13px] font-medium text-slate-900">{envelope.personName || "Sin persona"}</span>
                           <span className="block text-xs text-slate-500"><span className="font-mono">{envelope.displayNumber}</span> · {envelope.expenseCount} gastos</span>
                         </span>
-                        <span className={`inline-flex items-center gap-1.5 text-xs ${envelope.status === "settled" ? "text-emerald-800" : "text-amber-800"}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${envelope.status === "settled" ? "bg-emerald-500" : "bg-amber-500"}`} />{envelope.status === "settled" ? "Liquidado" : "Abierto"}
+                        <span className={`inline-flex items-center gap-1.5 text-xs ${envelope.status === "settled" ? "text-emerald-800" : envelope.status === "pending_approval" ? "text-[#2F52E0]" : "text-amber-800"}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${envelope.status === "settled" ? "bg-emerald-500" : envelope.status === "pending_approval" ? "bg-[#2F52E0]" : "bg-amber-500"}`} />{envelope.status === "settled" ? "Liquidado" : envelope.status === "pending_approval" ? "En aprobación" : envelope.approvedAt ? "Aprobado" : "Abierto"}
                         </span>
                       </button>
                     );
@@ -2087,7 +2124,7 @@ export default function BoxesPage() {
                             const envExpenses = expenses.filter((e) => e.envelopeId === envelope.id);
                             const pendingCount = envExpenses.filter((e) => e.status === "pending").length;
                             const conflictCount = envExpenses.filter((e) => !!e.conflictType).length;
-                            const st = envelope.status === "open" ? { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" } : envelope.status === "reviewing" ? { l: "En revisión", d: "bg-slate-400", t: "text-slate-600" } : { l: "Cerrado", d: "bg-emerald-500", t: "text-emerald-800" };
+                            const st = cardEnvState(envelope);
                             return (
                               <tr key={envelope.id} onClick={() => setSelectedEnvelope(envelope)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
                                 <td className="px-4 py-1.5 font-mono text-xs font-medium">{envelope.displayNumber}</td>
@@ -2134,7 +2171,7 @@ export default function BoxesPage() {
                   const tot = visible.reduce((s, e) => ({ base: s.base + e.baseAmount, vat: s.vat + e.vatAmount, total: s.total + e.totalAmount }), { base: 0, vat: 0, total: 0 });
                   const open = selectedEnvelope.status === "open";
                   const pendingN = envelopeExpenses.filter((e) => e.status === "pending").length;
-                  const est = open ? { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" } : selectedEnvelope.status === "reviewing" ? { l: "En revisión", d: "bg-slate-400", t: "text-slate-600" } : { l: "Cerrado", d: "bg-emerald-500", t: "text-emerald-800" };
+                  const est = cardEnvState(selectedEnvelope);
                   return (
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2156,14 +2193,18 @@ export default function BoxesPage() {
                             )}
                           </Menu>
                           {open && <Button variant="secondary" onClick={() => { setCardExpensesList([createEmptyCardExpense()]); setShowManualExpenseModal(true); }}><Plus size={14} /> Gasto</Button>}
-                          {open && (
-                            <Button variant="primary" onClick={() => handleCloseEnvelope(selectedEnvelope)} disabled={pendingN > 0} title={pendingN > 0 ? `Quedan ${pendingN} gastos por revisar` : undefined}>
+                          {(open || selectedEnvelope.status === "reviewing") && (
+                            <Button variant="primary" onClick={() => handleCloseEnvelope(selectedEnvelope)} disabled={pendingN > 0 || saving} title={pendingN > 0 ? `Quedan ${pendingN} gastos por revisar` : undefined}>
                               <Lock size={14} /> Cerrar sobre
                             </Button>
                           )}
                         </div>
                       </div>
 
+                      {selectedEnvelope.status === "pending_approval" && <PendingApprovalNotice doc={selectedEnvelope as any} />}
+                      {selectedEnvelope.status === "open" && selectedEnvelope.rejectionReason && (
+                        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">Rechazado{selectedEnvelope.rejectedByName ? ` por ${selectedEnvelope.rejectedByName}` : ""}: {selectedEnvelope.rejectionReason}</p>
+                      )}
                       {envelopeExpenses.length === 0 ? (
                         <EmptyState
                           title="Sin gastos en este sobre"
@@ -2301,7 +2342,12 @@ export default function BoxesPage() {
                         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
                           <span className="font-mono">{env.displayNumber}</span>
                           <span>{env.personName}</span>
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-normal ${draft ? "text-amber-800" : "text-emerald-800"}`}><span className={`h-1.5 w-1.5 rounded-full ${draft ? "bg-amber-500" : "bg-emerald-500"}`} />{draft ? "Abierto" : "Liquidado"}</span>
+                          {(() => {
+                            const ts = env.status === "pending_approval" ? { l: "En aprobación", d: "bg-[#2F52E0]", t: "text-[#2F52E0]" }
+                              : draft ? (env.approvedAt ? { l: "Aprobado", d: "bg-emerald-500", t: "text-emerald-800" } : { l: "Abierto", d: "bg-amber-500", t: "text-amber-800" })
+                              : { l: "Liquidado", d: "bg-emerald-500", t: "text-emerald-800" };
+                            return <span className={`inline-flex items-center gap-1.5 text-xs font-normal ${ts.t}`}><span className={`h-1.5 w-1.5 rounded-full ${ts.d}`} />{ts.l}</span>;
+                          })()}
                         </h2>
                         <p className="text-xs text-slate-500">
                           {[env.personDepartment, env.paymentDate && `pago ${env.paymentDate.split("-").reverse().join("/")}`].filter(Boolean).join(" · ")}
@@ -2320,11 +2366,27 @@ export default function BoxesPage() {
                             )}
                           </Menu>
                           <Button variant="secondary" onClick={() => { setExpensesList([createEmptyExpense()]); setShowAddExpenseModal(true); }}><Plus size={14} /> Gasto</Button>
-                          <Button variant="primary" onClick={() => { setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true); }} disabled={env.advances.length === 0 && env.expenseCount === 0}><Scale size={14} /> Liquidar</Button>
+                          <Button variant="primary" disabled={(env.advances.length === 0 && env.expenseCount === 0) || saving} onClick={async () => {
+                            // Si hay niveles de aprobación de sobres, primero se aprueba (lib/boxApproval).
+                            try {
+                              setSaving(true);
+                              if (await sendEnvelopeToApproval(projectId, "transfer", env as any, env.personDepartment, { uid: userId || "", name: userName })) {
+                                showToast("success", `${env.displayNumber} enviado a aprobación`);
+                                setSelectedTransferEnvelope({ ...env, status: "pending_approval", approvedAt: undefined, rejectionReason: undefined });
+                                loadData();
+                                return;
+                              }
+                            } catch (e) { showToast("error", errorText(e, "No se ha podido enviar a aprobación")); return; } finally { setSaving(false); }
+                            setSettleForm({ reference: "", proofFile: null }); setShowSettleModal(true);
+                          }}><Scale size={14} /> Liquidar</Button>
                         </div>
                       )}
                     </div>
 
+                    {env.status === "pending_approval" && <PendingApprovalNotice doc={env as any} />}
+                    {draft && env.rejectionReason && (
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">Rechazado{env.rejectedByName ? ` por ${env.rejectedByName}` : ""}: {env.rejectionReason}</p>
+                    )}
                     {/* Posición del sobre */}
                     <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200">
                       <div className="flex flex-col gap-0.5 border-r border-slate-100 px-4 py-3">

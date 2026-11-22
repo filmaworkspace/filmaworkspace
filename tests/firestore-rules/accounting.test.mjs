@@ -151,6 +151,21 @@ await t("ampliada da acceso a contabilidad (userProjects)", true, () => updateDo
 await t("ampliada edita config de aprobaciones", true, () => setDoc(doc(as("ext"), `${P}/config/approvals`), { poApprovals: [] }));
 await t("ampliada NO edita config de producción", false, () => setDoc(doc(as("ext"), `${P}/config/production`), { x: 2 }));
 
+console.log("aprobación de sobres de caja");
+await env.withSecurityRulesDisabled(async (c) => {
+  const db = c.firestore();
+  await setDoc(doc(db, `${P}/cardEnvelopes/envA`), { status: "pending_approval", approverIds: ["approver"], approvalSteps: [], totalBase: 100 });
+  await setDoc(doc(db, `${P}/transferEnvelopes/envT`), { status: "pending_approval", approverIds: ["approver"], approvalSteps: [], totalBase: 50 });
+});
+await t("aprobador (sin Caja) lee su sobre", true, () => getDoc(doc(as("approver"), `${P}/cardEnvelopes/envA`)));
+await t("aprobador lista sus sobres pendientes", true, () => getDocs(query(col(as("approver"), "cardEnvelopes"), where("approverIds", "array-contains", "approver"))));
+await t("otro sin Caja NO lee el sobre", false, () => getDoc(doc(as("crew2"), `${P}/cardEnvelopes/envA`)));
+await t("aprobador aprueba (estado y circuito)", true, () => updateDoc(doc(as("approver"), `${P}/cardEnvelopes/envA`), { status: "reviewing", approvedAt: new Date(), approvedBy: "approver", approvedByName: "A", approvalSteps: [], currentApprovalStep: -1 }));
+await t("aprobador NO cierra el sobre", false, () => updateDoc(doc(as("approver"), `${P}/cardEnvelopes/envA`), { status: "closed" }));
+await t("aprobador NO cambia importes", false, () => updateDoc(doc(as("approver"), `${P}/cardEnvelopes/envA`), { totalBase: 1 }));
+await t("aprobador rechaza la transferencia", true, () => updateDoc(doc(as("approver"), `${P}/transferEnvelopes/envT`), { status: "draft", rejectedAt: new Date(), rejectedBy: "approver", rejectedByName: "A", rejectionReason: "Falta ticket", approvalSteps: [] }));
+await t("aprobador NO liquida la transferencia", false, () => updateDoc(doc(as("approver"), `${P}/transferEnvelopes/envT`), { status: "settled" }));
+
 console.log(`\n${pass} ok, ${fail} fallos`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);
