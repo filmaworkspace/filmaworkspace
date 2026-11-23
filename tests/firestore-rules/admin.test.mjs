@@ -99,6 +99,9 @@ await t("admin crea la rectificativa emitida", true, () => setDoc(doc(as("admin"
 await t("admin anula la emitida", true, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { status: "voided", voidReason: "error", rectifiedBy: { id: "fIssued-R", number: "R2026-0001" } }));
 await t("admin NO reactiva una anulada", false, () => updateDoc(doc(as("admin"), "billingInvoices/fIssued"), { status: "issued" }));
 await t("admin borra un borrador", true, () => deleteDoc(doc(as("admin"), "billingInvoices/fDraft")));
+await t("admin guarda los datos fiscales de una persona", true, () => setDoc(doc(as("admin"), "billingClients/pm"), { name: "PM", taxId: "12345678Z" }));
+await t("usuario NO lee los datos fiscales de otra persona", false, () => getDoc(doc(as("other"), "billingClients/pm")));
+await t("la persona tampoco los edita", false, () => setDoc(doc(as("pm"), "billingClients/pm"), { name: "x" }));
 await t("admin acepta un presupuesto enviado", true, () => updateDoc(doc(as("admin"), "billingQuotes/pSent"), { status: "accepted" }));
 await t("admin NO cambia el importe de un presupuesto enviado", false, () => updateDoc(doc(as("admin"), "billingQuotes/pSent"), { baseAmount: 1 }));
 

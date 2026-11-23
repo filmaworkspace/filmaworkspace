@@ -23,7 +23,8 @@ import { ClientCard, SaveState } from "@/components/admin/billing/DocParts";
 import { SendDocModal } from "@/components/admin/billing/SendDocModal";
 import { invoiceState, useBillingSettings } from "@/components/admin/billing/useBilling";
 import {
-  addDaysIso, BillingInvoice, clientFromAccount, eur, fmtDay, invoiceTotals, issueInvoice, missingForIssue, monthName, todayIso, voidWithRectifying,
+  addDaysIso, BillingInvoice, clientFromAccount, fetchUserClient, saveUserClient, docSubject, eur, fmtDay, invoiceMonths, invoiceTotals, issueInvoice, missingForIssue,
+  monthsLabel, numberingRule, numberTaken, renderNumber, todayIso, voidWithRectifying,
 } from "@/lib/billing";
 import { downloadDocPdf, invoiceView } from "@/lib/billingPdf";
 
@@ -31,7 +32,7 @@ export default function InvoicePage() {
   const { invoiceId } = useParams() as { invoiceId: string };
   const router = useRouter();
   const { user: me } = useUser();
-  const { producerById, projects } = useAdminData();
+  const { producerById, projects, users } = useAdminData();
   const settings = useBillingSettings();
   const [toast, showToast] = useToast();
   const [inv, setInv] = useState<BillingInvoice | null>(null);
@@ -40,6 +41,7 @@ export default function InvoicePage() {
   const [act, setAct] = useState<null | "issue" | "delete" | "void" | "paid">(null);
   const [sendOpen, setSendOpen] = useState(false);
   const [paidOn, setPaidOn] = useState(todayIso());
+  const [customNumber, setCustomNumber] = useState("");
   const dirty = useRef(false);
 
   useEffect(() => onSnapshot(doc(db, "billingInvoices", invoiceId), (s) => {
@@ -68,17 +70,22 @@ export default function InvoicePage() {
 
   const draft = inv.status === "draft";
   const acc = producerById(inv.producerId);
+  const usr = inv.billTo === "user" ? users.find((u) => u.id === inv.userId) : undefined;
+  const subject = inv.subject || "project";
+  const rule = numberingRule(settings, "invoice");
+  const ms = invoiceMonths(inv);
   const accProjects = projects.filter((p) => p.producers.includes(inv.producerId) && !p.trashedAt);
   const live = draft ? invoiceTotals(inv.lines) : inv;
   const st = invoiceState(inv);
-  const problems = missingForIssue(inv, settings).concat(inv.projectName ? [] : ["El proyecto al que se refiere"]);
+  const problems = missingForIssue(inv, settings).concat(inv.projectName || subject === "budgeting" ? [] : ["El proyecto o concepto"]);
   const days = Math.max(0, Math.round((new Date(`${inv.dueDate}T12:00:00`).getTime() - new Date(`${inv.issueDate}T12:00:00`).getTime()) / 86_400_000));
 
   const duplicate = async () => {
     const today = todayIso();
     const ref = await addDoc(collection(db, "billingInvoices"), {
-      producerId: inv.producerId, client: clientFromAccount(acc), issuer: null, number: null, series: null, year: null,
-      status: "draft", kind: "standard", periodType: inv.periodType, periodMonth: inv.periodMonth, projectId: inv.projectId, projectName: inv.projectName,
+      producerId: inv.producerId, billTo: inv.billTo || "account", userId: inv.userId || null, subject: inv.subject || "project",
+      client: inv.billTo === "user" ? inv.client : clientFromAccount(acc), issuer: null, number: null, series: null, year: null,
+      status: "draft", kind: "standard", periodType: inv.periodType, periodMonth: inv.periodMonth, periodMonths: inv.periodMonths || null, projectId: inv.projectId, projectName: inv.projectName,
       quoteId: inv.quoteId || null, quoteNumber: inv.quoteNumber || null,
       issueDate: today, dueDate: addDaysIso(today, settings.paymentDays || 30),
       lines: inv.lines.map((l) => ({ ...l, quantity: Math.abs(l.quantity) })), ...invoiceTotals(inv.lines.map((l) => ({ ...l, quantity: Math.abs(l.quantity) }))),
@@ -95,7 +102,7 @@ export default function InvoicePage() {
       <Link href="/admindashboard/accounts/billing" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Facturación</Link>
       <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
-          {inv.number || "Factura"} <span className="truncate text-[15px] font-normal text-slate-400">{acc?.name || inv.client.name}</span>
+          {inv.number || "Factura"} <span className="truncate text-[15px] font-normal text-slate-400">{usr?.name || acc?.name || inv.client.name} · {docSubject(inv)}</span>
           <Badge tone={tone}>{st.label}</Badge>
         </h1>
         <div className="flex items-center gap-2">
@@ -138,13 +145,19 @@ export default function InvoicePage() {
         <div className="min-w-0 space-y-8">
           <section className="space-y-4">
             <BlockTitle>Cliente</BlockTitle>
-            <ClientCard client={inv.client} producerId={inv.producerId} editable={draft} onRefresh={() => edit({ client: clientFromAccount(acc) })} />
+            <ClientCard client={inv.client} source={{ kind: inv.billTo === "user" ? "user" : "account", id: inv.billTo === "user" ? inv.userId || "" : inv.producerId }} editable={draft}
+              onChange={(client) => edit({ client })} onRefresh={async () => edit({ client: inv.billTo === "user" ? await fetchUserClient(db, usr) : clientFromAccount(acc) })} />
           </section>
 
           <section className="space-y-4">
             <BlockTitle>Factura</BlockTitle>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Proyecto">
+              <Field label="Qué se factura">
+                <Select value={subject} disabled={!draft || !!inv.quoteId} onChange={(e) => edit({ subject: e.target.value as BillingInvoice["subject"], ...(e.target.value === "budgeting" ? { projectName: "Filma Budgeting", projectId: null } : {}) })}>
+                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="other">Otro concepto</option>
+                </Select>
+              </Field>
+              <Field label={subject === "project" ? "Proyecto" : "Concepto"}>
                 <Input value={inv.projectName || ""} disabled={!draft || !!inv.quoteId} list="inv-projects"
                   onChange={(e) => edit({ projectName: e.target.value, projectId: accProjects.find((p) => p.name === e.target.value)?.id || null })} />
                 <datalist id="inv-projects">{accProjects.map((p) => <option key={p.id} value={p.name} />)}</datalist>
@@ -156,9 +169,9 @@ export default function InvoicePage() {
                   <option value="monthly">Mensual</option>
                 </Select>
               </Field>
-              {inv.periodType === "monthly" && (
-                <Field label="Mes facturado"><Input type="month" value={inv.periodMonth || ""} disabled={!draft || !!inv.quoteId} onChange={(e) => edit({ periodMonth: e.target.value })} /></Field>
-              )}
+              {inv.periodType === "monthly" && (ms.length > 1
+                ? <Field label="Meses facturados"><Input value={monthsLabel(ms)} disabled /></Field>
+                : <Field label="Mes facturado"><Input type="month" value={inv.periodMonth || ""} disabled={!draft || !!inv.quoteId} onChange={(e) => edit({ periodMonth: e.target.value, periodMonths: null })} /></Field>)}
               <Field label="Fecha de emisión"><Input type="date" value={inv.issueDate} disabled={!draft} onChange={(e) => edit({ issueDate: e.target.value, dueDate: addDaysIso(e.target.value, days) })} /></Field>
               {inv.kind === "standard" && (
                 <Field label="Vencimiento" hint={`${days} días · ${fmtDay(inv.dueDate)}`}>
@@ -195,15 +208,22 @@ export default function InvoicePage() {
         confirmLabel={problems.length ? "Faltan datos" : "Emitir"}
         notice={problems.length
           ? <>Antes de emitir completa:<br />{problems.map((p) => <span key={p} className="block">· {p}</span>)}</>
-          : <>Se le asigna el siguiente número de la serie <strong>{settings.invoicePrefix || "F"}{inv.issueDate.slice(0, 4)}</strong> y deja de poder modificarse. Total: <strong>{eur(live.totalAmount)}</strong>{inv.periodMonth ? ` · ${monthName(inv.periodMonth)}` : ""}.</>}
+          : <>
+            Recibe el siguiente número de la serie <span className="font-mono">{rule.prefix}</span> (o el que escribas) y deja de poder modificarse. Total: <strong>{eur(live.totalAmount)}</strong>{ms.length ? ` · ${monthsLabel(ms)}` : ""}.
+            <span className="mt-3 block"><Field label="Número a mano (opcional)"><Input value={customNumber} onChange={(e) => setCustomNumber(e.target.value)} className="font-mono" placeholder={renderNumber(rule, inv.issueDate, 1)} /></Field></span>
+          </>}
         onConfirm={async () => {
           if (problems.length) throw new Error("Completa los datos que faltan");
           await persist(inv);
-          const number = await issueInvoice(db, invoiceId, settings, me?.uid || "");
+          if (customNumber.trim() && await numberTaken(db, "invoice", customNumber)) throw new Error(`Ya hay una factura con el número ${customNumber.trim()}`);
+          const number = await issueInvoice(db, invoiceId, settings, me?.uid || "", customNumber);
+          setCustomNumber("");
+          // Los datos fiscales de la persona se guardan para la próxima vez.
+          if (inv.billTo === "user" && inv.userId) await saveUserClient(db, inv.userId, inv.client).catch(() => {});
           showToast("success", `Factura ${number} emitida`);
         }} />
       <ConfirmModal open={act === "void"} onClose={() => setAct(null)} title={`Anular ${inv.number}`} confirmLabel="Anular y emitir rectificativa"
-        notice={<>Se emite una <strong>factura rectificativa</strong> (serie {settings.rectifyingPrefix || "R"}) por el importe en negativo, que anula esta. Después puedes duplicarla para emitir la correcta.</>}
+        notice={<>Se emite una <strong>factura rectificativa</strong> (serie {numberingRule(settings, "rectifying").prefix}) por el importe en negativo, que anula esta. Después puedes duplicarla para emitir la correcta.</>}
         reason={{ label: "Motivo de la rectificación", placeholder: "Error en el importe, datos fiscales del cliente…", required: true }}
         onConfirm={async (reason) => {
           const r = await voidWithRectifying(db, invoiceId, reason, settings, me?.uid || "");

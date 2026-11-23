@@ -13,7 +13,7 @@ import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, update
 import { ArrowLeft, Check, Copy, Download, FileText, Mail, MoreHorizontal, Plus, Send, Trash2, X } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
-import { Badge, Button, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Page, PageLoading, Segmented, Textarea, useToast } from "@/components/ds";
+import { Badge, Button, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Page, PageLoading, Segmented, Select, Textarea, useToast } from "@/components/ds";
 import { useAdminData } from "@/components/admin/AdminData";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BlockTitle, RowBar } from "@/components/admin/ui";
@@ -23,9 +23,11 @@ import { ClientCard, SaveState } from "@/components/admin/billing/DocParts";
 import { NewDocModal } from "@/components/admin/billing/NewDocModal";
 import { SendDocModal } from "@/components/admin/billing/SendDocModal";
 import { invoiceState, useBilling } from "@/components/admin/billing/useBilling";
+import { PhasesEditor, PHASE_COLORS } from "@/components/admin/billing/PhasesEditor";
 import {
-  addDaysIso, BillingQuote, clientFromAccount, countsAsBilled, eur, fmtDay, invoiceTotals, issueQuote, monthName, QUOTE_STATUS,
-  quoteGrandTotal, quoteMonths,
+  addDaysIso, BillingQuote, clientFromAccount, fetchUserClient, saveUserClient, countsAsBilled, DEFAULT_PHASES, docSubject, eur, fmtDay, invoiceMonths, invoiceTotals,
+  issueQuote, monthName, newLineId, numberingRule, numberTaken, phaseSchedule, phasesToLines, QUOTE_STATUS, quoteGrandTotal, quoteMonths,
+  renderNumber, type BillingMode, type QuotePhase,
 } from "@/lib/billing";
 import { downloadDocPdf, quoteView } from "@/lib/billingPdf";
 
@@ -33,7 +35,7 @@ export default function QuotePage() {
   const { quoteId } = useParams() as { quoteId: string };
   const router = useRouter();
   const { user: me } = useUser();
-  const { producerById, projects } = useAdminData();
+  const { producerById, projects, users } = useAdminData();
   const { invoices, quotes, settings } = useBilling();
   const [toast, showToast] = useToast();
   const [q, setQ] = useState<BillingQuote | null>(null);
@@ -42,6 +44,7 @@ export default function QuotePage() {
   const [act, setAct] = useState<null | "issue" | "delete" | "reject">(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [customNumber, setCustomNumber] = useState("");
   const dirty = useRef(false);
 
   useEffect(() => onSnapshot(doc(db, "billingQuotes", quoteId), (s) => {
@@ -64,6 +67,23 @@ export default function QuotePage() {
   }, [q, quoteId]);
 
   const edit = (patch: Partial<BillingQuote>) => { dirty.current = true; setQ((x) => (x ? { ...x, ...patch } : x)); };
+  // Por fases, las líneas del documento salen de las fases (cuota × meses).
+  const editPhases = (phases: QuotePhase[]) => edit({ phases, lines: phasesToLines(phases), months: phases.reduce((t, p) => t + (p.months || 0), 0) });
+  const setMode = (mode: BillingMode) => {
+    if (!q) return;
+    const start = q.startMonth || q.issueDate.slice(0, 7);
+    if (mode === "phases") {
+      const phases = q.phases?.length ? q.phases : (settings.phaseDefaults?.length ? settings.phaseDefaults : DEFAULT_PHASES.map((d) => ({ ...d, price: settings.monthlyPrice || 0 }))).map((d) => ({
+        id: newLineId(), name: d.name, months: d.months,
+        lines: (q.lines.length ? q.lines : [{ id: newLineId(), description: "Licencia mensual de Filma Workspace", quantity: 1, unitPrice: 0, vatRate: settings.defaultVat || 21 }]).map((l) => ({ ...l, id: newLineId(), quantity: 1, unitPrice: d.price || l.unitPrice })),
+      }));
+      edit({ billingMode: mode, startMonth: start, phases, lines: phasesToLines(phases), months: phases.reduce((t, p) => t + p.months, 0) });
+    } else {
+      // Al salir de fases se queda con las líneas mensuales de la primera fase.
+      const lines = q.billingMode === "phases" && q.phases?.length ? q.phases[0].lines.map((l) => ({ ...l, id: newLineId() })) : q.lines;
+      edit({ billingMode: mode, lines, phases: null, months: mode === "monthly" ? q.months || 12 : null, startMonth: mode === "monthly" ? start : null });
+    }
+  };
 
   const linked = useMemo(() => invoices.filter((i) => i.quoteId === quoteId), [invoices, quoteId]);
   const billed = linked.filter(countsAsBilled);
@@ -74,18 +94,23 @@ export default function QuotePage() {
 
   const draft = q.status === "draft";
   const acc = producerById(q.producerId);
+  const usr = q.billTo === "user" ? users.find((u) => u.id === q.userId) : undefined;
+  const subject = q.subject || "project";
+  const rule = numberingRule(settings, "quote");
   const accProjects = projects.filter((p) => p.producers.includes(q.producerId) && !p.trashedAt);
   const live = draft ? invoiceTotals(q.lines) : q;
   const grand = quoteGrandTotal({ ...q, ...live });
   const billedBase = billed.reduce((s, i) => s + i.baseAmount, 0);
   const pct = grand.base > 0 ? Math.min(100, Math.round((billedBase / grand.base) * 100)) : 0;
   const months = quoteMonths(q);
-  const billedMonths = new Map(billed.map((i) => [i.periodMonth, i]));
+  const billedMonths = new Map(billed.flatMap((i) => invoiceMonths(i).map((m) => [m, i] as const)));
+  const schedule = q.billingMode === "phases" ? phaseSchedule(q) : [];
+  const phaseOf = (m: string) => schedule.find((x) => x.month === m);
   const st = QUOTE_STATUS[q.status];
   const problems = [
     !settings.name || !settings.taxId ? "Tus datos fiscales (Facturación → Datos fiscales)" : "",
     !q.client.name || !q.client.taxId ? "Razón social y NIF del cliente" : "",
-    !q.projectName ? "Proyecto" : "",
+    !q.projectName && subject !== "budgeting" ? "Proyecto o concepto" : "",
     !q.lines.length || q.lines.some((l) => !l.description.trim()) ? "Líneas con concepto" : "",
   ].filter(Boolean);
 
@@ -113,7 +138,7 @@ export default function QuotePage() {
       <Link href="/admindashboard/accounts/billing?tab=quotes" className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Facturación</Link>
       <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-slate-900">
-          {q.number || "Presupuesto"} <span className="truncate text-[15px] font-normal text-slate-400">{q.projectName}</span>
+          {q.number || "Presupuesto"} <span className="truncate text-[15px] font-normal text-slate-400">{docSubject(q)} · {usr?.name || acc?.name || q.client.name}</span>
           <Badge tone={st.tone === "ok" ? "success" : st.tone === "bad" ? "danger" : st.tone === "info" ? "info" : "neutral"}>{st.label}</Badge>
         </h1>
         <div className="flex items-center gap-2">
@@ -149,19 +174,26 @@ export default function QuotePage() {
                 Facturado · <span className="text-slate-900">{eur(billedBase)}</span> de {eur(grand.base)} <span className="text-slate-400">+ IVA</span>
               </BlockTitle>
               <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#24406E" }} /></div>
-              {q.billingMode === "monthly" && months.length > 0 && (
+              {q.billingMode !== "single" && months.length > 0 && (
                 <div className="mt-4 grid grid-cols-6 gap-1.5 sm:grid-cols-12">
                   {months.map((m) => {
                     const inv = billedMonths.get(m);
+                    const ph = phaseOf(m);
                     return (
-                      <button key={m} title={inv ? `${monthName(m)} · ${inv.number}` : `${monthName(m)} · pendiente`}
+                      <button key={m} title={`${monthName(m)}${ph ? ` · ${ph.phase.name}` : ""} · ${inv ? inv.number : "pendiente"}`}
                         onClick={() => (inv ? router.push(`/admindashboard/accounts/billing/invoices/${inv.id}`) : setInvoiceOpen(true))}
                         className={`rounded-md border px-1 py-1.5 text-center text-[11px] capitalize transition-colors ${inv ? "border-transparent text-white" : "border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-900"}`}
                         style={inv ? { background: inv.paid ? "#24406E" : "#5B7BB0" } : undefined}>
+                        {ph && <span className="mx-auto mb-1 block h-0.5 w-4 rounded-full" style={{ background: inv ? "rgba(255,255,255,.7)" : PHASE_COLORS[ph.index % PHASE_COLORS.length] }} />}
                         {new Date(`${m}-15`).toLocaleDateString("es-ES", { month: "short" })}<span className="block text-[9px] opacity-70">{m.slice(2, 4)}</span>
                       </button>
                     );
                   })}
+                </div>
+              )}
+              {q.billingMode === "phases" && (q.phases || []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                  {(q.phases || []).map((p, i) => <span key={p.id} className="flex items-center gap-1.5"><span className="h-0.5 w-3 rounded-full" style={{ background: PHASE_COLORS[i % PHASE_COLORS.length] }} />{p.name} · {p.months} m</span>)}
                 </div>
               )}
               {linked.length > 0 && (
@@ -172,7 +204,7 @@ export default function QuotePage() {
                       return (
                         <tr key={i.id} onClick={() => router.push(`/admindashboard/accounts/billing/invoices/${i.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
                           <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={s.tone} />{i.number || "Borrador"}</td>
-                          <td className="px-3 text-slate-600"><span className="block truncate">{i.periodMonth ? monthName(i.periodMonth) : i.lines[0]?.description}</span></td>
+                          <td className="px-3 text-slate-600"><span className="block truncate capitalize">{invoiceMonths(i).length ? invoiceMonths(i).map(monthName).join(", ") : i.lines[0]?.description}</span></td>
                           <td className="w-28 px-3 text-right tabular-nums">{eur(i.status === "draft" ? invoiceTotals(i.lines).totalAmount : i.totalAmount)}</td>
                           <td className="w-40 px-3 text-slate-600">{s.label}</td>
                         </tr>
@@ -186,13 +218,19 @@ export default function QuotePage() {
 
           <section className="space-y-4">
             <BlockTitle>Cliente</BlockTitle>
-            <ClientCard client={q.client} producerId={q.producerId} editable={draft} onRefresh={() => edit({ client: clientFromAccount(acc) })} />
+            <ClientCard client={q.client} source={{ kind: q.billTo === "user" ? "user" : "account", id: q.billTo === "user" ? q.userId || "" : q.producerId }} editable={draft}
+              onChange={(client) => edit({ client })} onRefresh={async () => edit({ client: q.billTo === "user" ? await fetchUserClient(db, usr) : clientFromAccount(acc) })} />
           </section>
 
           <section className="space-y-4">
             <BlockTitle>Presupuesto</BlockTitle>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Proyecto">
+              <Field label="Qué se factura">
+                <Select value={subject} disabled={!draft} onChange={(e) => edit({ subject: e.target.value as BillingQuote["subject"], ...(e.target.value === "budgeting" ? { projectName: "Filma Budgeting", projectId: null } : {}) })}>
+                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="other">Otro concepto</option>
+                </Select>
+              </Field>
+              <Field label={subject === "project" ? "Proyecto" : "Concepto"}>
                 <Input value={q.projectName} disabled={!draft} onChange={(e) => edit({ projectName: e.target.value, projectId: accProjects.find((p) => p.name === e.target.value)?.id || null })} list="acc-projects" />
                 <datalist id="acc-projects">{accProjects.map((p) => <option key={p.id} value={p.name} />)}</datalist>
               </Field>
@@ -202,20 +240,25 @@ export default function QuotePage() {
             </div>
             <Field label="Cómo se cobra">
               {draft
-                ? <Segmented value={q.billingMode} onChange={(v) => edit({ billingMode: v, months: v === "monthly" ? q.months || 12 : null, startMonth: v === "monthly" ? q.startMonth || q.issueDate.slice(0, 7) : null })} options={[{ value: "monthly", label: "Cuota mensual" }, { value: "single", label: "Pago único" }]} />
-                : <p className="text-[13px] text-slate-700">{q.billingMode === "monthly" ? `Cuota mensual · ${q.months} meses desde ${monthName(q.startMonth)}` : "Pago único"}</p>}
+                ? <Segmented value={q.billingMode} onChange={setMode} options={[{ value: "phases", label: "Por fases" }, { value: "monthly", label: "Cuota mensual" }, { value: "single", label: "Pago único" }]} />
+                : <p className="text-[13px] text-slate-700">{q.billingMode === "single" ? "Pago único" : `${q.billingMode === "phases" ? "Por fases" : "Cuota mensual"} · ${q.months} meses desde ${monthName(q.startMonth)}`}</p>}
             </Field>
-            {draft && q.billingMode === "monthly" && (
+            {draft && q.billingMode !== "single" && (
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Meses"><Input type="number" min={1} value={String(q.months || "")} onChange={(e) => edit({ months: Math.max(1, Number(e.target.value) || 1) })} /></Field>
+                {q.billingMode === "monthly"
+                  ? <Field label="Meses"><Input type="number" min={1} value={String(q.months || "")} onChange={(e) => edit({ months: Math.max(1, Number(e.target.value) || 1) })} /></Field>
+                  : <Field label="Meses en total"><Input value={`${q.months || 0} meses`} disabled /></Field>}
                 <Field label="Desde"><Input type="month" value={q.startMonth || ""} onChange={(e) => edit({ startMonth: e.target.value })} /></Field>
               </div>
             )}
           </section>
 
           <section>
-            <BlockTitle>{q.billingMode === "monthly" ? "Cuota mensual" : "Líneas"}</BlockTitle>
-            <LinesEditor lines={q.lines} readOnly={!draft} defaultVat={settings.defaultVat || 21} onChange={(lines) => edit({ lines })} />
+            <BlockTitle>{q.billingMode === "monthly" ? "Cuota mensual" : q.billingMode === "phases" ? "Fases" : "Líneas"}</BlockTitle>
+            {q.billingMode === "phases"
+              ? <PhasesEditor phases={q.phases || []} startMonth={q.startMonth} readOnly={!draft} defaultVat={settings.defaultVat || 21}
+                  defaultPrice={subject === "budgeting" ? settings.budgetingPrice || 0 : settings.monthlyPrice || 0} onChange={editPhases} />
+              : <LinesEditor lines={q.lines} readOnly={!draft} defaultVat={settings.defaultVat || 21} onChange={(lines) => edit({ lines })} />}
             <div className="mt-3 flex justify-end gap-6 text-[13px]">
               <span className="text-slate-500">Base <strong className="font-medium text-slate-900">{eur(live.baseAmount)}</strong></span>
               <span className="text-slate-500">IVA <strong className="font-medium text-slate-900">{eur(live.vatAmount)}</strong></span>
@@ -242,13 +285,19 @@ export default function QuotePage() {
 
       <ConfirmModal open={act === "issue"} onClose={() => setAct(null)} title="Emitir presupuesto" danger={false} password={false}
         confirmLabel={problems.length ? "Faltan datos" : "Emitir"}
-        notice={problems.length ? <>Antes de emitir completa:<br />{problems.map((p) => <span key={p} className="block">· {p}</span>)}</> : "Se le asigna el siguiente número de la serie de presupuestos y queda fijo. Luego podrás descargarlo, enviarlo y facturar a partir de él."}
+        notice={problems.length ? <>Antes de emitir completa:<br />{problems.map((p) => <span key={p} className="block">· {p}</span>)}</> : <>
+          Recibe el siguiente número de la serie <span className="font-mono">{rule.prefix}</span> (o el que escribas) y queda fijo. Luego podrás descargarlo, enviarlo y facturar a partir de él.
+          <span className="mt-3 block"><Field label="Número a mano (opcional)"><Input value={customNumber} onChange={(e) => setCustomNumber(e.target.value)} className="font-mono" placeholder={renderNumber(rule, q.issueDate, 1)} /></Field></span>
+        </>}
         onConfirm={async () => {
           if (problems.length) throw new Error("Completa los datos que faltan");
           const { id: _i, ...data } = q; void _i;
           await updateDoc(doc(db, "billingQuotes", quoteId), { ...data, ...invoiceTotals(q.lines), updatedAt: serverTimestamp() });
           dirty.current = false;
-          const number = await issueQuote(db, quoteId, settings, me?.uid || "");
+          if (customNumber.trim() && await numberTaken(db, "quote", customNumber)) throw new Error(`Ya hay un presupuesto con el número ${customNumber.trim()}`);
+          const number = await issueQuote(db, quoteId, settings, me?.uid || "", customNumber);
+          setCustomNumber("");
+          if (q.billTo === "user" && q.userId) await saveUserClient(db, q.userId, q.client).catch(() => {});
           showToast("success", `Presupuesto ${number} emitido`);
         }} />
       <ConfirmModal open={act === "reject"} onClose={() => setAct(null)} title="Marcar como rechazado" danger={false} password={false} confirmLabel="Rechazado"

@@ -11,22 +11,23 @@ import { BillingInvoice, BillingQuote, BillingSettings, DEFAULT_SETTINGS, fetchB
 const byNewest = <T extends { issueDate?: string; createdAt?: { toMillis: () => number } | null }>(a: T, b: T) =>
   (b.issueDate || "").localeCompare(a.issueDate || "") || (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0);
 
-export function useBilling(producerId?: string) {
+export function useBilling(producerId?: string, userId?: string) {
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [quotes, setQuotes] = useState<BillingQuote[]>([]);
   const [settings, setSettings] = useState<BillingSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const inv = producerId ? query(collection(db, "billingInvoices"), where("producerId", "==", producerId)) : collection(db, "billingInvoices");
-    const quo = producerId ? query(collection(db, "billingQuotes"), where("producerId", "==", producerId)) : collection(db, "billingQuotes");
+    const filter = (c: string) => userId ? query(collection(db, c), where("userId", "==", userId)) : producerId ? query(collection(db, c), where("producerId", "==", producerId)) : collection(db, c);
+    const inv = filter("billingInvoices");
+    const quo = filter("billingQuotes");
     let n = 0;
     const done = () => { n += 1; if (n >= 2) setLoading(false); };
     const u1 = onSnapshot(inv, (s) => { setInvoices(s.docs.map((d) => ({ id: d.id, ...d.data() } as BillingInvoice)).sort(byNewest)); done(); }, () => done());
     const u2 = onSnapshot(quo, (s) => { setQuotes(s.docs.map((d) => ({ id: d.id, ...d.data() } as BillingQuote)).sort(byNewest)); done(); }, () => done());
     fetchBillingSettings(db).then(setSettings);
     return () => { u1(); u2(); };
-  }, [producerId]);
+  }, [producerId, userId]);
 
   return { invoices, quotes, settings, setSettings, loading };
 }

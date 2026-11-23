@@ -6,7 +6,8 @@
 
 import jsPDF from "jspdf";
 import {
-  BillingInvoice, BillingLine, BillingParty, BillingQuote, BillingSettings, eur, fmtDay, invoiceTotals, lineTotal, monthName, partyLines, quoteGrandTotal,
+  BillingInvoice, BillingLine, BillingParty, BillingQuote, BillingSettings, eur, fmtDay, invoiceMonths, invoiceTotals, lineTotal, monthName, monthsLabel,
+  partyLines, phaseMonthlyBase, quoteGrandTotal,
 } from "./billing";
 
 type Issuer = BillingParty & { phone?: string; iban?: string; bank?: string; footer?: string };
@@ -30,8 +31,8 @@ export interface DocView {
   signature: boolean;
 }
 
-export function periodLabel(inv: Pick<BillingInvoice, "periodType" | "periodMonth" | "projectName">) {
-  if (inv.periodType === "monthly" && inv.periodMonth) return `Mensual · ${monthName(inv.periodMonth)}`;
+export function periodLabel(inv: Pick<BillingInvoice, "periodType" | "periodMonth" | "periodMonths" | "projectName">) {
+  if (inv.periodType === "monthly" && invoiceMonths(inv).length) return `Mensual · ${monthsLabel(invoiceMonths(inv))}`;
   if (inv.periodType === "project") return "Proyecto";
   return "";
 }
@@ -43,8 +44,8 @@ export function invoiceView(inv: BillingInvoice, settings: BillingSettings): Doc
   const totals = inv.status === "draft" ? invoiceTotals(inv.lines) : { baseAmount: inv.baseAmount, vatAmount: inv.vatAmount, totalAmount: inv.totalAmount, vatBreakdown: inv.vatBreakdown };
   const meta: [string, string][] = [["Fecha de emisión", fmtDay(inv.issueDate)]];
   if (inv.kind === "standard") meta.push(["Vencimiento", fmtDay(inv.dueDate)]);
-  if (inv.projectName) meta.push(["Proyecto", inv.projectName]);
-  if (inv.periodType === "monthly" && inv.periodMonth) meta.push(["Periodo", monthName(inv.periodMonth)]);
+  if (inv.projectName) meta.push([inv.subject === "budgeting" ? "Servicio" : inv.subject === "other" ? "Concepto" : "Proyecto", inv.projectName]);
+  if (inv.periodType === "monthly" && invoiceMonths(inv).length) meta.push(["Periodo", monthsLabel(invoiceMonths(inv))]);
   if (inv.quoteNumber) meta.push(["Presupuesto", inv.quoteNumber]);
   return {
     title: inv.kind === "rectifying" ? "Factura rectificativa" : inv.status === "draft" ? "Borrador de factura" : "Factura",
@@ -66,9 +67,11 @@ export function quoteView(q: BillingQuote, settings: BillingSettings): DocView {
   const issuer = (q.issuer || settings) as Issuer;
   const totals = q.status === "draft" ? invoiceTotals(q.lines) : { baseAmount: q.baseAmount, vatAmount: q.vatAmount, totalAmount: q.totalAmount, vatBreakdown: q.vatBreakdown };
   const monthly = q.billingMode === "monthly";
+  const phased = q.billingMode === "phases";
   const grand = quoteGrandTotal({ ...q, ...totals });
-  const meta: [string, string][] = [["Fecha", fmtDay(q.issueDate)], ["Válido hasta", fmtDay(q.validUntil)], ["Proyecto", q.projectName || "—"]];
-  if (monthly && q.startMonth) meta.push(["Inicio", monthName(q.startMonth)]);
+  const meta: [string, string][] = [["Fecha", fmtDay(q.issueDate)], ["Válido hasta", fmtDay(q.validUntil)], [q.subject === "budgeting" ? "Servicio" : q.subject === "other" ? "Concepto" : "Proyecto", q.projectName || "—"]];
+  if ((monthly || phased) && q.startMonth) meta.push(["Inicio", monthName(q.startMonth)]);
+  const phaseText = (q.phases || []).map((p) => `${p.name}: ${p.months} ${p.months === 1 ? "mes" : "meses"} × ${eur(phaseMonthlyBase(p))}`).join(" · ");
   return {
     title: q.status === "draft" ? "Borrador de presupuesto" : "Presupuesto",
     number: q.number,
@@ -78,7 +81,9 @@ export function quoteView(q: BillingQuote, settings: BillingSettings): DocView {
     lines: q.lines, totals,
     totalLabel: monthly ? "Total al mes" : "Total",
     extraTotals: monthly && q.months ? [[`Total ${q.months} ${q.months === 1 ? "mes" : "meses"} (IVA incl.)`, eur(grand.total)], [`Base ${q.months} ${q.months === 1 ? "mes" : "meses"}`, eur(grand.base)]] : [],
-    payment: [monthly
+    payment: [phased
+      ? `Facturación mensual por fases (+ IVA). ${phaseText}${q.startMonth ? `, desde ${monthName(q.startMonth)}` : ""}.`
+      : monthly
       ? `Cuota mensual de ${eur(totals.baseAmount)} + IVA${q.months ? ` durante ${q.months} ${q.months === 1 ? "mes" : "meses"}` : ""}${q.startMonth ? ` desde ${monthName(q.startMonth)}` : ""}, facturada cada mes.`
       : `Pago único de ${eur(totals.baseAmount)} + IVA, facturable en uno o varios plazos.`],
     notesTitle: "Notas", notes: q.notes || "", conditions: q.conditions || "", signature: true,

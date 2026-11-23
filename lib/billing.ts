@@ -5,7 +5,7 @@
 // adminConfig/billing y se copian a la factura al emitirla, para que un
 // cambio posterior no altere facturas ya emitidas.
 
-import { doc, getDoc, runTransaction, serverTimestamp, type Firestore } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where, type DocumentReference, type Firestore, type Transaction } from "firebase/firestore";
 import { lineAmounts, round2 } from "@/lib/amounts";
 
 export interface BillingParty {
@@ -31,7 +31,58 @@ export interface BillingSettings extends BillingParty {
   paymentDays: number;
   defaultVat: number;
   monthlyPrice: number;
+  /** Cuota mensual del acceso a Budgeting (por persona). */
+  budgetingPrice?: number;
   footer: string;
+  /** Numeración personalizada por tipo de documento (si falta, la clásica F2026-0001). */
+  numbering?: Partial<Record<NumberingKind, Partial<NumberingRule>>>;
+  /** Fases que se proponen en un presupuesto por fases, con su cuota mensual y meses. */
+  phaseDefaults?: { name: string; price: number; months: number }[];
+}
+
+export type NumberingKind = "invoice" | "rectifying" | "quote";
+export interface NumberingRule {
+  /** Serie: la parte fija (F, FW-, FACT/…). */
+  prefix: string;
+  /** Plantilla con {SERIE}, {AAAA}, {AA}, {MM} y {N} (obligatorio). */
+  format: string;
+  /** Dígitos del número (0001 → 4). */
+  digits: number;
+  /** Cada año empieza en 1, o la numeración sigue siempre. */
+  reset: "yearly" | "never";
+}
+
+export const NUMBERING_LABEL: Record<NumberingKind, string> = { invoice: "Facturas", rectifying: "Rectificativas", quote: "Presupuestos" };
+const DEFAULT_PREFIX: Record<NumberingKind, string> = { invoice: "F", rectifying: "R", quote: "P" };
+export const DEFAULT_FORMAT = "{SERIE}{AAAA}-{N}";
+
+export const DEFAULT_PHASES = [
+  { name: "Preproducción", price: 0, months: 2 },
+  { name: "Rodaje", price: 0, months: 2 },
+  { name: "Postproducción", price: 0, months: 3 },
+];
+
+/** Regla de numeración efectiva (con compatibilidad con las series antiguas). */
+export function numberingRule(s: BillingSettings, kind: NumberingKind): NumberingRule {
+  const n = s.numbering?.[kind] || {};
+  const legacy = kind === "invoice" ? s.invoicePrefix : kind === "rectifying" ? s.rectifyingPrefix : s.quotePrefix;
+  return {
+    prefix: (n.prefix ?? legacy ?? DEFAULT_PREFIX[kind]) || DEFAULT_PREFIX[kind],
+    format: n.format && n.format.includes("{N}") ? n.format : DEFAULT_FORMAT,
+    digits: Math.min(8, Math.max(1, Number(n.digits) || 4)),
+    reset: n.reset === "never" ? "never" : "yearly",
+  };
+}
+
+/** Clave del contador (la anual coincide con la de siempre: F-2026). */
+export const counterKey = (r: NumberingRule, year: number) => (r.reset === "never" ? `${r.prefix}-all` : `${r.prefix}-${year}`);
+
+/** Número a partir de la regla, la fecha (AAAA-MM-DD) y el correlativo. */
+export function renderNumber(r: NumberingRule, dateIso: string, seq: number) {
+  const [y, m] = dateIso.split("-");
+  return r.format
+    .replaceAll("{SERIE}", r.prefix).replaceAll("{AAAA}", y).replaceAll("{AA}", y.slice(2)).replaceAll("{MM}", m)
+    .replaceAll("{N}", String(seq).padStart(r.digits, "0"));
 }
 
 export const DEFAULT_SETTINGS: BillingSettings = {
@@ -54,6 +105,11 @@ export interface BillingLine {
 export type InvoiceStatus = "draft" | "issued" | "voided";
 export type InvoiceKind = "standard" | "rectifying";
 export type PeriodType = "monthly" | "project" | "other";
+/** A quién se factura: una cuenta (productora) o una persona (usuario). */
+export type BillTo = "account" | "user";
+/** Qué se factura: un proyecto, el acceso a Budgeting u otra cosa. */
+export type BillingSubject = "project" | "budgeting" | "other";
+export const SUBJECT_LABEL: Record<BillingSubject, string> = { project: "Proyecto", budgeting: "Budgeting", other: "Otro concepto" };
 
 export interface BillingInvoice {
   id: string;
@@ -62,11 +118,18 @@ export interface BillingInvoice {
   number: string | null;
   series: string | null;
   year: number | null;
+  /** Cuenta a la que se factura (vacío si es a una persona). */
   producerId: string;
+  billTo?: BillTo;
+  /** Persona a la que se factura (billTo = user). */
+  userId?: string | null;
+  subject?: BillingSubject;
   client: BillingParty;
   issuer: (BillingParty & { phone?: string; iban?: string; bank?: string; footer?: string }) | null;
   periodType: PeriodType;
   periodMonth: string | null;
+  /** Meses que cubre (una factura puede agrupar varios). */
+  periodMonths?: string[] | null;
   projectId: string | null;
   projectName: string | null;
   issueDate: string;
@@ -93,7 +156,10 @@ export interface BillingInvoice {
 }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected";
-export type BillingMode = "monthly" | "single";
+export type BillingMode = "monthly" | "phases" | "single";
+
+/** Fase de un presupuesto por fases: sus meses y sus líneas mensuales. */
+export interface QuotePhase { id: string; name: string; months: number; lines: BillingLine[] }
 
 /** Presupuesto para un proyecto de una cuenta; de él salen las facturas. */
 export interface BillingQuote {
@@ -102,7 +168,12 @@ export interface BillingQuote {
   number: string | null;
   series: string | null;
   year: number | null;
+  /** Cuenta a la que se factura (vacío si es a una persona). */
   producerId: string;
+  billTo?: BillTo;
+  /** Persona a la que se factura (billTo = user). */
+  userId?: string | null;
+  subject?: BillingSubject;
   client: BillingParty;
   issuer: BillingInvoice["issuer"];
   projectId: string | null;
@@ -111,9 +182,11 @@ export interface BillingQuote {
   issueDate: string;
   validUntil: string;
   billingMode: BillingMode;
-  /** Solo cuota mensual: número de meses y mes de inicio (AAAA-MM). */
+  /** Cuota mensual y por fases: número de meses y mes de inicio (AAAA-MM). */
   months: number | null;
   startMonth: string | null;
+  /** Por fases (preproducción, rodaje…): cada una con sus meses y su cuota. */
+  phases?: QuotePhase[] | null;
   lines: BillingLine[];
   baseAmount: number;
   vatAmount: number;
@@ -128,18 +201,57 @@ export interface BillingQuote {
   createdAt?: { toMillis: () => number } | null;
 }
 
-/** Importe total del presupuesto (en mensual, la cuota por el número de meses). */
+/** Importe total del presupuesto (en mensual, la cuota por el número de meses; por fases ya va todo en las líneas). */
 export const quoteGrandTotal = (q: Pick<BillingQuote, "billingMode" | "months" | "totalAmount" | "baseAmount">) =>
   q.billingMode === "monthly" && q.months ? { base: round2(q.baseAmount * q.months), total: round2(q.totalAmount * q.months) } : { base: q.baseAmount, total: q.totalAmount };
 
-/** Meses (AAAA-MM) que cubre un presupuesto mensual. */
-export function quoteMonths(q: Pick<BillingQuote, "startMonth" | "months">): string[] {
-  if (!q.startMonth || !q.months) return [];
-  const [y, m] = q.startMonth.split("-").map(Number);
-  return Array.from({ length: q.months }, (_, i) => {
-    const d = new Date(y, m - 1 + i, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const addMonths = (ym: string, n: number) => {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+/** Meses (AAAA-MM) que cubre un presupuesto mensual o por fases. */
+export function quoteMonths(q: Pick<BillingQuote, "startMonth" | "months"> & { billingMode?: BillingMode; phases?: QuotePhase[] | null }): string[] {
+  const total = q.billingMode === "phases" ? (q.phases || []).reduce((t, p) => t + (p.months || 0), 0) : q.months || 0;
+  if (!q.startMonth || !total) return [];
+  return Array.from({ length: total }, (_, i) => addMonths(q.startMonth!, i));
+}
+
+/** Fase a la que pertenece cada mes de un presupuesto por fases. */
+export function phaseSchedule(q: Pick<BillingQuote, "startMonth" | "phases">): { month: string; phase: QuotePhase; index: number }[] {
+  if (!q.startMonth) return [];
+  const out: { month: string; phase: QuotePhase; index: number }[] = [];
+  let k = 0;
+  (q.phases || []).forEach((phase, index) => {
+    for (let i = 0; i < (phase.months || 0); i++) out.push({ month: addMonths(q.startMonth!, k++), phase, index });
   });
+  return out;
+}
+
+/** Líneas del presupuesto por fases: cada línea mensual × los meses de su fase. */
+export function phasesToLines(phases: QuotePhase[]): BillingLine[] {
+  return phases.flatMap((p) => p.lines.map((l) => ({
+    ...l,
+    id: `${p.id}-${l.id}`,
+    description: `${p.name} · ${l.description}`.trim(),
+    quantity: round2((l.quantity || 0) * (p.months || 0)),
+  })));
+}
+
+/** Cuota mensual (base) de una fase. */
+export const phaseMonthlyBase = (p: QuotePhase) => invoiceTotals(p.lines).baseAmount;
+
+/** Meses que ya cubre una factura. */
+export const invoiceMonths = (i: Pick<BillingInvoice, "periodMonth" | "periodMonths">) =>
+  i.periodMonths?.length ? i.periodMonths : i.periodMonth ? [i.periodMonth] : [];
+
+/** "enero 2027" o "enero – marzo 2027". */
+export function monthsLabel(months: string[]) {
+  if (!months.length) return "";
+  if (months.length === 1) return monthName(months[0]);
+  const s = [...months].sort();
+  return `${monthName(s[0])} – ${monthName(s[s.length - 1])} (${s.length} meses)`;
 }
 
 /** Facturas que cuentan para lo facturado (emitidas, no anuladas, no rectificativas). */
@@ -206,8 +318,6 @@ export const addDaysIso = (iso: string, days: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-export const formatNumber = (series: string, year: number, seq: number) => `${series}${year}-${String(seq).padStart(4, "0")}`;
-
 export const partyLines = (p?: Partial<BillingParty> | null) => {
   if (!p) return [];
   const cityLine = [p.postalCode, p.city].filter(Boolean).join(" ") + (p.province && p.province !== p.city ? ` (${p.province})` : "");
@@ -230,7 +340,7 @@ export function missingForIssue(inv: Pick<BillingInvoice, "client" | "lines" | "
  * los datos fiscales de Filma. Todo en una transacción para que dos admins no
  * puedan sacar el mismo número.
  */
-export async function issueInvoice(db: Firestore, invoiceId: string, settings: BillingSettings, uid: string) {
+export async function issueInvoice(db: Firestore, invoiceId: string, settings: BillingSettings, uid: string, customNumber?: string) {
   const ref = doc(db, "billingInvoices", invoiceId);
   const counters = doc(db, "adminConfig", "billingCounters");
   return runTransaction(db, async (tx) => {
@@ -238,12 +348,7 @@ export async function issueInvoice(db: Firestore, invoiceId: string, settings: B
     const inv = snap.data() as BillingInvoice | undefined;
     if (!inv) throw new Error("Factura no encontrada");
     if (inv.status !== "draft") throw new Error("Esta factura ya está emitida");
-    const year = Number(inv.issueDate.slice(0, 4));
-    const series = settings.invoicePrefix || "F";
-    const key = `${series}-${year}`;
-    const seq = ((cSnap.data() || {})[key] || 0) + 1;
-    const number = formatNumber(series, year, seq);
-    tx.set(counters, { [key]: seq }, { merge: true });
+    const { number, series, year } = takeNumber(tx, counters, cSnap.data(), numberingRule(settings, "invoice"), inv.issueDate, customNumber);
     tx.update(ref, {
       status: "issued", number, series, year,
       issuer: issuerSnapshot(settings),
@@ -255,7 +360,7 @@ export async function issueInvoice(db: Firestore, invoiceId: string, settings: B
 }
 
 /** Emite un presupuesto: número de la serie de presupuestos y datos de Filma. */
-export async function issueQuote(db: Firestore, quoteId: string, settings: BillingSettings, uid: string) {
+export async function issueQuote(db: Firestore, quoteId: string, settings: BillingSettings, uid: string, customNumber?: string) {
   const ref = doc(db, "billingQuotes", quoteId);
   const counters = doc(db, "adminConfig", "billingCounters");
   return runTransaction(db, async (tx) => {
@@ -263,18 +368,35 @@ export async function issueQuote(db: Firestore, quoteId: string, settings: Billi
     const q = snap.data() as BillingQuote | undefined;
     if (!q) throw new Error("Presupuesto no encontrado");
     if (q.status !== "draft") throw new Error("Este presupuesto ya está emitido");
-    const year = Number(q.issueDate.slice(0, 4));
-    const series = settings.quotePrefix || "P";
-    const key = `${series}-${year}`;
-    const seq = ((cSnap.data() || {})[key] || 0) + 1;
-    const number = formatNumber(series, year, seq);
-    tx.set(counters, { [key]: seq }, { merge: true });
+    const { number, series, year } = takeNumber(tx, counters, cSnap.data(), numberingRule(settings, "quote"), q.issueDate, customNumber);
     tx.update(ref, {
       status: "sent", number, series, year, issuer: issuerSnapshot(settings), ...invoiceTotals(q.lines),
       issuedAt: serverTimestamp(), issuedBy: uid, updatedAt: serverTimestamp(),
     });
     return number;
   });
+}
+
+/**
+ * Siguiente número de la serie (o el número escrito a mano, que no mueve el
+ * contador). Se llama dentro de la transacción de emisión.
+ */
+function takeNumber(
+  tx: Transaction, counters: DocumentReference, data: Record<string, number> | undefined,
+  rule: NumberingRule, dateIso: string, customNumber?: string,
+) {
+  const year = Number(dateIso.slice(0, 4));
+  if (customNumber?.trim()) return { number: customNumber.trim(), series: rule.prefix, year };
+  const key = counterKey(rule, year);
+  const seq = ((data || {})[key] || 0) + 1;
+  tx.set(counters, { [key]: seq }, { merge: true });
+  return { number: renderNumber(rule, dateIso, seq), series: rule.prefix, year };
+}
+
+/** ¿Hay ya un documento con ese número? (para los números escritos a mano) */
+export async function numberTaken(db: Firestore, kind: "invoice" | "quote", number: string) {
+  const snap = await getDocs(query(collection(db, kind === "quote" ? "billingQuotes" : "billingInvoices"), where("number", "==", number.trim())));
+  return !snap.empty;
 }
 
 const issuerSnapshot = (s: BillingSettings) => ({
@@ -298,13 +420,8 @@ export async function voidWithRectifying(db: Firestore, invoiceId: string, reaso
     if (inv.status !== "issued") throw new Error("Solo se puede anular una factura emitida");
     if (inv.kind === "rectifying") throw new Error("Una rectificativa no se anula: emite una factura nueva");
     const issueDate = todayIso();
-    const year = Number(issueDate.slice(0, 4));
-    const series = settings.rectifyingPrefix || "R";
-    const key = `${series}-${year}`;
-    const seq = ((cSnap.data() || {})[key] || 0) + 1;
-    const number = formatNumber(series, year, seq);
+    const { number, series, year } = takeNumber(tx, counters, cSnap.data(), numberingRule(settings, "rectifying"), issueDate);
     const lines = inv.lines.map((l) => ({ ...l, id: `${l.id}r`, quantity: -l.quantity }));
-    tx.set(counters, { [key]: seq }, { merge: true });
     tx.set(newRef, {
       status: "issued", kind: "rectifying", number, series, year,
       producerId: inv.producerId, client: inv.client, issuer: issuerSnapshot(settings),
@@ -333,5 +450,31 @@ export function clientFromAccount(a?: {
     city: b.city || "", province: b.province || "", country: b.country || "España", email: b.email || a?.contactEmail || "",
   };
 }
+
+/** Datos fiscales del cliente a partir de una persona (usuario). */
+export function clientFromUser(u?: { name?: string; email?: string; billing?: Partial<BillingParty> | null } | null): BillingParty {
+  const b = u?.billing || {};
+  return {
+    name: b.name || u?.name || "", taxId: b.taxId || "", address: b.address || "", postalCode: b.postalCode || "",
+    city: b.city || "", province: b.province || "", country: b.country || "España", email: b.email || u?.email || "",
+  };
+}
+
+/**
+ * Datos fiscales de una persona: se guardan en billingClients/{uid} (solo
+ * admins), no en su perfil, que leen otros usuarios.
+ */
+export async function fetchUserClient(db: Firestore, u?: { id: string; name?: string; email?: string } | null): Promise<BillingParty> {
+  if (!u) return clientFromUser(null);
+  const snap = await getDoc(doc(db, "billingClients", u.id)).catch(() => null);
+  return clientFromUser({ ...u, billing: snap?.exists() ? (snap.data() as Partial<BillingParty>) : null });
+}
+export async function saveUserClient(db: Firestore, userId: string, client: BillingParty) {
+  await setDoc(doc(db, "billingClients", userId), { ...client, updatedAt: serverTimestamp() });
+}
+
+/** Nombre del concepto que sale en listados: proyecto, "Budgeting" u otro. */
+export const docSubject = (d: { subject?: BillingSubject; projectName?: string | null }) =>
+  d.subject === "budgeting" ? "Budgeting" : d.projectName || (d.subject === "other" ? "Otro concepto" : "—");
 
 export const newLineId = () => Math.random().toString(36).slice(2, 9);

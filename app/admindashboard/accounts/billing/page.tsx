@@ -15,7 +15,7 @@ import { downloadCsv, Pills, RowBar } from "@/components/admin/ui";
 import { BillingSettingsModal } from "@/components/admin/billing/BillingSettingsModal";
 import { NewDocModal } from "@/components/admin/billing/NewDocModal";
 import { invoiceState, useBilling } from "@/components/admin/billing/useBilling";
-import { countsAsBilled, eur, fmtDay, invoiceTotals, monthName, QUOTE_STATUS, quoteGrandTotal, todayIso } from "@/lib/billing";
+import { countsAsBilled, docSubject, eur, fmtDay, invoiceMonths, invoiceTotals, monthsLabel, QUOTE_STATUS, quoteGrandTotal, todayIso, type BillingInvoice } from "@/lib/billing";
 
 type Tab = "invoices" | "quotes";
 type InvFilter = "all" | "draft" | "pending" | "overdue" | "paid" | "voided";
@@ -31,7 +31,7 @@ const FIELDS: SearchField<F>[] = [
 function BillingInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const { loading: adminLoading, producers, producerById } = useAdminData();
+  const { loading: adminLoading, producers, producerById, users } = useAdminData();
   const { invoices, quotes, settings, setSettings, loading } = useBilling();
   const [tab, setTab] = useState<Tab>(params.get("tab") === "quotes" ? "quotes" : "invoices");
   const [invFilter, setInvFilter] = useState<InvFilter>("all");
@@ -44,28 +44,29 @@ function BillingInner() {
   const [newDoc, setNewDoc] = useState<null | "quote" | "invoice">(null);
 
   const years = useMemo(() => Array.from(new Set([new Date().getFullYear(), ...invoices.map((i) => Number(i.issueDate.slice(0, 4))), ...quotes.map((x) => Number(x.issueDate.slice(0, 4)))])).sort((a, b) => b - a), [invoices, quotes]);
-  const match = (number: string | null, client: string, project: string | null, producerId: string, date: string) => {
-    if (account !== "all" && producerId !== account) return false;
+  const match = (number: string | null, client: string, project: string | null, producerId: string, date: string, toUser = false) => {
+    if (account === "__users" ? !toUser : account !== "all" && producerId !== account) return false;
     if (year !== "all" && !date.startsWith(year)) return false;
     const t = q.trim().toLowerCase();
     if (!t) return true;
     const v = field === "number" ? number || "" : field === "client" ? client : field === "project" ? project || "" : `${number || ""} ${client} ${project || ""}`;
     return v.toLowerCase().includes(t);
   };
-  const clientName = (producerId: string, fallback: string) => producerById(producerId)?.name || fallback;
+  const clientName = (d: { producerId: string; billTo?: string; userId?: string | null; client: { name: string } }) =>
+    d.billTo === "user" ? users.find((u) => u.id === d.userId)?.name || d.client.name : producerById(d.producerId)?.name || d.client.name;
 
-  const invBase = useMemo(() => invoices.filter((i) => match(i.number, clientName(i.producerId, i.client.name), i.projectName, i.producerId, i.issueDate)),
+  const invBase = useMemo(() => invoices.filter((i) => match(i.number, clientName(i), docSubject(i), i.producerId, i.issueDate, i.billTo === "user")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [invoices, q, field, account, year, producers]);
+    [invoices, q, field, account, year, producers, users]);
   const invInFilter = (i: (typeof invoices)[number], f: InvFilter) => {
     const s = invoiceState(i).label;
     return f === "all" ? true : f === "draft" ? i.status === "draft" : f === "pending" ? s === "Pendiente de cobro" || s === "Vencida" : f === "overdue" ? s === "Vencida" : f === "paid" ? s === "Cobrada" : i.status === "voided" || i.kind === "rectifying";
   };
   const invRows = invBase.filter((i) => invInFilter(i, invFilter));
 
-  const quoteBase = useMemo(() => quotes.filter((x) => match(x.number, clientName(x.producerId, x.client.name), x.projectName, x.producerId, x.issueDate)),
+  const quoteBase = useMemo(() => quotes.filter((x) => match(x.number, clientName(x), docSubject(x), x.producerId, x.issueDate, x.billTo === "user")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [quotes, q, field, account, year, producers]);
+    [quotes, q, field, account, year, producers, users]);
   const quoteRows = quoteBase.filter((x) => quoteFilter === "all" || x.status === quoteFilter);
 
   const kpi = useMemo(() => {
@@ -81,8 +82,8 @@ function BillingInner() {
   if (loading || adminLoading) return <PageLoading />;
 
   const exportCsv = () => downloadCsv(`facturas_${year}.csv`, [
-    ["Número", "Fecha", "Cliente", "NIF", "Proyecto", "Periodo", "Presupuesto", "Base", "IVA", "Total", "Estado", "Cobrada el"],
-    ...invRows.filter((i) => i.status !== "draft").map((i) => [i.number, fmtDay(i.issueDate), i.client.name, i.client.taxId, i.projectName, i.periodMonth ? monthName(i.periodMonth) : "", i.quoteNumber, i.baseAmount, i.vatAmount, i.totalAmount, invoiceState(i).label, i.paidAt ? fmtDay(i.paidAt) : ""]),
+    ["Número", "Fecha", "Cliente", "NIF", "Concepto", "Periodo", "Presupuesto", "Base", "IVA", "Total", "Estado", "Cobrada el"],
+    ...invRows.filter((i) => i.status !== "draft").map((i) => [i.number, fmtDay(i.issueDate), i.client.name, i.client.taxId, docSubject(i), monthsLabel(invoiceMonths(i)), i.quoteNumber, i.baseAmount, i.vatAmount, i.totalAmount, invoiceState(i).label, i.paidAt ? fmtDay(i.paidAt) : ""]),
   ]);
 
   return (
@@ -98,7 +99,7 @@ function BillingInner() {
               <span>Por cobrar <strong className="font-medium text-slate-900">{eur(kpi.pending)}</strong></span>
               {kpi.overdueN > 0 && <span>Vencido <strong className="font-medium text-red-600">{eur(kpi.overdue)}</strong></span>}
             </span>
-            <IconButton label="Datos fiscales de Filma" onClick={() => setSettingsOpen(true)}><Settings size={15} /></IconButton>
+            <IconButton label="Ajustes de facturación" onClick={() => setSettingsOpen(true)}><Settings size={15} /></IconButton>
             <Button onClick={() => setNewDoc("quote")}><FileText size={14} /> Nuevo presupuesto</Button>
             <Button variant="primary" onClick={() => setNewDoc("invoice")}><Plus size={14} /> Nueva factura</Button>
           </>
@@ -133,7 +134,7 @@ function BillingInner() {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={FIELDS} field={field} onField={setField} value={q} onChange={setQ} count={tab === "invoices" ? invRows.length : quoteRows.length} />
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="w-48"><Select value={account} onChange={(e) => setAccount(e.target.value)}><option value="all">Todas las cuentas</option>{producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
+          <div className="w-48"><Select value={account} onChange={(e) => setAccount(e.target.value)}><option value="all">Todos los clientes</option><option value="__users">Personas (Budgeting…)</option>{producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
           <div className="w-32"><Select value={year} onChange={(e) => setYear(e.target.value)}><option value="all">Todos los años</option>{years.map((y) => <option key={y} value={String(y)}>{y}</option>)}</Select></div>
           {tab === "invoices" && <IconButton label="Exportar CSV (para la gestoría)" onClick={exportCsv}><Download size={15} /></IconButton>}
         </div>
@@ -161,8 +162,8 @@ function BillingInner() {
                   <tr key={i.id} onClick={() => router.push(`/admindashboard/accounts/billing/invoices/${i.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
                     <td className="relative py-1.5 pl-4 pr-3 font-mono text-[12px] text-slate-900"><RowBar tone={s.tone} />{i.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
                     <td className="px-3">
-                      <div className={`truncate ${i.status === "voided" ? "text-slate-400 line-through" : "font-medium text-slate-900"}`}>{clientName(i.producerId, i.client.name)}</div>
-                      <div className="truncate text-xs text-slate-500">{[i.projectName, i.periodMonth && monthName(i.periodMonth), i.quoteNumber].filter(Boolean).join(" · ")}</div>
+                      <div className={`truncate ${i.status === "voided" ? "text-slate-400 line-through" : "font-medium text-slate-900"}`}>{clientName(i)}</div>
+                      <div className="truncate text-xs text-slate-500">{[docSubject(i), monthsLabel(invoiceMonths(i as BillingInvoice)), i.quoteNumber].filter(Boolean).join(" · ")}</div>
                     </td>
                     <td className="px-3 text-slate-600">{fmtDay(i.issueDate)}</td>
                     <td className={`px-3 ${s.tone === "bad" ? "text-red-600" : "text-slate-600"}`}>{i.kind === "standard" ? fmtDay(i.dueDate) : "—"}</td>
@@ -198,11 +199,11 @@ function BillingInner() {
                 <tr key={x.id} onClick={() => router.push(`/admindashboard/accounts/billing/quotes/${x.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
                   <td className="relative py-1.5 pl-4 pr-3 font-mono text-[12px] text-slate-900"><RowBar tone={st.tone} />{x.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
                   <td className="px-3">
-                    <div className="truncate font-medium text-slate-900">{clientName(x.producerId, x.client.name)}</div>
-                    <div className="truncate text-xs text-slate-500">{x.projectName}{x.title ? ` · ${x.title}` : ""}</div>
+                    <div className="truncate font-medium text-slate-900">{clientName(x)}</div>
+                    <div className="truncate text-xs text-slate-500">{docSubject(x)}{x.title ? ` · ${x.title}` : ""}</div>
                   </td>
-                  <td className="px-3 text-slate-600">{x.billingMode === "monthly" ? `Mensual · ${x.months || "?"} meses` : "Pago único"}</td>
-                  <td className="px-3 text-right tabular-nums text-slate-900">{eur(t.baseAmount)}{x.billingMode === "monthly" && <span className="font-sans text-[11px] text-slate-400">/mes</span>}</td>
+                  <td className="px-3 text-slate-600">{x.billingMode === "monthly" ? `Mensual · ${x.months || "?"} meses` : x.billingMode === "phases" ? `${(x.phases || []).length} fases · ${x.months || 0} meses` : "Pago único"}</td>
+                  <td className="px-3 text-right tabular-nums text-slate-900">{eur(x.billingMode === "monthly" ? t.baseAmount : grand.base)}{x.billingMode === "monthly" && <span className="font-sans text-[11px] text-slate-400">/mes</span>}</td>
                   <td className="px-3">
                     {x.status === "draft" ? <span className="text-slate-300">—</span> : (
                       <span className="flex items-center gap-2">

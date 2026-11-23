@@ -21,6 +21,9 @@ import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { RoleModal } from "@/components/admin/RoleModal";
 import { adminFetch, BlockTitle, MiniEmpty, downloadJson, fmtDate, PHASE_DOT, ROLE_LABEL, RowBar, timeAgo } from "@/components/admin/ui";
 import { EMAIL_STATUS } from "@/components/admin/emailStatus";
+import { NewDocModal } from "@/components/admin/billing/NewDocModal";
+import { invoiceState, useBilling } from "@/components/admin/billing/useBilling";
+import { docSubject, eur, fmtDay, invoiceMonths, invoiceTotals, monthsLabel, QUOTE_STATUS, quoteGrandTotal } from "@/lib/billing";
 
 interface AuthInfo { exists: boolean; emailVerified: boolean; disabled: boolean; lastSignInTime: string | null; creationTime: string | null; providers: string[] }
 interface MailRow { id: string; subject: string; template: string; status: string; createdAt: { toMillis: () => number } | null }
@@ -42,6 +45,7 @@ function UserInner() {
   const params = useSearchParams();
   const { user: me } = useUser();
   const { loading, userById, projectById, producers, producerById, reload } = useAdminData();
+  const billing = useBilling(undefined, (useParams() as { userId: string }).userId);
   const u = userById(userId);
   const [toast, showToast] = useToast();
   const [info, setInfo] = useState<AuthInfo | null>(null);
@@ -51,6 +55,7 @@ function UserInner() {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [memberships, setMemberships] = useState<Record<string, { role?: string; position?: string; department?: string }>>({});
   const [action, setAction] = useState<Action>(null);
+  const [newDoc, setNewDoc] = useState<null | "quote" | "invoice">(null);
   const [roleOpen, setRoleOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -243,6 +248,41 @@ function UserInner() {
             </section>
           )}
 
+          <section>
+            <BlockTitle action={
+              <span className="flex gap-1.5">
+                <Button size="sm" onClick={() => setNewDoc("quote")}>Presupuesto</Button>
+                <Button size="sm" onClick={() => setNewDoc("invoice")}>Factura</Button>
+              </span>
+            }>Facturación</BlockTitle>
+            {billing.quotes.length + billing.invoices.length === 0 ? <MiniEmpty>Sin presupuestos ni facturas a esta persona</MiniEmpty> : (
+              <table className="tbl w-full table-fixed text-[13px]">
+                <tbody>
+                  {billing.quotes.map((x) => {
+                    const t = x.status === "draft" ? invoiceTotals(x.lines) : x;
+                    return (
+                      <tr key={x.id} onClick={() => router.push(`/admindashboard/accounts/billing/quotes/${x.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={QUOTE_STATUS[x.status].tone} />{x.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
+                        <td className="px-3"><div className="truncate text-slate-900">Presupuesto · {docSubject(x)}</div><div className="truncate text-xs text-slate-500">{x.billingMode === "monthly" ? `${eur(t.baseAmount)}/mes · ${x.months} meses` : eur(quoteGrandTotal({ ...x, ...t }).base)}</div></td>
+                        <td className="w-28 px-3 text-slate-600">{QUOTE_STATUS[x.status].label}</td>
+                      </tr>
+                    );
+                  })}
+                  {billing.invoices.map((i) => {
+                    const st = invoiceState(i);
+                    return (
+                      <tr key={i.id} onClick={() => router.push(`/admindashboard/accounts/billing/invoices/${i.id}`)} className="cursor-pointer hover:bg-[#FAFAFA]">
+                        <td className="relative w-36 py-1.5 pl-4 pr-3 font-mono text-[12px]"><RowBar tone={st.tone} />{i.number || <span className="font-sans text-slate-400">Borrador</span>}</td>
+                        <td className="px-3"><div className="truncate text-slate-900">Factura · {docSubject(i)} · {eur(i.status === "draft" ? invoiceTotals(i.lines).totalAmount : i.totalAmount)}</div><div className="truncate text-xs text-slate-500">{[fmtDay(i.issueDate), monthsLabel(invoiceMonths(i))].filter(Boolean).join(" · ")}</div></td>
+                        <td className="w-28 px-3 text-slate-600">{st.label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+
           {u.budgetingAccess && (
             <section>
               <BlockTitle count={drafts.length}>Presupuestos de Budgeting</BlockTitle>
@@ -387,6 +427,7 @@ function UserInner() {
           </Select>
         </Field>
       </Modal>
+      <NewDocModal open={!!newDoc} onClose={() => setNewDoc(null)} kind={newDoc || "invoice"} settings={billing.settings} quotes={billing.quotes} invoices={billing.invoices} userId={u.id} />
     </Page>
   );
 }
