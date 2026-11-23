@@ -6,7 +6,7 @@
 import jsPDF from "jspdf";
 import { quoteView, buildDocPdf, type DocView } from "@/lib/billingPdf";
 import type { BillingQuote, BillingSettings } from "@/lib/billing";
-import { EVENT_LABEL, fmtDateTime, type SignParty, type SignRequest } from "./types";
+import { docTypeLabel, EVENT_LABEL, fmtDateTime, type SignParty, type SignRequest } from "./types";
 
 type RGB = [number, number, number];
 const INK: RGB = [15, 23, 42];
@@ -40,7 +40,7 @@ async function textDocPdf(r: SignDoc, header: string | null | undefined): Promis
   const W = 210, M = 18;
   const set = (size: number, color: RGB, style: "normal" | "bold" = "normal") => { pdf.setFont("helvetica", style); pdf.setFontSize(size); pdf.setTextColor(...color); };
   if (header) pdf.addImage(header, "JPEG", 0, 0, W, 42); else { pdf.setFillColor(...ACCENT); pdf.rect(0, 0, W, 42, "F"); }
-  set(9, [255, 255, 255]); pdf.text("DOCUMENTO", W - M, 17, { align: "right" });
+  set(9, [255, 255, 255]); pdf.text((docTypeLabel(p.docType) || "Documento").toUpperCase(), W - M, 17, { align: "right" });
   set(15, [255, 255, 255], "bold"); pdf.text(p.reference || "Filma Sign", W - M, 26, { align: "right" });
   let y = 58;
   set(16, INK, "bold");

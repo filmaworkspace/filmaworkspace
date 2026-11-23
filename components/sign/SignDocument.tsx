@@ -5,7 +5,7 @@
 
 import { DocPreview } from "@/components/admin/billing/DocPreview";
 import { signQuoteView } from "@/lib/sign/render";
-import { fmtDateTime, type SignRequest } from "@/lib/sign/types";
+import { docTypeLabel, fmtDateTime, type SignRequest } from "@/lib/sign/types";
 
 export function SignDocument({ r }: { r: Pick<SignRequest, "payload" | "parties"> }) {
   const v = signQuoteView(r);
@@ -14,6 +14,7 @@ export function SignDocument({ r }: { r: Pick<SignRequest, "payload" | "parties"
   const p = r.payload;
   return (
     <div className="mx-auto w-full max-w-[560px] rounded-sm bg-white px-7 py-8 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_16px_48px_rgba(15,23,42,0.12)] ring-1 ring-slate-200">
+      {docTypeLabel(p.docType) && <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400">{docTypeLabel(p.docType)}</p>}
       <h2 className="text-[17px] font-semibold tracking-tight text-slate-900">{p.title}</h2>
       <div className="mt-4 space-y-3 text-[13px] leading-relaxed text-slate-700">
         {p.body.split(/\n{2,}/).map((para, i) => <p key={i} className="whitespace-pre-line">{para}</p>)}

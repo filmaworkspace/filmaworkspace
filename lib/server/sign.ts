@@ -12,6 +12,7 @@ import { sendEmail } from "@/lib/emails/send";
 import { signRequestHtml, signRequestText, signCompletedHtml, signCompletedText } from "@/lib/emails/sign";
 import { buildSignedPdf, signedFileName } from "@/lib/sign/render";
 import { plain, stableJson } from "@/lib/sign/hash";
+import { SIGN_DOC_TYPES, type SignDocType } from "@/lib/sign/types";
 import type { PublicSignRequest, SignEvent, SignKind, SignParty, SignPayload, SignRequest, SignSignature } from "@/lib/sign/types";
 
 const COL = "signRequests";
@@ -34,6 +35,7 @@ export interface CreateInput {
   /** Documento libre (kind document). */
   title?: string;
   body?: string;
+  docType?: string | null;
   signer: { name: string; email: string; role?: string; taxId?: string };
   issuer: { name: string; email: string; role: string; signature: SignSignature };
   message?: string;
@@ -58,7 +60,8 @@ export async function createSignRequest(input: CreateInput, meta: { ip: string; 
     reference = q.number; refPath = ref.path;
   } else {
     if (!input.title?.trim() || !input.body?.trim()) throw new Error("Escribe el título y el texto del documento");
-    payload = { kind: "document", title: input.title.trim(), body: input.body.trim(), issuerName: input.issuer.name, reference: null };
+    const docType = input.docType && input.docType in SIGN_DOC_TYPES ? (input.docType as SignDocType) : "other";
+    payload = { kind: "document", title: input.title.trim(), body: input.body.trim(), issuerName: input.issuer.name, reference: null, docType };
     title = input.title.trim();
   }
   const email = input.signer.email.trim().toLowerCase();
@@ -80,6 +83,7 @@ export async function createSignRequest(input: CreateInput, meta: { ip: string; 
   const data: Omit<SignRequest, "id"> & { tokenHashes: Record<string, string>; tokenIndex: string[] } = {
     kind: input.kind, status: "pending", title, reference, refPath, payload, docHash, parties,
     message: (input.message || "").slice(0, 2000), events, createdAt: now, createdBy: input.createdBy,
+    docType: input.kind === "document" ? (payload as { docType?: SignDocType | null }).docType || "other" : null,
     producerId: input.billTo?.producerId || null, projectId: input.billTo?.projectId || null, projectName: input.billTo?.projectName || null,
     expiresAt: now + (input.expiresInDays || 30) * DAY, completedAt: null,
     tokenHashes: { signer: sha256(token) }, tokenIndex: [sha256(token)],

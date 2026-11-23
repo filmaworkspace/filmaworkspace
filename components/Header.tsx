@@ -13,7 +13,7 @@ import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-import {
+import { FileSignature,
   ArrowLeftRight,
   Banknote,
   Briefcase,
@@ -56,7 +56,7 @@ export default function Header() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
   // Módulos del plan de la cuenta (false = no incluido; lo fija el admin)
-  const [projectModules, setProjectModules] = useState<{ accounting?: boolean; team?: boolean }>({});
+  const [projectModules, setProjectModules] = useState<{ accounting?: boolean; team?: boolean; sign?: boolean }>({});
   const [permissions, setPermissions] = useState({
     config: false,
     accounting: false,
@@ -228,6 +228,8 @@ export default function Header() {
   const isAccountingSection = pathname.includes("/accounting");
   const isTeamSection       = pathname.includes("/team");
   const isConfigSection     = pathname.includes("/config") && !pathname.includes("/accounting/config") && !pathname.includes("/team/");
+  // Filma Sign: servicio aparte dentro de Equipo, con su botón (no en el menú central).
+  const isSignSection       = /^\/project\/[^/]+\/team\/sign/.test(pathname);
   const isInProjectSection  = isAccountingSection || isTeamSection || isConfigSection;
 
   const currentSection = isAdminSection ? "admin"
@@ -252,6 +254,7 @@ export default function Header() {
     : pathname.includes("/approvals") ? "approvals"
     : pathname.includes("/payroll")   ? "payroll"
     : pathname.includes("/timesheet") ? "timesheet"
+    : isSignSection ? "sign"
     : pathname.includes("/config")    ? "config"
     : "panel"
     : null;
@@ -383,6 +386,13 @@ export default function Header() {
 
         {/* Derecha */}
         <div className="relative flex items-center gap-1.5">
+          {/* Filma Sign: servicio aparte, con su propio botón */}
+          {isTeamSection && projectId && projectModules.sign && permissions.team && (
+            <Link href={`/project/${projectId}/team/sign`} title="Filma Sign"
+              className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors ${isSignSection ? "border-[#24406E] bg-[#24406E] text-white" : "border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900"}`}>
+              <FileSignature size={14} /> Sign
+            </Link>
+          )}
           {/* Cajas (BOX) */}
           {isAccountingSection && projectId && accountingAccess.box && (
             <Link href={`/project/${projectId}/accounting/box`} className={iconButton} title="Cajas">

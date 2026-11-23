@@ -25,6 +25,9 @@ export interface AdminProject {
   description: string;
   language?: string;
   producers: string[];
+  /** Filma Sign contratado en el proyecto y cuenta a la que se factura. */
+  sign?: boolean;
+  signBillTo?: string | null;
   createdAt: Timestamp | null;
   frozen: boolean;
   trashedAt: Timestamp | null;
@@ -102,6 +105,9 @@ interface AdminDataValue {
 
 const Ctx = createContext<AdminDataValue | null>(null);
 
+/** Igual, pero sin error fuera del panel de admin (devuelve null). */
+export function useAdminDataOptional() { return useContext(Ctx); }
+
 export function useAdminData() {
   const v = useContext(Ctx);
   if (!v) throw new Error("useAdminData fuera de AdminDataProvider");
@@ -177,7 +183,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         const mSnap = await getDocs(collection(db, `projects/${d.id}/members`)).catch(() => null);
         return {
           id: d.id, name: x.name || d.id, phase: x.phase || "Desarrollo", description: x.description || "",
-          language: x.language, producers: x.producers || [], createdAt: ts(x.createdAt),
+          language: x.language, producers: x.producers || [], sign: !!x.modules?.sign, signBillTo: x.signBillTo || null, createdAt: ts(x.createdAt),
           frozen: !!x.frozen, trashedAt: ts(x.trashedAt), closingAt: ts(x.closingAt),
           members: (mSnap?.docs || []).map((m) => {
             const md = m.data();

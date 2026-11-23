@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       const m = meta(req);
       const r = await createSignRequest({
         kind: b.kind === "document" ? "document" : "quote",
-        quoteId: b.quoteId, title: b.title, body: b.body,
+        quoteId: b.quoteId, title: b.title, body: b.body, docType: typeof b.docType === "string" ? b.docType : null,
         signer: { name: String(b.signer?.name || ""), email: String(b.signer?.email || ""), role: b.signer?.role, taxId: b.signer?.taxId },
         issuer: {
           name: String(b.issuerName || me.name || "Filma"), email: settings.email || me.email || "",

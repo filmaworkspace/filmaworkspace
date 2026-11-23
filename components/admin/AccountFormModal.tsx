@@ -20,7 +20,8 @@ export async function syncProjectModules(projects: AdminProject[], producers: Ad
     const modules = mods.length
       ? { accounting: mods.some((m) => m.accounting !== false), team: mods.some((m) => m.team !== false) }
       : { accounting: true, team: true };
-    return updateDoc(doc(db, "projects", p.id), { modules }).catch(() => {});
+    // Campo a campo: Filma Sign (modules.sign) es del proyecto, no de la cuenta.
+    return updateDoc(doc(db, "projects", p.id), { "modules.accounting": modules.accounting, "modules.team": modules.team }).catch(() => {});
   }));
 }
 

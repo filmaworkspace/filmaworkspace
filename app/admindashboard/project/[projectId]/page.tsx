@@ -267,7 +267,7 @@ export default function AdminProjectPage() {
     content: "",
     type: "info" as "info" | "warning" | "success",
   });
-  const [editForm, setEditForm] = useState({ name: "", phase: "", description: "", producers: [] as string[] });
+  const [editForm, setEditForm] = useState({ name: "", phase: "", description: "", producers: [] as string[], sign: false, signBillTo: "" });
   const [allProducers, setAllProducers] = useState<{ id: string; name: string }[]>([]);
   const [producerSearch, setProducerSearch] = useState("");
   const [addMemberForm, setAddMemberForm] = useState({ odId: "", role: "", searchQuery: "", inviteName: "" });
@@ -347,6 +347,8 @@ export default function AdminProjectPage() {
         phase: projectData.phase,
         description: projectData.description || "",
         producers: projectData.producers || [],
+        sign: !!projectData.modules?.sign,
+        signBillTo: projectData.signBillTo || "",
       });
 
       // Members
@@ -543,6 +545,10 @@ export default function AdminProjectPage() {
       showToast("error", "El nombre es obligatorio");
       return;
     }
+    if (editForm.sign && !editForm.producers.length) {
+      showToast("error", "Filma Sign se factura a una cuenta: añade una productora");
+      return;
+    }
     setSaving(true);
     try {
       const oldProducers = project?.producers || [];
@@ -553,6 +559,8 @@ export default function AdminProjectPage() {
         phase: editForm.phase,
         description: editForm.description.trim(),
         producers: newProducers,
+        "modules.sign": editForm.sign,
+        signBillTo: editForm.sign ? (newProducers.includes(editForm.signBillTo) ? editForm.signBillTo : newProducers[0]) : null,
       });
 
       // Sync companyProjects
@@ -1823,6 +1831,19 @@ export default function AdminProjectPage() {
                       <p className="px-4 py-3 text-sm text-slate-400 text-center">Sin resultados</p>
                     )}
                   </div>
+                )}
+              </div>
+
+              <div>
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+                  <input type="checkbox" checked={editForm.sign} onChange={(e) => setEditForm({ ...editForm, sign: e.target.checked })} className="h-4 w-4 accent-slate-900" />
+                  Filma Sign
+                </label>
+                {editForm.sign && editForm.producers.length > 1 && (
+                  <select value={editForm.producers.includes(editForm.signBillTo) ? editForm.signBillTo : editForm.producers[0]} onChange={(e) => setEditForm({ ...editForm, signBillTo: e.target.value })}
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" aria-label="Se factura a">
+                    {editForm.producers.map((pid) => <option key={pid} value={pid}>Se factura a {allProducers.find((x) => x.id === pid)?.name || pid}</option>)}
+                  </select>
                 )}
               </div>
 

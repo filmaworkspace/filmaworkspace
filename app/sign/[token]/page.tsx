@@ -12,7 +12,7 @@ import { SignShell } from "@/components/sign/SignShell";
 import { SignDocument } from "@/components/sign/SignDocument";
 import { SignaturePad, type SignatureValue } from "@/components/sign/SignaturePad";
 import { buildSignedPdf, signedFileName } from "@/lib/sign/render";
-import { EVENT_LABEL, fmtDateTime, SIGN_TEMPLATES, type PublicSignRequest } from "@/lib/sign/types";
+import { docTypeLabel, EVENT_LABEL, fmtDateTime, SIGN_TEMPLATES, type PublicSignRequest } from "@/lib/sign/types";
 
 type View = "review" | "sign" | "decline";
 
@@ -106,7 +106,7 @@ export default function SignPage() {
   }
 
   return (
-    <SignShell title={r.title} subtitle={subtitle} steps={["Revisar", "Firmar", "Listo"]} step={view === "review" ? 0 : 1}>
+    <SignShell eyebrow={docTypeLabel(r.docType) || "Filma Sign"} title={r.title} subtitle={subtitle} steps={["Revisar", "Firmar", "Listo"]} step={view === "review" ? 0 : 1}>
       {view === "review" && (
         <>
           {r.message && <p className="mb-4 whitespace-pre-line rounded-xl bg-[#F7F7F8] px-4 py-3 text-[14px] text-slate-700">{r.message}</p>}

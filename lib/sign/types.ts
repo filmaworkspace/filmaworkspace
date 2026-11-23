@@ -11,6 +11,24 @@
 // qué pasa al completarse (lib/server/sign).
 
 export type SignKind = "quote" | "document";
+/** Tipos de documento (producción audiovisual). */
+export const SIGN_DOC_TYPES = {
+  employment: "Contrato laboral",
+  services: "Contrato de servicios",
+  deal_memo: "Deal memo",
+  nda: "Acuerdo de confidencialidad",
+  image_rights: "Cesión de derechos de imagen",
+  ip_rights: "Cesión de propiedad intelectual",
+  location: "Contrato de localización",
+  rental: "Alquiler de material",
+  authorization: "Autorización",
+  agreement: "Acuerdo",
+  addendum: "Anexo",
+  other: "Otro",
+} as const;
+export type SignDocType = keyof typeof SIGN_DOC_TYPES;
+export const docTypeLabel = (t?: string | null) => (t && t in SIGN_DOC_TYPES ? SIGN_DOC_TYPES[t as SignDocType] : null);
+
 export type SignStatus = "pending" | "completed" | "declined" | "cancelled" | "expired";
 
 export const SIGN_TEMPLATES: Record<SignKind, { label: string; noun: string; description: string }> = {
@@ -62,6 +80,8 @@ export interface SignRequest {
   parties: SignParty[];
   message: string;
   events: SignEvent[];
+  /** Tipo de documento (contrato, NDA…). */
+  docType?: SignDocType | null;
   /** Cuenta (y proyecto) a la que se imputa para facturar Filma Sign por uso. */
   producerId?: string | null;
   projectId?: string | null;
@@ -74,7 +94,7 @@ export interface SignRequest {
 
 export type SignPayload =
   | { kind: "quote"; quote: Record<string, unknown>; settings: Record<string, unknown> }
-  | { kind: "document"; title: string; body: string; issuerName: string; reference?: string | null };
+  | { kind: "document"; title: string; body: string; issuerName: string; reference?: string | null; docType?: SignDocType | null };
 
 export const SIGN_STATUS: Record<SignStatus, { label: string; tone: "warn" | "ok" | "bad" | "none" }> = {
   pending: { label: "Pendiente de firma", tone: "warn" },
