@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
-import { db } from "@/lib/firebase-admin";
+import { adminAuth, db } from "@/lib/firebase-admin";
 import { sendEmail } from "@/lib/emails/send";
 import { adminDigestHtml, adminDigestText } from "@/lib/emails/admin-digest";
 import { purgeProject } from "@/lib/server/deleteProject";
@@ -26,6 +26,18 @@ export async function GET(req: NextRequest) {
   const old = await db.collection("projects").where("trashedAt", "<=", Timestamp.fromMillis(Date.now() - 30 * DAY)).get();
   for (const d of old.docs) {
     try { await purgeProject(d.id); purged.push(d.data().name || d.id); } catch (e) { console.error("[admin-digest] purge", d.id, (e as Error).message); }
+  }
+
+  // 1b. Demos: una semana después de caducar se borran el usuario y su proyecto de ejemplo.
+  const demos = await db.collection("demoLinks").where("expiresAt", "<=", Timestamp.fromMillis(Date.now() - 7 * DAY)).get();
+  for (const d of demos.docs) {
+    const x = d.data();
+    if (x.cleanedAt) continue;
+    try {
+      if (x.projectId) await purgeProject(x.projectId);
+      if (x.uid) { await adminAuth.deleteUser(x.uid).catch(() => {}); await db.collection("users").doc(x.uid).delete().catch(() => {}); }
+      await d.ref.update({ cleanedAt: Timestamp.now(), status: x.status === "revoked" ? "revoked" : "expired" });
+    } catch (e) { console.error("[admin-digest] demo", d.id, (e as Error).message); }
   }
 
   // 2. Resumen

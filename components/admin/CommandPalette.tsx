@@ -59,6 +59,7 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
       { id: "s-data", group: "Secciones", label: "Datos", hint: "Recalcular presupuestos, reparar aprobaciones", icon: Wrench, keywords: "mantenimiento recalcular ledger presupuesto flujos aprobaciones reparar", run: go("/admindashboard/data") },
       { id: "s-sign", group: "Secciones", label: "Filma Sign", hint: "Firmas de presupuestos y documentos", icon: FileText, keywords: "firma firmar sign contrato aceptar", run: go("/admindashboard/sign") },
       { id: "s-billing", group: "Secciones", label: "Facturación", icon: Receipt, keywords: "facturas presupuestos cobros", run: go("/admindashboard/accounts/billing") },
+      { id: "s-demos", group: "Secciones", label: "Demos", hint: "Enlaces de demo guiada", icon: Plus, keywords: "demo prueba enlace invitar cliente", run: go("/admindashboard/demos") },
       { id: "s-metrics", group: "Secciones", label: "Métricas", icon: BarChart3, keywords: "embudo retencion cohortes", run: go("/admindashboard/metrics") },
     ];
     const actions: Item[] = [

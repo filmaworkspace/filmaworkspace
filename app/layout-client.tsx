@@ -8,6 +8,7 @@ import MaintenanceGate from "@/components/MaintenanceGate";
 import ErrorReporter from "@/components/ErrorReporter";
 import AppBanners from "@/components/AppBanners";
 import Toaster from "@/components/Toaster";
+import DemoGuide from "@/components/DemoGuide";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -30,6 +31,7 @@ export default function ClientLayout({
     pathname?.startsWith("/access") ||
     pathname?.startsWith("/caja/") ||
     pathname?.startsWith("/sign/") ||
+    pathname?.startsWith("/demo/") ||
     pathname?.startsWith("/guias") ||
     pathname?.startsWith("/budgeting");
 
@@ -64,6 +66,7 @@ export default function ClientLayout({
         {hold ? <div className="min-h-screen bg-white" /> : children}
       </MaintenanceGate>
       <Toaster />
+      {!isAuthPage && !isMobilePage && <DemoGuide />}
     </UserProvider>
   );
 }

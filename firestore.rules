@@ -121,7 +121,7 @@ service cloud.firestore {
     // si el propio usuario pudiera escribirlos, podría hacerse admin, entrar
     // en una productora o darse acceso a Budgeting.
     function protectedUserFields() {
-      return ["role", "companyId", "budgetingAccess", "supportSpecialty", "suspended", "isDemo"];
+      return ["role", "companyId", "budgetingAccess", "supportSpecialty", "suspended", "isDemo", "demoExpiresAt", "demoProjectId", "demoLinkId"];
     }
 
     // Lo único que puede escribir quien rellena un horario desde su enlace.

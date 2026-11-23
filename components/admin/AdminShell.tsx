@@ -11,8 +11,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { collection, getCountFromServer, query, where } from "firebase/firestore";
 import {
   Activity, AlertOctagon, ArrowLeft, FileSignature, BarChart3, BookOpen, Briefcase, Building2, ChevronsLeft, ChevronsRight, Clock, Database, Flag,
-  HeadphonesIcon, Home, Keyboard, LayoutDashboard, Mail, Megaphone, Newspaper, Receipt, ScrollText, Search, ShieldAlert, Users, Wrench, X,
-} from "lucide-react";
+  HeadphonesIcon, Home, Keyboard, LayoutDashboard, Mail, Megaphone, Newspaper, Receipt, ScrollText, Search, ShieldAlert, Users, Wrench, X, Compass } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { inter } from "@/lib/fonts";
 import { useUser } from "@/contexts/UserContext";
@@ -102,6 +101,7 @@ export default function AdminShell({ children, isAdmin, onSearch }: { children: 
       { href: "/admindashboard/users", label: "Usuarios", icon: Users, key: "u", badge: users.length },
       { href: "/admindashboard/accounts", label: "Cuentas", icon: Building2, key: "c", badge: producers.length },
       { href: "/admindashboard/accounts/billing", label: "Facturación", icon: Receipt, key: "f" },
+      { href: "/admindashboard/demos", label: "Demos", icon: Compass, key: "o" },
     ] },
     { label: "Comunicación", items: [
       { href: "/admindashboard/support", label: "Soporte", icon: HeadphonesIcon, key: "s", badge: unassignedTickets || openTickets, badgeTone: unassignedTickets ? "bad" : undefined },

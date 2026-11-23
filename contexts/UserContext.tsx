@@ -21,6 +21,8 @@ interface UserData {
   isLoading: boolean;
   /** Sesión de "Ver como" abierta por un admin (solo lectura). */
   impersonatedBy: string | null;
+  /** Usuario de la demo guiada (enlace enviado por el admin). */
+  demo?: { projectId: string; expiresAt: Date | null } | null;
 }
 
 interface MaintenanceState {
@@ -96,6 +98,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         budgetingAccess: userData?.budgetingAccess || false,
         isLoading: false,
         impersonatedBy,
+        demo: userData?.isDemo && userData?.demoProjectId ? { projectId: userData.demoProjectId, expiresAt: userData.demoExpiresAt?.toDate?.() || null } : null,
       });
     } catch (error) {
       console.error("Error loading user data:", error);
