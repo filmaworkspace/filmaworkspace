@@ -1,4 +1,5 @@
 "use client";
+import { PageHeader, Segmented } from "@/components/ds";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -239,37 +240,18 @@ export default function TeamApprovalsPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* ── Header (mismo patrón que accounting/approvals) ─────────────────── */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-baseline gap-2.5">
-                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Aprobaciones</h1>
-                {pendingCount > 0 && <span className="text-[13px] text-slate-400">{pendingCount}</span>}
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="absolute right-0 flex items-center gap-4">
-            </div>
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex items-center gap-4 pt-4">
-            <div className="flex items-center gap-1 border border-slate-200 rounded-md p-1">
-              {([
-                { key: "pending_approval", label: "Pendientes", count: pendingCount },
-                { key: "approved",         label: "Aprobadas",  count: members.filter((m) => m.approvalStatus === "approved").length },
-                { key: "rejected",         label: "Rechazadas", count: members.filter((m) => m.approvalStatus === "rejected").length },
-              ] as const).map((t) => (
-                <button key={t.key} onClick={() => { setTab(t.key); setSelected(null); }}
-                  className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${tab === t.key ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:text-slate-900"}`}>
-                  {t.label}
-                  <span className="ml-1.5 text-xs opacity-70">({t.count})</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className="mt-[53px] px-6 pt-8 sm:px-10">
+        <PageHeader title={<>Aprobaciones {pendingCount > 0 && <span className="text-[15px] font-normal text-slate-400">{pendingCount}</span>}</>} />
+        <div className="mt-6">
+          <Segmented
+            value={tab}
+            onChange={(v) => { setTab(v); setSelected(null); }}
+            options={[
+              { value: "pending_approval", label: `Pendientes · ${pendingCount}` },
+              { value: "approved", label: `Aprobadas · ${members.filter((m) => m.approvalStatus === "approved").length}` },
+              { value: "rejected", label: `Rechazadas · ${members.filter((m) => m.approvalStatus === "rejected").length}` },
+            ]}
+          />
         </div>
       </div>
 
@@ -405,10 +387,9 @@ export default function TeamApprovalsPage() {
                             <X size={14} /> Rechazar
                           </button>
                           <button onClick={() => handleApprove(selected)} disabled={processing}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-[13px] font-semibold text-white disabled:opacity-50 transition-colors shadow-sm"
-                            style={{ backgroundColor: TEAM_COLOR }}>
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-[13px] font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] disabled:opacity-50 transition-colors">
                             {processing
-                              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                              ? <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
                               : <Check size={14} />}
                             Aprobar alta
                           </button>
@@ -548,7 +529,7 @@ export default function TeamApprovalsPage() {
                 <button onClick={handleReject} disabled={processing}
                   className="flex-1 py-1.5 rounded-md text-[13px] font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {processing
-                    ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ? <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
                     : <X size={14} />}
                   Rechazar
                 </button>

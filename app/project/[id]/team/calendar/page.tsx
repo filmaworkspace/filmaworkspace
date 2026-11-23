@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, Button, IconButton, PageHeader, Segmented } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
@@ -486,38 +486,23 @@ export default function CalendarPage() {
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mt-[53px]">
         <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Calendario de producción</h1>
-            </div>
-            <div className="absolute right-0 flex items-center gap-2 print:hidden">
-              <button
-                onClick={() => window.print()}
-                title="Descargar / imprimir en PDF"
-                className="p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                <Printer size={18} />
-              </button>
-              <button
-                onClick={() => openCreate()}
-                className="flex items-center gap-2 px-4 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity"
-              >
-                <Plus size={15} />
-                Nuevo evento
-              </button>
-            </div>
-          </div>
+          <PageHeader title="Calendario de producción" actions={
+            <span className="flex items-center gap-2 print:hidden">
+              <IconButton label="Imprimir o guardar en PDF" onClick={() => window.print()}><Printer size={15} /></IconButton>
+              <Button variant="primary" onClick={() => openCreate()}><Plus size={14} /> Nuevo evento</Button>
+            </span>
+          } />
 
           <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
             {/* Date nav — pill contenedor que desaparece al imprimir, dejando solo el nombre del mes/semana */}
-            <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded-md pl-1 pr-3 py-1 print:bg-transparent print:border-0 print:p-0">
+            <div className="flex items-center gap-0.5 border border-slate-200 rounded-md pl-1 pr-1 py-0.5 print:border-0 print:p-0">
               <button
                 onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors print:hidden"
               >
                 <ChevronLeft size={16} />
               </button>
-              <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">
+              <h2 className="text-[14px] font-semibold text-slate-900 min-w-[180px] text-center px-1">
                 {viewMode === "month"
                   ? `${MONTHS_ES[currentMonth]} ${currentYear}`
                   : (() => {
@@ -584,21 +569,7 @@ export default function CalendarPage() {
                 )}
               </div>
 
-              <div className="flex border border-slate-200 rounded-md overflow-hidden">
-                {(["month", "week"] as ViewMode[]).map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setViewMode(v)}
-                    className={`px-3 py-2 text-xs font-medium transition-colors capitalize ${
-                      viewMode === v
-                        ? "bg-[#F1F1F3] text-slate-900"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {v === "month" ? "Mes" : "Semana"}
-                  </button>
-                ))}
-              </div>
+              <Segmented value={viewMode} onChange={(v) => setViewMode(v as ViewMode)} options={[{ value: "month", label: "Mes" }, { value: "week", label: "Semana" }]} />
             </div>
           </div>
         </div>
@@ -624,7 +595,7 @@ export default function CalendarPage() {
               {monthDays.map((ymd, idx) => {
                 const dayEvents = ymd ? eventsForDate(ymd) : [];
                 const isToday   = ymd === todayYMD;
-                const isSelected = ymd === selectedDate;
+                const isSelected = !!ymd && ymd === selectedDate;
                 const isWeekend = idx % 7 >= 5;
 
                 return (
@@ -635,7 +606,7 @@ export default function CalendarPage() {
                       setSelectedDate(isSelected ? null : ymd);
                       setSidebarEvent(null);
                     }}
-                    className={`min-h-[110px] border-r border-b border-slate-100 p-2 cursor-pointer transition-colors group ${!ymd ? "bg-slate-50/60" : ""}
+                    className={`min-h-[110px] border-r border-b border-slate-100 p-2 cursor-pointer transition-colors group ${!ymd ? "bg-[#FAFAFA]" : ""}
                       ${isWeekend && ymd ? "bg-slate-50/40" : ""}
                       ${isSelected ? "bg-[#F4F4F5] ring-1 ring-inset ring-slate-900/10" : "hover:bg-slate-50/70"}
                     `}

@@ -1,4 +1,5 @@
 "use client";
+import { PageHeader } from "@/components/ds";
 import { errorText } from "@/lib/toast";
 import { toast as appToast } from "@/lib/toast";
 
@@ -675,26 +676,19 @@ export default function ControlHorarioPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* Header */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Control horario</h1>
-            </div>
-            <div className="absolute right-0 flex items-center gap-1">
-              <button onClick={() => setShowConfig(true)}
+      <div className="mt-[53px] px-6 pt-8 sm:px-10">
+        <PageHeader title="Control horario" actions={<>
+<button onClick={() => setShowConfig(true)}
                 className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors" title="Configuración">
                 <Settings size={18} />
               </button>
-            </div>
-          </div>
-        </div>
+        </>} />
       </div>
 
       <main className="px-6 sm:px-10 pt-6 pb-16">
 
         {/* ── Navegador de fecha (mes + tira de días) ──────────────────────── */}
-        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 pt-3 pb-3.5 mb-8">
+        <div className="border border-slate-200 rounded-lg px-4 pt-3 pb-3.5 mb-8">
           {/* Month nav */}
           <div className="flex items-center gap-0.5 mb-1.5">
             <button
@@ -703,7 +697,7 @@ export default function ControlHorarioPage() {
             >
               <ChevronLeft size={16} />
             </button>
-            <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">
+            <h2 className="text-[14px] font-semibold text-slate-900 min-w-[180px] text-center px-1">
               {MONTH_NAMES[currentMonth]} {currentYear}
             </h2>
             <button

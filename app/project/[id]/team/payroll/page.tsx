@@ -4,7 +4,7 @@ import { toast as appToast } from "@/lib/toast";
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { inter } from "@/lib/fonts";
-import { AnchoredPanel } from "@/components/ds";
+import { AnchoredPanel, PageHeader, Segmented } from "@/components/ds";
 import { auth, db } from "@/lib/firebase";
 import {
   onAuthStateChanged,
@@ -128,13 +128,13 @@ interface AllowanceDef {
 }
 
 const ALLOWANCES: AllowanceDef[] = [
-  { key:"meals",           overrideKey:"mealRateOverride",            rateKey:"mealRate",            label:"Comidas",              dot:"#f97316", Icon:Utensils },
+  { key:"meals",           overrideKey:"mealRateOverride",            rateKey:"mealRate",            label:"Comidas",              dot:"#d97706", Icon:Utensils },
   { key:"halfPerDiem",     overrideKey:"halfPerDiemRateOverride",     rateKey:"halfPerDiemRate",     artisticRateKey:"halfPerDiemRateArtistic",     label:"Media dieta nac.",     dot:"#7dd3fc", Icon:Plane    },
   { key:"perDiem",         overrideKey:"perDiemRateOverride",         rateKey:"perDiemRate",         artisticRateKey:"perDiemRateArtistic",         label:"Dieta nacional",       dot:"#0ea5e9", Icon:Plane    },
   { key:"halfIntlPerDiem", overrideKey:"halfIntlPerDiemRateOverride", rateKey:"halfIntlPerDiemRate", artisticRateKey:"halfIntlPerDiemRateArtistic", label:"Media dieta inter.",   dot:"#a5b4fc", Icon:Globe    },
   { key:"intlPerDiem",     overrideKey:"intlPerDiemRateOverride",     rateKey:"intlPerDiemRate",     artisticRateKey:"intlPerDiemRateArtistic",     label:"Dieta inter.",         dot:"#6366f1", Icon:Globe    },
   { key:"accommodation",   overrideKey:"accommodationRateOverride",   rateKey:"accommodationRate",   label:"Alojamiento",          dot:"#a855f7", Icon:Home     },
-  { key:"car",             overrideKey:"carRateOverride",             rateKey:"carRate",             label:"Vehículo",             dot:"#10b981", Icon:Car      },
+  { key:"car",             overrideKey:"carRateOverride",             rateKey:"carRate",             label:"Vehículo",             dot:"#475569", Icon:Car      },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -667,14 +667,9 @@ export default function PayrollPage() {
     <div className={`min-h-screen bg-white ${inter.className}`}>
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Confección de nóminas</h1>
-            </div>
-            <div className="absolute right-0 flex items-center gap-2">
-              {saving && <span className="text-xs text-slate-400 animate-pulse mr-1">Guardando…</span>}
+      <div className="mt-[53px] px-6 pt-8 sm:px-10">
+        <PageHeader title="Confección de nóminas" actions={<>
+{saving && <span className="text-xs text-slate-400 animate-pulse mr-1">Guardando…</span>}
               <div className="relative">
                 <button onClick={() => setShowExport(v => !v)}
                   className="flex items-center gap-2 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md text-[13px] font-medium hover:bg-slate-50 transition-colors">
@@ -693,32 +688,23 @@ export default function PayrollPage() {
                   </>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
+        </>} />
       </div>
 
       {/* ── Controls + legend ────────────────────────────────────────────── */}
       <div className="px-6 sm:px-10 pt-6 pb-6">
-        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+        <div className="border border-slate-200 rounded-lg px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             {/* Month nav */}
             <div className="flex items-center gap-0.5">
               <button onClick={prevM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={16} /></button>
-              <h2 className="text-base font-bold text-slate-900 min-w-[180px] text-center px-1">{MONTH_NAMES[month]} {year}</h2>
+              <h2 className="text-[14px] font-semibold text-slate-900 min-w-[180px] text-center px-1">{MONTH_NAMES[month]} {year}</h2>
               <button onClick={nextM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronRight size={16} /></button>
             </div>
 
             <div className="flex items-center gap-2">
               {/* View */}
-              <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5">
-                {(["grid","summary"] as const).map(v => (
-                  <button key={v} onClick={() => setViewMode(v)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode===v ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-100"}`}>
-                    {v === "grid" ? "Tabla" : "Resumen"}
-                  </button>
-                ))}
-              </div>
+              <Segmented value={viewMode} onChange={(v) => setViewMode(v as "grid" | "summary")} options={[{ value: "grid", label: "Tabla" }, { value: "summary", label: "Resumen" }]} />
 
               {/* Period config */}
               <button
@@ -921,8 +907,7 @@ export default function PayrollPage() {
                   Cancelar
                 </button>
                 <button onClick={applyRangeFill} disabled={!anyType}
-                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
-                  style={{ backgroundColor: TEAM_COLOR }}>
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity disabled:opacity-40">
                   <Zap size={13} />
                   {rfMode === "mark" ? "Aplicar" : "Borrar"} días {rfDay1}–{rfDay2}
                 </button>
@@ -962,8 +947,7 @@ export default function PayrollPage() {
               {/* Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
-                    style={{ backgroundColor: TEAM_COLOR + "cc" }}>
+                  <div className="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold bg-[#F1F1F3] text-slate-700">
                     {m.firstName[0]}{m.lastName1[0]}
                   </div>
                   <div>
@@ -1044,8 +1028,7 @@ export default function PayrollPage() {
                               if (!isNaN(v) && v >= 0) saveSalaryOverride(m.id, v);
                               setEditingSalary(false);
                             }}
-                            className="px-3 py-1.5 text-xs font-medium text-white rounded-lg"
-                            style={{ backgroundColor: TEAM_COLOR }}>
+                            className="px-3 py-1.5 text-xs font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md">
                             OK
                           </button>
                           <button onClick={() => setEditingSalary(false)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-700">✕</button>
@@ -1211,8 +1194,7 @@ export default function PayrollPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => { saveNote(m.id, noteDraft); setNoteDraft(null); }}
-                          className="flex-1 py-1.5 text-xs font-medium text-white rounded-lg"
-                          style={{ backgroundColor: TEAM_COLOR }}>
+                          className="flex-1 py-1.5 text-xs font-medium border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md">
                           Guardar
                         </button>
                         {notes[m.id] && (
@@ -1397,7 +1379,7 @@ export default function PayrollPage() {
                       </div>
                       <div className="p-4 space-y-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                          <div className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-2">
                             <p className="text-xs text-slate-500 truncate">{f.url}</p>
                           </div>
                           <button onClick={() => copyToClipboard(f.url, `url-${i}`)}
@@ -1407,7 +1389,7 @@ export default function PayrollPage() {
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                          <div className="flex-1 border border-slate-200 rounded-lg px-3 py-2">
                             <p className="text-[13px] font-bold text-slate-900 tracking-widest">{f.pin}</p>
                           </div>
                           <button onClick={() => copyToClipboard(f.pin, `pin-${i}`)}
@@ -1442,8 +1424,7 @@ export default function PayrollPage() {
                     if (solStep < 3) setSolStep(s => s+1);
                     else generateDietasForms();
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
-                  style={{ backgroundColor: TEAM_COLOR }}>
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-colors disabled:opacity-40">
                   {generating ? "Creando…" : solStep===3 ? <><Send size={14} /> Crear formulario{solMode==="individual"&&solPeople.size>1?"s":""}</> : "Siguiente"}
                 </button>
               </div>
@@ -1610,8 +1591,7 @@ export default function PayrollPage() {
                   Cancelar
                 </button>
                 <button onClick={confirmEdit}
-                  className="flex-1 flex items-center justify-center gap-2 py-1.5 text-white rounded-md text-[13px] font-medium hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: TEAM_COLOR }}>
+                  className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium transition-opacity">
                   <Check size={15} />Confirmar
                 </button>
               </div>
@@ -1861,8 +1841,7 @@ export default function PayrollPage() {
             return (
               <div key={m.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-white select-none"
-                    style={{ backgroundColor: TEAM_COLOR + "cc" }}>
+                  <div className="w-9 h-9 rounded-md flex-shrink-0 flex items-center justify-center text-[13px] font-bold bg-[#F1F1F3] text-slate-700 select-none">
                     {m.firstName[0]}{m.lastName1[0]}
                   </div>
                   <div className="flex-1 min-w-0">

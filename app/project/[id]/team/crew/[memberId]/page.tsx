@@ -77,7 +77,7 @@ type ApprovalStatus = "draft" | "pending_approval" | "approved" | "rejected";
 const APPROVAL_CONFIG: Record<ApprovalStatus, { label: string; bg: string; text: string; dot: string }> = {
   draft:            { label: "Borrador",           bg: "bg-slate-100",   text: "text-slate-600",   dot: "bg-slate-400"   },
   pending_approval: { label: "Pendiente aprobación", bg: "bg-amber-50", text: "text-amber-700",   dot: "bg-amber-500"   },
-  approved:         { label: "Aprobada",            bg: "bg-emerald-50",  text: "text-emerald-700", dot: "bg-emerald-500" },
+  approved:         { label: "Aprobada",            bg: "bg-white",  text: "text-slate-800", dot: "bg-emerald-500" },
   rejected:         { label: "Rechazada",           bg: "bg-red-50",      text: "text-red-700",     dot: "bg-red-500"     },
 };
 
@@ -692,10 +692,10 @@ export default function CrewMemberPage() {
             {/* Right */}
             <div className="flex items-center gap-2">
               {/* Completeness */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
-                <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="flex items-center gap-2 px-1 py-1.5">
+                <div className="w-20 h-1 bg-[#F1F1F3] rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
-                    style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#0F172A" : completeness >= 50 ? "#F59E0B" : "#EF4444" }} />
+                    style={{ width: `${completeness}%`, backgroundColor: completeness >= 80 ? "#0F172A" : completeness >= 50 ? "#64748B" : "#D97706" }} />
                 </div>
                 <span className="text-xs text-slate-500 font-medium">{completeness}% completado</span>
               </div>
