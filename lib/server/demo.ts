@@ -8,11 +8,12 @@ import { createHash, randomBytes } from "crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { syncProjectLedger } from "@/lib/server/ledger";
+import { DEMO_BUDGET } from "@/lib/server/demoBudget";
 
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 export const newToken = () => randomBytes(24).toString("base64url");
 
-const DEPARTMENTS = ["Producción", "Dirección", "Fotografía", "Arte", "Sonido", "Vestuario", "Maquillaje y peluquería", "Reparto"];
+const DEPARTMENTS = ["Producción", "Dirección", "Guion", "Fotografía", "Arte", "Sonido", "Vestuario", "Maquillaje y peluquería", "Montaje", "Música", "Reparto"];
 
 /** IBAN español válido a partir de banco+sucursal+cuenta (20 dígitos). */
 function iban(bban: string) {
@@ -34,7 +35,7 @@ export async function createDemoProject(uid: string, person: { name: string; ema
 
   // Proyecto y miembro (la persona de la demo es la PM, con acceso completo)
   set(base, {
-    name: "El último verano", description: "Largometraje de ejemplo · datos ficticios", phase: "Rodaje", producers: [],
+    name: "La última marea", description: "Largometraje de ficción · thriller dramático. Madrid, puerto de Vigo y costa gallega. Datos ficticios.", phase: "Rodaje", producers: [],
     departments: DEPARTMENTS, language: "es", createdAt: FieldValue.serverTimestamp(), isDemo: true,
     modules: { accounting: true, team: true, sign: false },
   });
@@ -44,10 +45,11 @@ export async function createDemoProject(uid: string, person: { name: string; ema
   set(db.doc(`userProjects/${uid}/projects/${projectId}`), { projectId, ...member });
   // Compañeros ficticios (sin cuenta)
   const others: [string, string, string | null, string | null, string | null][] = [
-    ["demo-ep", "Carmen Ibáñez", "EP", null, null],
+    ["demo-ep", "Marcos Beltrán", "EP", null, null],
+    ["demo-pm", "Irene Campos", "PM", null, null],
     ["demo-ctl", "Andrés Molina", "Controller", null, null],
-    ["demo-hod-foto", "Lucía Prieto", null, "Fotografía", "HOD"],
-    ["demo-hod-arte", "Diego Vidal", null, "Arte", "HOD"],
+    ["demo-hod-foto", "Diego Aranda", null, "Fotografía", "HOD"],
+    ["demo-hod-arte", "Paula Navas", null, "Arte", "HOD"],
   ];
   for (const [id, name, role, department, position] of others) {
     set(base.collection("members").doc(id), {
@@ -57,41 +59,34 @@ export async function createDemoProject(uid: string, person: { name: string; ema
     });
   }
 
-  set(base.collection("config").doc("company"), { fiscalName: "Producciones Ejemplo S.L.", taxId: "B00000000", address: "Calle Ficticia 1", postalCode: "28001", city: "Madrid", province: "Madrid", country: "España" });
-  set(base.collection("config").doc("production"), { projectType: "pelicula", shootingDays: 30, shootingStartDate: ymd(-20), shootingEndDate: ymd(16), language: "Español" });
+  set(base.collection("config").doc("company"), { fiscalName: "Marea Producciones S.L.", taxId: "B00000000", address: "Calle Ficticia 1", postalCode: "28001", city: "Madrid", province: "Madrid", country: "España" });
+  set(base.collection("config").doc("production"), { projectType: "pelicula", episodeDuration: 110, shootingDays: 36, shootingStartDate: ymd(-20), shootingEndDate: ymd(16), language: "Español" });
 
-  // Presupuesto: cuentas, subcuentas y cifras (budgetLines)
-  const budget: [string, string, [string, string, number][]][] = [
-    ["02", "Personal artístico", [["02.01", "Protagonistas", 90000], ["02.02", "Secundarios", 45000]]],
-    ["03", "Equipo técnico", [["03.01", "Dirección", 60000], ["03.02", "Fotografía", 75000], ["03.03", "Arte", 40000]]],
-    ["04", "Escenografía", [["04.01", "Construcción de decorados", 38000], ["04.02", "Atrezo", 18000]]],
-    ["05", "Material técnico", [["05.01", "Cámara y ópticas", 42000], ["05.02", "Iluminación y grupo", 30000]]],
-    ["08", "Viajes, alojamiento y dietas", [["08.01", "Alojamiento", 26000], ["08.03", "Catering", 22000]]],
-  ];
+  // Presupuesto: «La última marea», 4.000.000 € (cuentas, subcuentas y cifras en budgetLines)
   const subs: Record<string, { id: string; description: string }> = {};
-  for (const [code, description, lines] of budget) {
-    const acc = base.collection("accounts").doc(`a${code}`);
-    set(acc, { code, description, createdAt: ts(-40) });
-    for (const [scode, sdesc, amount] of lines) {
-      const sid = `s${scode.replace(".", "")}`;
+  for (const a of DEMO_BUDGET) {
+    const acc = base.collection("accounts").doc(`a${a.code}`);
+    set(acc, { code: a.code, description: a.description, createdAt: ts(-60) });
+    for (const [scode, sdesc, amount] of a.subs) {
+      const sid = `s${scode.replace(/\W/g, "")}`;
       subs[scode] = { id: sid, description: sdesc };
-      set(acc.collection("subaccounts").doc(sid), { code: scode, description: sdesc, accountId: acc.id, committed: 0, actual: 0, box: 0, createdAt: ts(-40) });
+      set(acc.collection("subaccounts").doc(sid), { code: scode, description: sdesc, accountId: acc.id, committed: 0, actual: 0, box: 0, createdAt: ts(-60) });
       set(base.collection("budgetLines").doc(sid), { budgeted: amount, accountId: acc.id, code: scode });
     }
   }
 
   // Proveedores (IBAN con certificado verificado salvo uno)
   const suppliers: [string, string, string, string, string, boolean][] = [
-    ["sup-rental", "Alquileres Cámara Norte S.L.", "Cámara Norte", "B10000003", "21000418450200051332", true],
-    ["sup-luz", "Iluminación Sur S.L.", "Luz Sur", "B20000002", "00491500051234567892", true],
-    ["sup-carpinteria", "Carpintería del Río S.L.", "Carpintería del Río", "B30000001", "20800000650000000123", true],
-    ["sup-catering", "Catering La Mesa S.L.", "La Mesa Catering", "B40000000", "01822370410201234567", true],
-    ["sup-hotel", "Hotel Mirador S.A.", "Hotel Mirador", "A50000009", "21003000141234567890", false],
+    ["sup-rental", "Atlántica Rental Cine S.L.", "Atlántica Rental", "B10000003", "21000418450200051332", true],
+    ["sup-luz", "Luz de Faro Iluminación S.L.", "Luz de Faro", "B20000002", "00491500051234567892", true],
+    ["sup-carpinteria", "Carpintería Ría de Vigo S.L.", "Carpintería Ría", "B30000001", "20800000650000000123", true],
+    ["sup-catering", "Catering O Porto S.L.", "Catering O Porto", "B40000000", "01822370410201234567", true],
+    ["sup-hotel", "Hotel Costa da Morte S.A.", "Hotel Costa da Morte", "A50000009", "21003000141234567890", false],
   ];
   for (const [id, fiscal, commercial, taxId, bban, verified] of suppliers) {
     set(base.collection("suppliers").doc(id), {
       fiscalName: fiscal, commercialName: commercial, country: "ES", taxId,
-      address: { street: "Calle Ejemplo 10", number: "", city: "Madrid", province: "Madrid", postalCode: "28010" },
+      address: { street: "Rúa do Porto 10", number: "", city: "Vigo", province: "Pontevedra", postalCode: "36202" },
       contact: { name: "Contacto", email: `${id}@demo.filma`, phone: "600000000" },
       paymentMethod: "transferencia", bankAccount: iban(bban), bic: "",
       certificates: { bankOwnership: { uploaded: true, verified }, contractorsCertificate: { uploaded: false } },
@@ -104,7 +99,7 @@ export async function createDemoProject(uid: string, person: { name: string; ema
   const step = () => ({ id: "s1", order: 1, approverType: "role", roles: ["PM"], requireAll: false, approvers: [uid], approverNames: [person.name], approvedBy: [], rejectedBy: [], status: "pending" });
 
   // Autoría por departamento (compañeros ficticios); el borrador de la PO-0006 es de la propia persona.
-  const AUTHOR: Record<string, [string, string]> = { "Fotografía": ["demo-hod-foto", "Lucía Prieto"], "Arte": ["demo-hod-arte", "Diego Vidal"], "Producción": ["demo-ep", "Carmen Ibáñez"] };
+  const AUTHOR: Record<string, [string, string]> = { "Fotografía": ["demo-hod-foto", "Diego Aranda"], "Arte": ["demo-hod-arte", "Paula Navas"], "Producción": ["demo-pm", "Irene Campos"] };
   const authorOf = (department: string, own = false) => {
     const [id, name] = own ? [uid, person.name] : AUTHOR[department] || [uid, person.name];
     return { createdBy: id, createdByName: name };
@@ -116,12 +111,12 @@ export async function createDemoProject(uid: string, person: { name: string; ema
     quantity: 1, unitPrice: amount, baseAmount: amount, vatRate: vat, vatAmount: +(amount * vat / 100).toFixed(2), irpfRate: 0, irpfAmount: 0, totalAmount: +(amount * (1 + vat / 100)).toFixed(2),
   });
   const pos: [string, string, string, string, string, ReturnType<typeof poItem>[], Record<string, unknown>][] = [
-    ["po1", "0001", "sup-rental", "Fotografía", "Paquete de cámara y ópticas, 6 semanas", [poItem("Cámara y ópticas", "05.01", 18600)], { status: "approved", approvedAt: ts(-25) }],
-    ["po2", "0002", "sup-luz", "Fotografía", "Iluminación y grupo electrógeno", [poItem("Material de iluminación", "05.02", 12400), poItem("Grupo electrógeno", "05.02", 2900)], { status: "approved", approvedAt: ts(-22) }],
-    ["po3", "0003", "sup-carpinteria", "Arte", "Construcción del decorado de la casa", [poItem("Construcción decorado", "04.01", 21500)], { status: "approved", approvedAt: ts(-18) }],
-    ["po4", "0004", "sup-catering", "Producción", "Catering semanas 1 a 4", [poItem("Catering 45 personas", "08.03", 15800, 10)], { status: "approved", approvedAt: ts(-15) }],
-    ["po5", "0005", "sup-hotel", "Producción", "Alojamiento del equipo en exteriores", [poItem("Habitaciones 12 noches", "08.01", 9600, 10)], { status: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }],
-    ["po6", "0006", "sup-carpinteria", "Arte", "Atrezo de época", [poItem("Atrezo", "04.02", 3200)], { status: "draft" }],
+    ["po1", "0001", "sup-rental", "Fotografía", "Paquete de cámara para el rodaje", [poItem("Cámara principal y ópticas, 6 semanas", "06-01-01", 18600)], { status: "approved", approvedAt: ts(-25) }],
+    ["po2", "0002", "sup-luz", "Fotografía", "Iluminación y grupo electrógeno", [poItem("Material de iluminación", "06-01-07", 12400), poItem("Grupo electrógeno", "06-01-07", 2900)], { status: "approved", approvedAt: ts(-22) }],
+    ["po3", "0003", "sup-carpinteria", "Arte", "Construcción del decorado de la casa de Inés", [poItem("Construcción decorado en plató", "04-01-01", 21500)], { status: "approved", approvedAt: ts(-18) }],
+    ["po4", "0004", "sup-catering", "Producción", "Comidas de rodaje, semanas 1 a 4", [poItem("Comidas 45 personas", "07-03-04", 15800, 10)], { status: "approved", approvedAt: ts(-15) }],
+    ["po5", "0005", "sup-hotel", "Producción", "Hotel del equipo técnico en la costa", [poItem("Habitaciones, 12 noches", "07-03-02", 9600, 10)], { status: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }],
+    ["po6", "0006", "sup-carpinteria", "Arte", "Atrezzo del puerto", [poItem("Redes, boyas y aparejos", "04-02-02", 3200)], { status: "draft" }],
   ];
   for (const [id, number, sid, department, desc, items, extra] of pos) {
     const baseAmount = items.reduce((a, i) => a + i.baseAmount, 0), vat = items.reduce((a, i) => a + i.vatAmount, 0);
@@ -147,39 +142,48 @@ export async function createDemoProject(uid: string, person: { name: string; ema
       createdAt: ts(invoiceDay + 1), ...authorOf(poId ? pos.find((p) => p[0] === poId)![3] : "Producción"), ...extra,
     });
   };
-  inv(1, "po1", "sup-rental", "Cámara y ópticas · semanas 1 y 2", "05.01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-12), codedAt: ts(-11), paidAt: ts(-4), paymentDate: ts(-4) }, -14, 16);
-  inv(2, "po1", "sup-rental", "Cámara y ópticas · semanas 3 y 4", "05.01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-2), codedAt: ts(-1) }, -3, 27);
-  inv(3, "po3", "sup-carpinteria", "Primer pago decorado (50 %)", "04.01", 10750, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-6) }, -8, 2);
-  inv(4, "po4", "sup-catering", "Catering semanas 1 y 2", "08.03", 7900, 10, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-9), codedAt: ts(-8) }, -10, -1);
-  inv(5, "po2", "sup-luz", "Iluminación · primera quincena", "05.02", 7650, 21, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -2, 28);
-  inv(6, null, "sup-hotel", "Alojamiento localizaciones", "08.01", 1840, 10, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -1, 29);
+  inv(1, "po1", "sup-rental", "Cámara · semanas 1 y 2", "06-01-01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-12), codedAt: ts(-11), paidAt: ts(-4), paymentDate: ts(-4) }, -14, 16);
+  inv(2, "po1", "sup-rental", "Cámara · semanas 3 y 4", "06-01-01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-2), codedAt: ts(-1) }, -3, 27);
+  inv(3, "po3", "sup-carpinteria", "Primer pago del decorado (50 %)", "04-01-01", 10750, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-6) }, -8, 2);
+  inv(4, "po4", "sup-catering", "Comidas de rodaje, semanas 1 y 2", "07-03-04", 7900, 10, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-9), codedAt: ts(-8) }, -10, -1);
+  inv(5, "po2", "sup-luz", "Iluminación, primera quincena", "06-01-07", 7650, 21, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -2, 28);
+  inv(6, null, "sup-hotel", "Hotel del equipo, localizaciones", "07-03-02", 1840, 10, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -1, 29);
   set(base.collection("counters").doc("invoices"), { last: 6 });
 
   // Crew
-  const crew: [string, string, string, string, string, number][] = [
-    ["Laura", "Benítez", "Directora", "Dirección", "technical", 3200],
-    ["Martín", "Roca", "Ayudante de dirección", "Dirección", "technical", 1650],
-    ["Lucía", "Prieto", "Directora de fotografía", "Fotografía", "technical", 2600],
-    ["Hugo", "Serrano", "Foquista", "Fotografía", "technical", 1400],
-    ["Diego", "Vidal", "Director de arte", "Arte", "technical", 2100],
-    ["Paula", "Nieto", "Ambientadora", "Arte", "technical", 1150],
-    ["Sara", "León", "Jefa de sonido", "Sonido", "technical", 1800],
-    ["Elena", "Campos", "Protagonista", "Reparto", "cast", 0],
+  const crew: [string, string, string, string, string, number, string?][] = [
+    ["Clara", "Montes", "Directora", "Dirección", "technical", 3400],
+    ["Elena", "Valdés", "Guionista", "Guion", "technical", 2200],
+    ["Marcos", "Beltrán", "Productor ejecutivo", "Producción", "technical", 3000],
+    ["Irene", "Campos", "Directora de producción", "Producción", "technical", 2600],
+    ["Diego", "Aranda", "Director de fotografía", "Fotografía", "technical", 2600],
+    ["Paula", "Navas", "Directora de arte", "Arte", "technical", 2300],
+    ["Mateo", "Cruz", "Diseñador de sonido", "Sonido", "technical", 1900],
+    ["Sofía", "Roldán", "Montadora", "Montaje", "technical", 2100],
+    ["Andrés", "Leiva", "Compositor", "Música", "technical", 1800],
+    ["Lucía", "Ferrer", "Protagonista", "Reparto", "cast", 0, "Inés Robles"],
+    ["Álvaro", "Sanz", "Protagonista", "Reparto", "cast", 0, "Daniel Vega"],
+    ["Javier", "Llorente", "Secundario", "Reparto", "cast", 0, "Tomás Robles"],
+    ["Nerea", "Vidal", "Secundaria", "Reparto", "cast", 0, "Mara Souto"],
+    ["Sergio", "Montalbán", "Secundario", "Reparto", "cast", 0, "Comisario Esteban Rivas"],
+    ["Hugo", "Paredes", "Secundario", "Reparto", "cast", 0, "Nico"],
   ];
-  crew.forEach(([firstName, lastName1, role, department, section, weekly], i) => {
+  crew.forEach(([firstName, lastName1, role, department, section, weekly, character], i) => {
     set(base.collection("crew").doc(`crew${i + 1}`), {
       crewNumber: String(i + 1).padStart(4, "0"), section, firstName, lastName1, role, department, status: "active",
-      email: `${firstName.toLowerCase()}@demo.filma`, ...(weekly ? { salaryType: "weekly", salaryAmount: weekly } : { sessions: 20, salaryPerSession: 600 }),
+      email: `${firstName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}@demo.filma`,
+      ...(weekly ? { salaryType: "weekly", salaryAmount: weekly } : { sessions: 20, salaryPerSession: role === "Protagonista" ? 6000 : 1500 }),
+      ...(character ? { character } : {}),
       startDate: ymd(-27), createdAt: ts(-30), createdBy: uid, createdByName: person.name,
     });
   });
   set(base.collection("counters").doc("crew"), { last: crew.length });
-  set(base.collection("teamConfig").doc("departmentOrder"), { order: ["Dirección", "Fotografía", "Arte", "Sonido", "Reparto"] });
+  set(base.collection("teamConfig").doc("departmentOrder"), { order: ["Dirección", "Guion", "Producción", "Fotografía", "Arte", "Sonido", "Montaje", "Música", "Reparto"] });
 
   // Calendario
   const events: [number, string, string, string?][] = [
-    [-20, "milestone", "Inicio de rodaje"], [-6, "location", "Exteriores: playa", "Costa norte"], [2, "scene", "Escenas 24 a 31", "Casa del faro"],
-    [9, "location", "Cambio de localización", "Pueblo"], [16, "milestone", "Fin de rodaje"],
+    [-20, "milestone", "Inicio de rodaje", "Madrid"], [-6, "location", "Exteriores: puerto de Vigo", "Puerto de Vigo"], [2, "scene", "Escenas 24 a 31", "Casa de Inés"],
+    [9, "location", "Traslado a la costa", "Costa gallega"], [16, "milestone", "Fin de rodaje"],
   ];
   events.forEach(([d, category, title, location], i) => {
     set(base.collection("calendarEvents").doc(`ev${i + 1}`), {

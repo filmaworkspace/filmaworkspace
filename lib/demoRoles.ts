@@ -1,35 +1,37 @@
-// Perfiles de «Ver la demo como…»: el usuario demo cambia de rol en su proyecto
-// de ejemplo para comprobar lo que ve cada uno.
+// Perfiles con los que se puede ver la demo: al terminar la intro se elige uno
+// y el usuario demo pasa a tener ese rol en su proyecto de ejemplo.
 
-export type DemoRoleKey = "pm" | "hod" | "crew" | "visitor";
+export type DemoRoleKey = "pm" | "controller" | "hod" | "crew";
 
 export const DEMO_ROLES: Record<DemoRoleKey, {
   label: string; note: string;
   member: { role: string | null; department: string | null; position: string | null; permissions: { config: boolean; accounting: boolean; team: boolean }; accountingAccessLevel: string; boxAccess: boolean };
 }> = {
   pm: {
-    label: "PM", note: "Rol de proyecto con contabilidad ampliada: lo ves todo.",
+    label: "PM", note: "Dirige la producción. Lo ve y lo decide todo.",
     member: { role: "PM", department: null, position: null, permissions: { config: true, accounting: true, team: true }, accountingAccessLevel: "accounting_extended", boxAccess: true },
   },
+  controller: {
+    label: "Controller", note: "Lleva la contabilidad del proyecto.",
+    member: { role: "Controller", department: null, position: null, permissions: { config: false, accounting: true, team: false }, accountingAccessLevel: "accounting_extended", boxAccess: true },
+  },
   hod: {
-    label: "Jefatura de Arte", note: "Ves las POs y facturas de Arte y apruebas lo que te toca.",
+    label: "Jefatura de Arte", note: "Gestiona y aprueba lo de su departamento.",
     member: { role: null, department: "Arte", position: "HOD", permissions: { config: false, accounting: true, team: true }, accountingAccessLevel: "user", boxAccess: false },
   },
   crew: {
-    label: "Crew de Arte", note: "Solo ves las POs y facturas que creas tú.",
+    label: "Crew de Arte", note: "Pide lo que necesita y sigue sus documentos.",
     member: { role: null, department: "Arte", position: "Crew", permissions: { config: false, accounting: true, team: false }, accountingAccessLevel: "user", boxAccess: false },
-  },
-  visitor: {
-    label: "Visitante", note: "Solo el panel de contabilidad, en lectura.",
-    member: { role: null, department: null, position: null, permissions: { config: false, accounting: true, team: false }, accountingAccessLevel: "visitor", boxAccess: false },
   },
 };
 
-export function demoRoleOf(m: { role?: string | null; position?: string | null; accountingAccessLevel?: string | null } | null | undefined): DemoRoleKey {
+export const DEMO_ROLE_ORDER: DemoRoleKey[] = ["pm", "controller", "hod", "crew"];
+
+export function demoRoleOf(m: { role?: string | null; position?: string | null } | null | undefined): DemoRoleKey {
   if (!m) return "pm";
+  if (m.role === "Controller") return "controller";
   if (m.role) return "pm";
   if (m.position === "HOD") return "hod";
   if (m.position === "Crew") return "crew";
-  if (m.accountingAccessLevel === "visitor") return "visitor";
   return "pm";
 }

@@ -7,8 +7,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { BadgeCheck, Clapperboard, Banknote, Bell, Calculator, Check, Eye, FilePlus2, FolderOpen, Layers, PenLine, PenTool, Search, SlidersHorizontal, Smartphone, Sparkles, Stamp, Users, WifiOff, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Briefcase, Clapperboard, HardHat, Palette, Banknote, Bell, Calculator, Check, Eye, FilePlus2, FolderOpen, Layers, PenLine, PenTool, Search, SlidersHorizontal, Smartphone, Sparkles, Stamp, Users, WifiOff, type LucideIcon } from "lucide-react";
 import { inter } from "@/lib/fonts";
+import { DEMO_ROLES, DEMO_ROLE_ORDER, type DemoRoleKey } from "@/lib/demoRoles";
 
 type Item = { title: string; text?: string; icon?: LucideIcon };
 /** Tono del fondo: el de Filma, el de cada entorno, o los dos a la vez. */
@@ -22,16 +23,19 @@ type Slide =
   | { kind: "flow"; title: string; steps: Item[]; text: string; tones?: Tones }
   | { kind: "phone"; title: string; text: string; items: Item[]; tones?: Tones }
   | { kind: "cloud"; title: string; text: string; words: string[]; icon?: LucideIcon; tones?: Tones }
+  | { kind: "brand"; text: string; tones?: Tones }
   | { kind: "end"; title: string; text: string ; tones?: Tones };
+
+const ROLE_ICON: Record<DemoRoleKey, LucideIcon> = { pm: Clapperboard, controller: Briefcase, hod: Palette, crew: HardHat };
 
 const STEP_MS = 1100; // entre elementos de una lista
 /** Dónde flotan las palabras de Filma Hub alrededor del título: x %, y %, opacidad. */
 const CLOUD: [number, number, number][] = [[6, 14, .55], [70, 8, .4], [80, 40, .6], [2, 52, .35], [62, 80, .5], [14, 84, .45], [40, 4, .3], [36, 92, .35]];
 
 const slidesFor = (first: string): Slide[] => [
+  { kind: "brand", text: "Toda la producción en un solo lugar" },
   { kind: "hero", title: first ? `Hola, ${first}` : "Hola" },
-  { kind: "hero", title: "Filma Workspace", text: "Toda la producción en un solo lugar." },
-  { kind: "hero", icon: Layers, title: "Un proyecto\nDos entornos de trabajo", tones: [{ theme: "both", at: 600 }] },
+  { kind: "hero", icon: Layers, title: "Un proyecto.\nDos entornos de trabajo.", tones: [{ theme: "both", at: 600 }] },
   { kind: "hero", icon: Calculator, title: "Contabilidad", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
   { kind: "hero", icon: Users, title: "Equipo", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
   { kind: "flow", title: "Nada sale sin aprobar", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
@@ -50,16 +54,17 @@ const slidesFor = (first: string): Slide[] => [
     { title: "Encuentra cualquier documento", icon: Search },
     { title: "También sin conexión", icon: WifiOff },
   ] },
-  { kind: "hero", icon: Sparkles, title: "Menos tiempo administrando\nMás tiempo haciendo cine", tones: [{ theme: "both", at: 400 }, { theme: "filma", at: 3200 }] },
+  { kind: "hero", icon: Sparkles, title: "Menos tiempo administrando.\nMás tiempo haciendo cine.", tones: [{ theme: "both", at: 400 }, { theme: "filma", at: 3200 }] },
   { kind: "list", title: "Y cuando lo necesites, más", items: [
     { title: "Filma Sign", text: "Firma digital, sin salir de la plataforma.", icon: PenTool },
     { title: "Budgeting", text: "El presupuesto, antes de rodar.", icon: Calculator },
   ] },
-  { kind: "end", title: "Tu proyecto de ejemplo está listo", text: "«El último verano», con datos ficticios para probar sin miedo." },
+  { kind: "end", title: "¿Cómo quieres verla?", text: "«La última marea», una producción de ejemplo con datos ficticios. Elige un perfil: cada uno ve la plataforma a su manera." },
 ];
 
 const durationOf = (s: Slide) =>
   s.kind === "end" ? Infinity
+  : s.kind === "brand" ? 4200
   : s.kind === "hero" ? (s.text ? 4800 : s.title.includes("\n") ? 4600 : 2600)
   : s.kind === "flow" ? 7200
   : s.kind === "cloud" ? 6800
@@ -75,10 +80,10 @@ function Mark({ icon: Icon, size = 56, delay = "0ms", className = "" }: { icon: 
   );
 }
 
-export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready = true, error }: {
+export default function DemoIntro({ name, onChoose, ready = true, error }: {
   name?: string;
-  onEnter: () => void;
-  enterLabel?: string;
+  /** Al elegir perfil en la última pantalla. */
+  onChoose: (role: DemoRoleKey) => void;
   /** El proyecto ya está preparado (si no, el botón espera). */
   ready?: boolean;
   error?: string;
@@ -86,7 +91,7 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
   const slides = slidesFor((name || "").trim().split(" ")[0]);
   const [i, setI] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const [entering, setEntering] = useState(false);
+  const [entering, setEntering] = useState<DemoRoleKey | null>(null);
   const [theme, setTheme] = useState<Theme>("filma");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const last = slides.length - 1;
@@ -120,7 +125,6 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
     const k = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(i + 1); }
       if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
-      if (e.key === "Enter" && i === last && ready) enter();
       if (e.key === "Escape") go(last);
     };
     window.addEventListener("keydown", k);
@@ -128,7 +132,7 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, go, ready]);
 
-  const enter = () => { if (entering) return; setEntering(true); onEnter(); };
+  const choose = (r: DemoRoleKey) => { if (entering || !ready) return; setEntering(r); onChoose(r); };
   const s = slides[i];
 
   return (
@@ -156,7 +160,15 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
 
       {/* Diapositiva */}
       <main className="relative z-10 flex h-full items-center justify-center px-6 sm:px-10" aria-live="polite">
-        <div key={i} className={`w-full ${["hero", "end", "flow", "cloud", "phone"].includes(s.kind) ? "max-w-5xl" : "max-w-3xl"} [text-wrap:balance] ${leaving ? "demo-out" : ""}`}>
+        <div key={i} className={`w-full ${["hero", "end", "flow", "cloud", "phone", "brand"].includes(s.kind) ? "max-w-5xl" : "max-w-3xl"} [text-wrap:balance] ${leaving ? "demo-out" : ""}`}>
+          {s.kind === "brand" && (
+            <div className="flex flex-col items-center text-center">
+              <Image src="/logo.svg" alt="Filma Workspace" width={560} height={110} priority className="demo-in h-auto w-[min(560px,78vw)]" />
+              <p className="demo-in mt-4 text-[13px] font-medium uppercase tracking-[0.42em] text-white/70 sm:text-[15px]" style={{ animationDelay: "500ms" }}>Workspace</p>
+              <p className="demo-in mt-10 text-[19px] text-white/85 sm:text-[24px]" style={{ animationDelay: "1300ms" }}>{s.text}</p>
+            </div>
+          )}
+
           {s.kind === "hero" && (
             <div className="text-center">
               {s.icon && <Mark icon={s.icon} size={64} className="mb-7" />}
@@ -280,17 +292,27 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
           {s.kind === "end" && (
             <div className="text-center">
               <h1 className="demo-in text-[36px] font-semibold leading-[1.1] tracking-tight sm:text-[56px]">{s.title}</h1>
-              <p className="demo-in mx-auto mt-5 max-w-xl text-[18px] text-white/75 sm:text-[21px]" style={{ animationDelay: "700ms" }}>{s.text}</p>
-              <div className="demo-in mt-10" style={{ animationDelay: "1300ms" }}>
-                {error ? (
-                  <p className="mx-auto max-w-md rounded-lg bg-white/10 px-4 py-3 text-[15px]">{error}</p>
-                ) : (
-                  <button onClick={enter} disabled={!ready || entering}
-                    className="inline-flex h-12 min-w-[180px] items-center justify-center rounded-full bg-white px-8 text-[16px] font-semibold text-[#172544] transition hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:opacity-70">
-                    {entering ? "Entrando…" : ready ? enterLabel : "Preparando tu proyecto…"}
-                  </button>
-                )}
-              </div>
+              <p className="demo-in mx-auto mt-4 max-w-xl text-[17px] text-white/75 sm:text-[20px]" style={{ animationDelay: "600ms" }}>{s.text}</p>
+              {error ? (
+                <p className="demo-in mx-auto mt-10 max-w-md rounded-lg bg-white/10 px-4 py-3 text-[15px]" style={{ animationDelay: "1100ms" }}>{error}</p>
+              ) : (
+                <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4" role="group" aria-label="Elige un perfil">
+                  {DEMO_ROLE_ORDER.map((r, k) => {
+                    const Icon = ROLE_ICON[r];
+                    const busy = entering === r;
+                    return (
+                      <button key={r} onClick={() => choose(r)} disabled={!ready || !!entering}
+                        className={`demo-in group flex flex-col items-center rounded-2xl px-4 pb-5 pt-6 text-center ring-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:cursor-default ${busy ? "bg-white text-[#172544] ring-white" : "bg-white/[.06] ring-white/20 hover:bg-white/[.12] hover:ring-white/50"} ${entering && !busy ? "opacity-40" : ""}`}
+                        style={{ animationDelay: `${1100 + k * 160}ms` }}>
+                        <span className={`flex h-12 w-12 items-center justify-center rounded-full ring-1 ${busy ? "ring-[#172544]/20" : "ring-white/30"}`}><Icon size={22} strokeWidth={1.4} /></span>
+                        <span className="mt-4 text-[17px] font-semibold">{DEMO_ROLES[r].label}</span>
+                        <span className={`mt-1.5 text-[13px] leading-snug ${busy ? "text-[#172544]/70" : "text-white/65"}`}>{busy ? "Entrando…" : DEMO_ROLES[r].note}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {!ready && !error && <p className="demo-in mt-6 text-[13px] text-white/60" style={{ animationDelay: "1600ms" }}>Preparando tu proyecto…</p>}
             </div>
           )}
         </div>

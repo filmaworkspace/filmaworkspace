@@ -11,6 +11,8 @@ import { signInWithCustomToken, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { inter } from "@/lib/fonts";
 import DemoIntro from "@/components/demo/DemoIntro";
+import { setDemoRole } from "@/lib/demoClient";
+import type { DemoRoleKey } from "@/lib/demoRoles";
 
 const post = (body: object) =>
   fetch("/api/demo/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -35,12 +37,14 @@ export default function DemoEntryPage() {
     }).catch((e) => setFatal(e.message));
   }, [token]);
 
-  const enter = async () => {
+  // Elegido el perfil: sesión, rol en el proyecto de ejemplo y a su página de inicio.
+  const choose = async (role: DemoRoleKey) => {
     if (!session) return;
     try {
       if (auth.currentUser) await signOut(auth);
       await signInWithCustomToken(auth, session.customToken);
-      setTimeout(() => router.replace(`/project/${session.projectId}/accounting`), 450);
+      await setDemoRole(role);
+      router.replace(`/project/${session.projectId}`);
     } catch {
       setPrepError("No se ha podido entrar. Vuelve a abrir el enlace.");
     }
@@ -58,5 +62,5 @@ export default function DemoEntryPage() {
     );
   }
   if (!info) return <div className="fixed inset-0" style={{ background: "linear-gradient(135deg, #172544 0%, #24406E 55%, #3B5D96 100%)" }} />;
-  return <DemoIntro name={info.name} onEnter={enter} ready={!!session} error={prepError} />;
+  return <DemoIntro name={info.name} onChoose={choose} ready={!!session} error={prepError} />;
 }
