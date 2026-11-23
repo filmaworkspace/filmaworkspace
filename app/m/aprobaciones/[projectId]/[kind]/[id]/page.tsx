@@ -18,6 +18,7 @@ import { toast, errorText } from "@/lib/toast";
 import { useMobileData } from "@/components/mobile/MobileData";
 import { ApprovalSteps, PendingApprovalNotice } from "@/components/accounting/ApprovalFlow";
 import { approvalHref, Card, money } from "@/components/mobile/ui";
+import { haptic } from "@/components/mobile/gestures";
 
 const COLLECTION: Record<PendingKind, string> = { po: "pos", invoice: "invoices", card: "cardEnvelopes", transfer: "transferEnvelopes" };
 const EXPENSES: Partial<Record<PendingKind, string>> = { card: "cardExpenses", transfer: "transferExpenses" };
@@ -30,6 +31,7 @@ export default function MobileApprovalDetail() {
   // Desde un proyecto se vuelve al proyecto; si no, a la bandeja.
   const backParam = useSearchParams().get("back");
   const backHref = backParam?.startsWith("/m/") ? backParam : "/m/aprobaciones";
+  const backLabel = backHref === "/m/aprobaciones" ? "Aprobaciones" : backHref === "/m/buscar" ? "Buscar" : backHref === "/m/actividad" ? "Actividad" : "Volver";
   const { user } = useUser();
   const { data, reload } = useMobileData();
   const [d, setD] = useState<DocumentData | null | undefined>(undefined);
@@ -61,7 +63,7 @@ export default function MobileApprovalDetail() {
   const next = (data?.approvals || []).find((a) => !(a.id === id && a.kind === kind));
 
   const finish = async (msg: string, ok = true) => {
-    if (ok) toast.success(msg); else toast.info(msg);
+    if (ok) { haptic([10, 40, 10]); toast.success(msg); } else toast.info(msg);
     await reload();
     router.replace(next ? approvalHref(next) : "/m/aprobaciones");
   };
@@ -85,7 +87,7 @@ export default function MobileApprovalDetail() {
 
   return (
     <div className="space-y-5 pb-20">
-      <Link href={backHref} className="-ml-1 inline-flex h-9 items-center gap-1 text-[13px] text-slate-500"><ArrowLeft size={16} /> {backHref === "/m/aprobaciones" ? "Aprobaciones" : "Volver"}</Link>
+      <Link href={backHref} className="-ml-1 inline-flex h-9 items-center gap-1 text-[13px] text-slate-500"><ArrowLeft size={16} /> {backLabel}</Link>
 
       <div>
         <div className="flex items-baseline gap-2 text-[12px] text-slate-500">

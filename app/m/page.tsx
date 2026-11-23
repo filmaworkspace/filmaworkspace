@@ -11,10 +11,12 @@ import { useUser } from "@/contexts/UserContext";
 import { toast, errorText } from "@/lib/toast";
 import { useMobileData } from "@/components/mobile/MobileData";
 import { ApprovalRow, Card, DocRow, Empty, SectionTitle, money } from "@/components/mobile/ui";
+import { PullToRefresh } from "@/components/mobile/gestures";
+import { InstallCard } from "@/components/mobile/pwa";
 
 export default function MobileHome() {
   const { user } = useUser();
-  const { data, invitations, loading, reload } = useMobileData();
+  const { data, invitations, loading, reload, online, updatedAt } = useMobileData();
   const [busy, setBusy] = useState<string | null>(null);
   const approvals = data?.approvals || [];
   const docs = data?.myDocs || [];
@@ -41,10 +43,15 @@ export default function MobileHome() {
   const first = (user?.name || "").split(" ")[0];
 
   return (
+    <PullToRefresh onRefresh={reload}>
     <div className="space-y-7">
-      <h1 className="text-[22px] font-semibold tracking-tight">{first ? `Hola, ${first}` : "Hola"}</h1>
+      <div>
+        <h1 className="text-[22px] font-semibold tracking-tight">{first ? `Hola, ${first}` : "Hola"}</h1>
+        {!online && updatedAt && <p className="mt-0.5 text-xs text-amber-700">Sin conexión · datos de las {new Date(updatedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>}
+      </div>
+      <InstallCard />
 
-      {loading ? (
+      {loading && !data ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>
       ) : (
         <>
@@ -103,5 +110,6 @@ export default function MobileHome() {
         </>
       )}
     </div>
+    </PullToRefresh>
   );
 }
