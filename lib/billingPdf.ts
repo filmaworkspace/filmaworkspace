@@ -6,8 +6,8 @@
 
 import jsPDF from "jspdf";
 import {
-  BillingInvoice, BillingLine, BillingParty, BillingQuote, BillingSettings, eur, fmtDay, invoiceMonths, invoiceTotals, lineTotal, monthName, monthsLabel,
-  partyLines, phaseMonthlyBase, quoteGrandTotal,
+  BillingInvoice, BillingLine, BillingParty, BillingQuote, BillingSettings, eur, fmtDay, invoiceMonths, invoiceTotals, isService, lineTotal, monthName, monthsLabel,
+  partyLines, phaseMonthlyBase, quoteGrandTotal, signUsagePrices,
 } from "./billing";
 
 type Issuer = BillingParty & { phone?: string; iban?: string; bank?: string; footer?: string };
@@ -46,7 +46,7 @@ export function invoiceView(inv: BillingInvoice, settings: BillingSettings): Doc
   const totals = inv.status === "draft" ? invoiceTotals(inv.lines) : { baseAmount: inv.baseAmount, vatAmount: inv.vatAmount, totalAmount: inv.totalAmount, vatBreakdown: inv.vatBreakdown };
   const meta: [string, string][] = [["Fecha de emisión", fmtDay(inv.issueDate)]];
   if (inv.kind === "standard") meta.push(["Vencimiento", fmtDay(inv.dueDate)]);
-  if (inv.projectName) meta.push([inv.subject === "budgeting" ? "Servicio" : inv.subject === "other" ? "Concepto" : "Proyecto", inv.projectName]);
+  if (inv.projectName) meta.push([isService(inv.subject) ? "Servicio" : inv.subject === "other" ? "Concepto" : "Proyecto", inv.projectName]);
   if (inv.periodType === "monthly" && invoiceMonths(inv).length) meta.push(["Periodo", monthsLabel(invoiceMonths(inv))]);
   if (inv.quoteNumber) meta.push(["Presupuesto", inv.quoteNumber]);
   return {
@@ -71,7 +71,7 @@ export function quoteView(q: BillingQuote, settings: BillingSettings): DocView {
   const monthly = q.billingMode === "monthly";
   const phased = q.billingMode === "phases";
   const grand = quoteGrandTotal({ ...q, ...totals });
-  const meta: [string, string][] = [["Fecha", fmtDay(q.issueDate)], ["Válido hasta", fmtDay(q.validUntil)], [q.subject === "budgeting" ? "Servicio" : q.subject === "other" ? "Concepto" : "Proyecto", q.projectName || "—"]];
+  const meta: [string, string][] = [["Fecha", fmtDay(q.issueDate)], ["Válido hasta", fmtDay(q.validUntil)], [isService(q.subject) ? "Servicio" : q.subject === "other" ? "Concepto" : "Proyecto", q.projectName || "—"]];
   if ((monthly || phased) && q.startMonth) meta.push(["Inicio", monthName(q.startMonth)]);
   const phaseText = (q.phases || []).map((p) => `${p.name}: ${p.months} ${p.months === 1 ? "mes" : "meses"} × ${eur(phaseMonthlyBase(p))}`).join(" · ");
   return {
@@ -81,9 +81,11 @@ export function quoteView(q: BillingQuote, settings: BillingSettings): DocView {
     issuer, client: q.client, meta,
     banner: q.title || "",
     lines: q.lines, totals,
-    totalLabel: monthly ? "Total al mes" : "Total",
+    totalLabel: monthly ? "Total al mes" : q.billingMode === "usage" ? "Total estimado" : "Total",
     extraTotals: monthly && q.months ? [[`Total ${q.months} ${q.months === 1 ? "mes" : "meses"} (IVA incl.)`, eur(grand.total)], [`Base ${q.months} ${q.months === 1 ? "mes" : "meses"}`, eur(grand.base)]] : [],
-    payment: [phased
+    payment: [q.billingMode === "usage"
+      ? (() => { const pr = signUsagePrices(q.lines, settings); return `Por uso: ${eur(pr.signed)} por documento firmado y ${eur(pr.expired)} por documento caducado o rechazado (+ IVA), según lo real de cada periodo. Las cantidades son una estimación; los envíos cancelados no se cobran.`; })()
+      : phased
       ? `Facturación mensual por fases (+ IVA). ${phaseText}${q.startMonth ? `, desde ${monthName(q.startMonth)}` : ""}.`
       : monthly
       ? `Cuota mensual de ${eur(totals.baseAmount)} + IVA${q.months ? ` durante ${q.months} ${q.months === 1 ? "mes" : "meses"}` : ""}${q.startMonth ? ` desde ${monthName(q.startMonth)}` : ""}, facturada cada mes.`

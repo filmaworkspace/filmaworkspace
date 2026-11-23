@@ -24,7 +24,7 @@ import { SendDocModal } from "@/components/admin/billing/SendDocModal";
 import { invoiceState, useBillingSettings } from "@/components/admin/billing/useBilling";
 import {
   addDaysIso, BillingInvoice, clientFromAccount, fetchUserClient, saveUserClient, docSubject, eur, fmtDay, invoiceMonths, invoiceTotals, issueInvoice, missingForIssue,
-  monthsLabel, numberingRule, numberTaken, renderNumber, todayIso, voidWithRectifying,
+  monthsLabel, numberingRule, numberTaken, renderNumber, todayIso, voidWithRectifying, isService, SERVICES, type BillingSubject, type ServiceSubject,
 } from "@/lib/billing";
 import { downloadDocPdf, invoiceView } from "@/lib/billingPdf";
 
@@ -77,7 +77,7 @@ export default function InvoicePage() {
   const accProjects = projects.filter((p) => p.producers.includes(inv.producerId) && !p.trashedAt);
   const live = draft ? invoiceTotals(inv.lines) : inv;
   const st = invoiceState(inv);
-  const problems = missingForIssue(inv, settings).concat(inv.projectName || subject === "budgeting" ? [] : ["El proyecto o concepto"]);
+  const problems = missingForIssue(inv, settings).concat(inv.projectName || isService(subject) ? [] : ["El proyecto o concepto"]);
   const days = Math.max(0, Math.round((new Date(`${inv.dueDate}T12:00:00`).getTime() - new Date(`${inv.issueDate}T12:00:00`).getTime()) / 86_400_000));
 
   const duplicate = async () => {
@@ -131,12 +131,13 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      {(inv.status === "voided" || inv.kind === "rectifying" || inv.quoteNumber) && (
+      {(inv.status === "voided" || inv.kind === "rectifying" || inv.quoteNumber || inv.signUsage) && (
         <div className="mt-6 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-slate-600">
           {inv.status === "voided" && inv.rectifiedBy && <span>Anulada{inv.voidReason ? ` (${inv.voidReason})` : ""} por la rectificativa <Link className="font-medium text-slate-900 hover:underline" href={`/admindashboard/accounts/billing/invoices/${inv.rectifiedBy.id}`}>{inv.rectifiedBy.number}</Link></span>}
           {inv.kind === "rectifying" && inv.rectifies && <span>Rectifica a <Link className="font-medium text-slate-900 hover:underline" href={`/admindashboard/accounts/billing/invoices/${inv.rectifies.id}`}>{inv.rectifies.number}</Link></span>}
           {inv.quoteNumber && inv.quoteId && <span>Del presupuesto <Link className="font-medium text-slate-900 hover:underline" href={`/admindashboard/accounts/billing/quotes/${inv.quoteId}`}>{inv.quoteNumber}</Link></span>}
           {inv.paid && inv.paidAt && <span>Cobrada el {fmtDay(inv.paidAt)}</span>}
+          {inv.signUsage && <span>Filma Sign · {inv.signUsage.signed.length} firmados y {inv.signUsage.expired.length} caducados o rechazados · <Link className="font-medium text-slate-900 hover:underline" href="/admindashboard/sign">ver solicitudes</Link></span>}
           {inv.sentTo && <span>Enviada a {inv.sentTo}</span>}
         </div>
       )}
@@ -153,8 +154,8 @@ export default function InvoicePage() {
             <BlockTitle>Factura</BlockTitle>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Qué se factura">
-                <Select value={subject} disabled={!draft || !!inv.quoteId} onChange={(e) => edit({ subject: e.target.value as BillingInvoice["subject"], ...(e.target.value === "budgeting" ? { projectName: "Filma Budgeting", projectId: null } : {}) })}>
-                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="other">Otro concepto</option>
+                <Select value={subject} disabled={!draft || !!inv.quoteId} onChange={(e) => edit({ subject: e.target.value as BillingInvoice["subject"], ...(isService(e.target.value as BillingSubject) ? { projectName: SERVICES[e.target.value as ServiceSubject].name, projectId: null } : {}) })}>
+                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="sign">Filma Sign</option><option value="other">Otro concepto</option>
                 </Select>
               </Field>
               <Field label={subject === "project" ? "Proyecto" : "Concepto"}>

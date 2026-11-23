@@ -62,3 +62,13 @@ describe("meses de una factura", () => {
     expect(monthsLabel(["2027-02", "2027-01"])).toContain("2 meses");
   });
 });
+
+describe("servicios (Budgeting, Filma Sign)", () => {
+  it("se reconocen y salen con su nombre en los listados", async () => {
+    const { isService, docSubject, SERVICES } = await import("@/lib/billing");
+    expect(isService("sign")).toBe(true);
+    expect(isService("project")).toBe(false);
+    expect(docSubject({ subject: "sign", projectName: "x" })).toBe("Filma Sign");
+    expect(SERVICES.sign.price({ ...DEFAULT_SETTINGS, signPricePerSigned: 3 })).toBe(3);
+  });
+});

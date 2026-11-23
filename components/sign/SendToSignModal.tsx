@@ -5,7 +5,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { Button, Field, Input, Modal, Textarea } from "@/components/ds";
+import { Button, Field, Input, Modal, Select, Textarea } from "@/components/ds";
+import { useAdminData } from "@/components/admin/AdminData";
 import { useUser } from "@/contexts/UserContext";
 import { adminFetch } from "@/components/admin/ui";
 import { SignaturePad, type SignatureValue } from "./SignaturePad";
@@ -25,6 +26,8 @@ export function SendToSignModal({ open, onClose, kind, quoteId, defaultSigner, i
   onSent?: (r: { id: string; url: string }) => void;
 }) {
   const { user } = useUser();
+  const { producers, projects } = useAdminData();
+  const [billTo, setBillTo] = useState({ producerId: "", projectId: "" });
   const [signer, setSigner] = useState({ name: "", email: "", role: "" });
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -41,7 +44,7 @@ export function SendToSignModal({ open, onClose, kind, quoteId, defaultSigner, i
   useEffect(() => {
     if (!open) return;
     setSigner({ name: defaultSigner?.name || "", email: defaultSigner?.email || "", role: defaultSigner?.role || "" });
-    setTitle(""); setBody(""); setMessage(""); setError(""); setDone(null); setCopied(false);
+    setTitle(""); setBody(""); setMessage(""); setError(""); setDone(null); setCopied(false); setBillTo({ producerId: "", projectId: "" });
     setMe({ name: user?.name || "", role: issuerRole || "Filma Workspace" });
     const s = readSig(); setSaved(s); setUseSaved(!!s); setSig(null);
   }, [open, defaultSigner?.name, defaultSigner?.email, defaultSigner?.role, user?.name, issuerRole]);
@@ -55,6 +58,7 @@ export function SendToSignModal({ open, onClose, kind, quoteId, defaultSigner, i
       if (!signature) throw new Error("Firma antes de enviar");
       const r = await adminFetch<{ id: string; url: string; emailError: string | null }>("/api/admin/sign", {
         action: "create", kind, quoteId, title, body, signer, message, signature, issuerName: me.name, issuerRole: me.role,
+        billTo: billTo.producerId ? { ...billTo, projectName: projects.find((p) => p.id === billTo.projectId)?.name || null } : null,
       });
       writeSig(signature);
       setDone(r);
@@ -96,6 +100,24 @@ export function SendToSignModal({ open, onClose, kind, quoteId, defaultSigner, i
             <Input value={signer.role} onChange={(e) => setSigner({ ...signer, role: e.target.value })} placeholder="Cargo / empresa" />
           </div>
         </div>
+        {kind === "document" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Se imputa a la cuenta" hint="Para facturar Filma Sign por uso">
+              <Select value={billTo.producerId} onChange={(e) => setBillTo({ producerId: e.target.value, projectId: "" })}>
+                <option value="">Ninguna (uso de Filma)</option>
+                {producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+            </Field>
+            {billTo.producerId && (
+              <Field label="Proyecto">
+                <Select value={billTo.projectId} onChange={(e) => setBillTo({ ...billTo, projectId: e.target.value })}>
+                  <option value="">Sin proyecto</option>
+                  {projects.filter((p) => p.producers.includes(billTo.producerId) && !p.trashedAt).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              </Field>
+            )}
+          </div>
+        )}
         <Field label="Mensaje (opcional)"><Textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Te paso el presupuesto para que lo firmes." /></Field>
         <div className="border-t border-slate-100 pt-4">
           <div className="mb-2 grid grid-cols-2 gap-3">

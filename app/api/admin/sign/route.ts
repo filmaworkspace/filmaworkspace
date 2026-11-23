@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
           signature: { image: sig.image, method: sig.method === "type" ? "type" : "draw", typedName: String(sig.typedName || ""), signedAt: Date.now(), ip: m.ip, userAgent: m.userAgent.slice(0, 300) },
         },
         message: b.message, expiresInDays: Number(b.expiresInDays) || 30, createdBy: admin.uid,
+        billTo: typeof b.billTo?.producerId === "string" && b.billTo.producerId
+          ? { producerId: b.billTo.producerId, projectId: typeof b.billTo.projectId === "string" ? b.billTo.projectId : null, projectName: typeof b.billTo.projectName === "string" ? b.billTo.projectName.slice(0, 200) : null }
+          : null,
       }, m);
       await auditFromServer(admin.uid, "sign_request_created", `${r.id} → ${b.signer?.email}`);
       return NextResponse.json(r);

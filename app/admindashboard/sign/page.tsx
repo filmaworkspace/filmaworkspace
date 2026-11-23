@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import { Button, Page, PageHeader } from "@/components/ds";
 import { adminFetch, BlockTitle, Pills, RowBar } from "@/components/admin/ui";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { useAdminData } from "@/components/admin/AdminData";
 import { SendToSignModal } from "@/components/sign/SendToSignModal";
 import { SignDocument } from "@/components/sign/SignDocument";
 import { buildSignedPdf, signedFileName } from "@/lib/sign/render";
@@ -23,6 +24,7 @@ import { toast } from "@/lib/toast";
 type Filter = "all" | SignStatus;
 
 export default function AdminSign() {
+  const { producerById } = useAdminData();
   const [rows, setRows] = useState<SignRequest[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export default function AdminSign() {
                   const signer = r.parties.find((p) => p.side === "signer");
                   return (
                     <tr key={r.id} onClick={() => setOpen(r.id)} className={`cursor-pointer hover:bg-[#FAFAFA] ${open === r.id ? "bg-[#FAFAFA]" : ""}`}>
-                      <td className="relative py-2 pl-4 pr-3"><RowBar tone={st.tone} /><div className="truncate font-medium text-slate-900">{r.title}</div><div className="truncate text-xs text-slate-500">{SIGN_TEMPLATES[r.kind].label}{r.reference ? <> · <span className="font-mono">{r.reference}</span></> : null}</div></td>
+                      <td className="relative py-2 pl-4 pr-3"><RowBar tone={st.tone} /><div className="truncate font-medium text-slate-900">{r.title}</div><div className="truncate text-xs text-slate-500">{SIGN_TEMPLATES[r.kind].label}{r.reference ? <> · <span className="font-mono">{r.reference}</span></> : null}{r.producerId ? ` · ${producerById(r.producerId)?.name || "Cuenta"}${r.projectName ? ` / ${r.projectName}` : ""}` : ""}</div></td>
                       <td className="px-3"><div className="truncate text-slate-900">{signer?.name}</div><div className="truncate text-xs text-slate-500">{signer?.email}</div></td>
                       <td className="px-3 text-slate-600">{fmtDateTime(r.createdAt)}</td>
                       <td className={`px-3 ${st.tone === "ok" ? "text-emerald-700" : st.tone === "bad" ? "text-red-600" : st.tone === "warn" ? "text-amber-700" : "text-slate-500"}`}>{st.label}{signer?.viewedAt && statusOf(r) === "pending" ? <span className="block text-[11px] text-slate-400">Abierto {fmtDateTime(signer.viewedAt)}</span> : null}</td>

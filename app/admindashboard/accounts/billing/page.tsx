@@ -134,7 +134,7 @@ function BillingInner() {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <SearchBar fields={FIELDS} field={field} onField={setField} value={q} onChange={setQ} count={tab === "invoices" ? invRows.length : quoteRows.length} />
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="w-48"><Select value={account} onChange={(e) => setAccount(e.target.value)}><option value="all">Todos los clientes</option><option value="__users">Personas (Budgeting…)</option>{producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
+          <div className="w-48"><Select value={account} onChange={(e) => setAccount(e.target.value)}><option value="all">Todos los clientes</option><option value="__users">Personas</option>{producers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
           <div className="w-32"><Select value={year} onChange={(e) => setYear(e.target.value)}><option value="all">Todos los años</option>{years.map((y) => <option key={y} value={String(y)}>{y}</option>)}</Select></div>
           {tab === "invoices" && <IconButton label="Exportar CSV (para la gestoría)" onClick={exportCsv}><Download size={15} /></IconButton>}
         </div>

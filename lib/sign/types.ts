@@ -62,6 +62,10 @@ export interface SignRequest {
   parties: SignParty[];
   message: string;
   events: SignEvent[];
+  /** Cuenta (y proyecto) a la que se imputa para facturar Filma Sign por uso. */
+  producerId?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
   createdAt: number;
   createdBy: string;
   expiresAt: number;

@@ -28,7 +28,7 @@ import { PhasesEditor, PHASE_COLORS } from "@/components/admin/billing/PhasesEdi
 import {
   addDaysIso, BillingQuote, clientFromAccount, fetchUserClient, saveUserClient, countsAsBilled, DEFAULT_PHASES, docSubject, eur, fmtDay, invoiceMonths, invoiceTotals,
   issueQuote, monthName, newLineId, numberingRule, numberTaken, phaseSchedule, phasesToLines, QUOTE_STATUS, quoteGrandTotal, quoteMonths,
-  renderNumber, type BillingMode, type QuotePhase,
+  renderNumber, type BillingMode, type QuotePhase, isService, SERVICES, type BillingSubject, type ServiceSubject,
 } from "@/lib/billing";
 import { downloadDocPdf, quoteView } from "@/lib/billingPdf";
 
@@ -112,7 +112,7 @@ export default function QuotePage() {
   const problems = [
     !settings.name || !settings.taxId ? "Tus datos fiscales (Facturación → Datos fiscales)" : "",
     !q.client.name || !q.client.taxId ? "Razón social y NIF del cliente" : "",
-    !q.projectName && subject !== "budgeting" ? "Proyecto o concepto" : "",
+    !q.projectName && !isService(subject) ? "Proyecto o concepto" : "",
     !q.lines.length || q.lines.some((l) => !l.description.trim()) ? "Líneas con concepto" : "",
   ].filter(Boolean);
 
@@ -185,7 +185,7 @@ export default function QuotePage() {
                 Facturado · <span className="text-slate-900">{eur(billedBase)}</span> de {eur(grand.base)} <span className="text-slate-400">+ IVA</span>
               </BlockTitle>
               <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#24406E" }} /></div>
-              {q.billingMode !== "single" && months.length > 0 && (
+              {(q.billingMode === "monthly" || q.billingMode === "phases") && months.length > 0 && (
                 <div className="mt-4 grid grid-cols-6 gap-1.5 sm:grid-cols-12">
                   {months.map((m) => {
                     const inv = billedMonths.get(m);
@@ -237,8 +237,8 @@ export default function QuotePage() {
             <BlockTitle>Presupuesto</BlockTitle>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Qué se factura">
-                <Select value={subject} disabled={!draft} onChange={(e) => edit({ subject: e.target.value as BillingQuote["subject"], ...(e.target.value === "budgeting" ? { projectName: "Filma Budgeting", projectId: null } : {}) })}>
-                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="other">Otro concepto</option>
+                <Select value={subject} disabled={!draft} onChange={(e) => edit({ subject: e.target.value as BillingQuote["subject"], ...(isService(e.target.value as BillingSubject) ? { projectName: SERVICES[e.target.value as ServiceSubject].name, projectId: null } : {}) })}>
+                  <option value="project">Proyecto</option><option value="budgeting">Budgeting</option><option value="sign">Filma Sign</option><option value="other">Otro concepto</option>
                 </Select>
               </Field>
               <Field label={subject === "project" ? "Proyecto" : "Concepto"}>
@@ -250,11 +250,13 @@ export default function QuotePage() {
               <Field label="Válido hasta"><Input type="date" value={q.validUntil} disabled={!draft} onChange={(e) => edit({ validUntil: e.target.value })} /></Field>
             </div>
             <Field label="Cómo se cobra">
-              {draft
+              {q.billingMode === "usage"
+                ? <p className="text-[13px] text-slate-700">Por uso: documentos firmados y caducados o rechazados de cada periodo. Las cantidades son una estimación.</p>
+                : draft
                 ? <Segmented value={q.billingMode} onChange={setMode} options={[{ value: "phases", label: "Por fases" }, { value: "monthly", label: "Cuota mensual" }, { value: "single", label: "Pago único" }]} />
                 : <p className="text-[13px] text-slate-700">{q.billingMode === "single" ? "Pago único" : `${q.billingMode === "phases" ? "Por fases" : "Cuota mensual"} · ${q.months} meses desde ${monthName(q.startMonth)}`}</p>}
             </Field>
-            {draft && q.billingMode !== "single" && (
+            {draft && (q.billingMode === "monthly" || q.billingMode === "phases") && (
               <div className="grid grid-cols-2 gap-3">
                 {q.billingMode === "monthly"
                   ? <Field label="Meses"><Input type="number" min={1} value={String(q.months || "")} onChange={(e) => edit({ months: Math.max(1, Number(e.target.value) || 1) })} /></Field>
@@ -265,15 +267,15 @@ export default function QuotePage() {
           </section>
 
           <section>
-            <BlockTitle>{q.billingMode === "monthly" ? "Cuota mensual" : q.billingMode === "phases" ? "Fases" : "Líneas"}</BlockTitle>
+            <BlockTitle>{q.billingMode === "monthly" ? "Cuota mensual" : q.billingMode === "phases" ? "Fases" : q.billingMode === "usage" ? "Estimación" : "Líneas"}</BlockTitle>
             {q.billingMode === "phases"
               ? <PhasesEditor phases={q.phases || []} startMonth={q.startMonth} readOnly={!draft} defaultVat={settings.defaultVat || 21}
-                  defaultPrice={subject === "budgeting" ? settings.budgetingPrice || 0 : settings.monthlyPrice || 0} onChange={editPhases} />
+                  defaultPrice={isService(subject) ? SERVICES[subject].price(settings) : settings.monthlyPrice || 0} onChange={editPhases} />
               : <LinesEditor lines={q.lines} readOnly={!draft} defaultVat={settings.defaultVat || 21} onChange={(lines) => edit({ lines })} />}
             <div className="mt-3 flex justify-end gap-6 text-[13px]">
               <span className="text-slate-500">Base <strong className="font-medium text-slate-900">{eur(live.baseAmount)}</strong></span>
               <span className="text-slate-500">IVA <strong className="font-medium text-slate-900">{eur(live.vatAmount)}</strong></span>
-              <span className="text-slate-500">Total{q.billingMode === "monthly" ? " al mes" : ""} <strong className="font-semibold text-slate-900">{eur(live.totalAmount)}</strong></span>
+              <span className="text-slate-500">Total{q.billingMode === "monthly" ? " al mes" : q.billingMode === "usage" ? " estimado" : ""} <strong className="font-semibold text-slate-900">{eur(live.totalAmount)}</strong></span>
             </div>
             {q.billingMode === "monthly" && q.months && <p className="mt-1 text-right text-xs text-slate-500">{q.months} meses: {eur(grand.base)} + IVA = <strong className="font-medium text-slate-900">{eur(grand.total)}</strong></p>}
           </section>

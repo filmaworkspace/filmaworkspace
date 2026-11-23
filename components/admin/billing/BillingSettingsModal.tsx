@@ -170,6 +170,8 @@ export function BillingSettingsModal({ open, onClose, settings, onSaved }: { ope
               <Field label="Validez presupuesto (días)"><Input {...n("quoteValidityDays")} /></Field>
               <Field label="Cuota mensual (€)" hint="Presupuestos de cuota fija"><Input {...n("monthlyPrice")} /></Field>
               <Field label="Budgeting al mes (€)" hint="Por persona"><Input {...n("budgetingPrice")} /></Field>
+              <Field label="Filma Sign: firmado (€)" hint="Por documento firmado"><Input {...n("signPricePerSigned")} /></Field>
+              <Field label="Filma Sign: caducado (€)" hint="Caducado o rechazado; los cancelados no se cobran"><Input {...n("signPricePerExpired")} /></Field>
             </div>
             <div className="border-t border-slate-100 pt-4">
               <p className="mb-2 text-xs font-medium text-slate-600">Fases propuestas en los presupuestos por fases</p>

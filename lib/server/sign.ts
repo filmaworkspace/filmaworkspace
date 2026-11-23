@@ -39,6 +39,8 @@ export interface CreateInput {
   message?: string;
   expiresInDays?: number;
   createdBy: string;
+  /** A qué cuenta/proyecto se imputa (Filma Sign por uso). */
+  billTo?: { producerId?: string | null; projectId?: string | null; projectName?: string | null } | null;
 }
 
 export async function createSignRequest(input: CreateInput, meta: { ip: string; userAgent: string }) {
@@ -78,6 +80,7 @@ export async function createSignRequest(input: CreateInput, meta: { ip: string; 
   const data: Omit<SignRequest, "id"> & { tokenHashes: Record<string, string>; tokenIndex: string[] } = {
     kind: input.kind, status: "pending", title, reference, refPath, payload, docHash, parties,
     message: (input.message || "").slice(0, 2000), events, createdAt: now, createdBy: input.createdBy,
+    producerId: input.billTo?.producerId || null, projectId: input.billTo?.projectId || null, projectName: input.billTo?.projectName || null,
     expiresAt: now + (input.expiresInDays || 30) * DAY, completedAt: null,
     tokenHashes: { signer: sha256(token) }, tokenIndex: [sha256(token)],
   };

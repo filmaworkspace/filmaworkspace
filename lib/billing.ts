@@ -33,6 +33,9 @@ export interface BillingSettings extends BillingParty {
   monthlyPrice: number;
   /** Cuota mensual del acceso a Budgeting (por persona). */
   budgetingPrice?: number;
+  /** Filma Sign por uso: precio por documento firmado y por documento caducado o rechazado. */
+  signPricePerSigned?: number;
+  signPricePerExpired?: number;
   footer: string;
   /** Numeración personalizada por tipo de documento (si falta, la clásica F2026-0001). */
   numbering?: Partial<Record<NumberingKind, Partial<NumberingRule>>>;
@@ -100,6 +103,8 @@ export interface BillingLine {
   unitPrice: number;
   vatRate: number;
   projectId?: string | null;
+  /** Línea de uso de Filma Sign (firmados / caducados). */
+  usage?: "signed" | "expired";
 }
 
 export type InvoiceStatus = "draft" | "issued" | "voided";
@@ -107,9 +112,18 @@ export type InvoiceKind = "standard" | "rectifying";
 export type PeriodType = "monthly" | "project" | "other";
 /** A quién se factura: una cuenta (productora) o una persona (usuario). */
 export type BillTo = "account" | "user";
-/** Qué se factura: un proyecto, el acceso a Budgeting u otra cosa. */
-export type BillingSubject = "project" | "budgeting" | "other";
-export const SUBJECT_LABEL: Record<BillingSubject, string> = { project: "Proyecto", budgeting: "Budgeting", other: "Otro concepto" };
+/** Qué se factura: un proyecto, un servicio (Budgeting, Filma Sign) u otra cosa. */
+export type BillingSubject = "project" | "budgeting" | "sign" | "other";
+export const SUBJECT_LABEL: Record<BillingSubject, string> = { project: "Proyecto", budgeting: "Budgeting", sign: "Filma Sign", other: "Otro concepto" };
+
+/** Servicios de Filma que se cobran aparte de los proyectos (cuota mensual). */
+export const SERVICES = {
+  budgeting: { name: "Filma Budgeting", line: "Acceso a Filma Budgeting", price: (s: BillingSettings) => s.budgetingPrice || 0 },
+  // Filma Sign se cobra por uso (ver SIGN_USAGE); este precio es el del documento firmado.
+  sign: { name: "Filma Sign", line: "Filma Sign · documento firmado", price: (s: BillingSettings) => s.signPricePerSigned || 0 },
+} as const;
+export type ServiceSubject = keyof typeof SERVICES;
+export const isService = (s?: BillingSubject | null): s is ServiceSubject => s === "budgeting" || s === "sign";
 
 export interface BillingInvoice {
   id: string;
@@ -130,6 +144,8 @@ export interface BillingInvoice {
   periodMonth: string | null;
   /** Meses que cubre (una factura puede agrupar varios). */
   periodMonths?: string[] | null;
+  /** Filma Sign por uso: periodo y solicitudes que se facturan (no se cobran dos veces). */
+  signUsage?: { from: string; to: string; signed: string[]; expired: string[] } | null;
   projectId: string | null;
   projectName: string | null;
   issueDate: string;
@@ -156,7 +172,28 @@ export interface BillingInvoice {
 }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected";
-export type BillingMode = "monthly" | "phases" | "single";
+export type BillingMode = "monthly" | "phases" | "single" | "usage";
+
+// ── Filma Sign por uso ──────────────────────────────────────────────────────
+// Se cobra cada documento enviado a firmar según cómo acaba: firmado (precio
+// completo) o caducado/rechazado (su propio precio). Los cancelados no se
+// cobran. El presupuesto lleva cantidades estimadas; la factura, las reales.
+export type SignUsageKind = "signed" | "expired";
+export const SIGN_USAGE: Record<SignUsageKind, { line: string; price: (s: BillingSettings) => number }> = {
+  signed: { line: "Filma Sign · documento firmado", price: (s) => s.signPricePerSigned || 0 },
+  expired: { line: "Filma Sign · documento caducado o rechazado", price: (s) => s.signPricePerExpired || 0 },
+};
+/** Líneas de uso de Filma Sign con sus cantidades. */
+export function signUsageLines(q: { signed: number; expired: number }, prices: { signed: number; expired: number }, vatRate: number, suffix = ""): BillingLine[] {
+  return (["signed", "expired"] as SignUsageKind[]).map((k) => ({
+    id: newLineId(), description: `${SIGN_USAGE[k].line}${suffix}`, quantity: q[k], unitPrice: prices[k], vatRate, usage: k,
+  }));
+}
+/** Precio unitario de cada tipo en un presupuesto por uso (o el de ajustes). */
+export function signUsagePrices(lines: BillingLine[] | null | undefined, s: BillingSettings) {
+  const find = (k: SignUsageKind) => lines?.find((l) => l.usage === k)?.unitPrice;
+  return { signed: find("signed") ?? SIGN_USAGE.signed.price(s), expired: find("expired") ?? SIGN_USAGE.expired.price(s) };
+}
 
 /** Fase de un presupuesto por fases: sus meses y sus líneas mensuales. */
 export interface QuotePhase { id: string; name: string; months: number; lines: BillingLine[] }
@@ -476,8 +513,8 @@ export async function saveUserClient(db: Firestore, userId: string, client: Bill
   await setDoc(doc(db, "billingClients", userId), { ...client, updatedAt: serverTimestamp() });
 }
 
-/** Nombre del concepto que sale en listados: proyecto, "Budgeting" u otro. */
+/** Nombre del concepto que sale en listados: proyecto, el servicio u otro. */
 export const docSubject = (d: { subject?: BillingSubject; projectName?: string | null }) =>
-  d.subject === "budgeting" ? "Budgeting" : d.projectName || (d.subject === "other" ? "Otro concepto" : "—");
+  isService(d.subject) ? SERVICES[d.subject].name : d.projectName || (d.subject === "other" ? "Otro concepto" : "—");
 
 export const newLineId = () => Math.random().toString(36).slice(2, 9);
