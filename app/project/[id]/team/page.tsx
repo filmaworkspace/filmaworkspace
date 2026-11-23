@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { ClipboardCheck, Plus, Settings } from "lucide-react";
+import { ClipboardCheck, FolderDown, Plus, Settings } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { Page, PageHeader, PageLoading, buttonClass } from "@/components/ds";
 
@@ -168,6 +168,7 @@ export default function TeamPanelPage() {
         actions={
           <>
             <Link href={`/project/${id}/team/approvals`} className={iconLink} title="Aprobaciones de altas" aria-label="Aprobaciones de altas"><ClipboardCheck size={17} /></Link>
+            <Link href={`/project/${id}/team/document-center`} className={iconLink} title="Centro de documentación" aria-label="Centro de documentación"><FolderDown size={17} /></Link>
             <Link href={`/project/${id}/team/config`} className={iconLink} title="Configuración de equipo" aria-label="Configuración de equipo"><Settings size={17} /></Link>
             <Link href={`/project/${id}/team/crew`} className={buttonClass("primary")}><Plus size={14} /> Añadir miembro</Link>
           </>

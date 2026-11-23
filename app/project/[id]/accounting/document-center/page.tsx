@@ -20,7 +20,7 @@ import { scopeFromPermissions } from "@/lib/accountingScope";
 import { Button, Checkbox, EmptyState, IconButton, Modal, NoAccess, Page, PageHeader, PageLoading, Select, Spinner, useToast } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { loadHub, numberingGaps, renderHubItem, type HubItem, type HubProject } from "@/lib/docs/hub";
-import { DOC_TYPES, type DocTypeKey } from "@/lib/docs/projectPdf";
+import { ACCOUNTING_DOC_TYPES, DOC_TYPES, type DocTypeKey } from "@/lib/docs/projectPdf";
 
 type F = "all" | "number" | "name" | "status";
 const FIELDS: SearchField<F>[] = [
@@ -270,7 +270,7 @@ function HubInner() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <SearchBar fields={FIELDS} field={field} onField={setField} value={q} onChange={setQ} count={searching ? rows.length : undefined} />
             <div className="flex items-center gap-3">
-              <div className="w-40"><Select value={type} onChange={(e) => setType(e.target.value as typeof type)}><option value="all">Todos los tipos</option>{(Object.keys(DOC_TYPES) as DocTypeKey[]).map((k) => <option key={k} value={k}>{DOC_TYPES[k].label}</option>)}</Select></div>
+              <div className="w-40"><Select value={type} onChange={(e) => setType(e.target.value as typeof type)}><option value="all">Todos los tipos</option>{ACCOUNTING_DOC_TYPES.map((k) => <option key={k} value={k}>{DOC_TYPES[k].label}</option>)}</Select></div>
               <Checkbox checked={onlyWarnings} onChange={setOnlyWarnings} label="Con avisos" />
             </div>
           </div>

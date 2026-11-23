@@ -78,7 +78,7 @@ export async function contentFingerprint(data: unknown): Promise<string> {
 // ─── Código de color por tipo de documento ───────────────────────────────────
 // La proforma va en rojo: no vale como justificante y, cuando llega la factura
 // definitiva, se sustituye (el mismo documento pasa a ser factura).
-export type DocTypeKey = "po" | "invoice" | "proforma" | "budget" | "guarantee" | "box" | "supplier";
+export type DocTypeKey = "po" | "invoice" | "proforma" | "budget" | "guarantee" | "box" | "supplier" | "crew" | "sign";
 export const DOC_TYPES: Record<DocTypeKey, { label: string; rgb: RGB; hex: string }> = {
   po:        { label: "Orden de compra",  rgb: [47, 82, 224],  hex: "#2F52E0" },
   invoice:   { label: "Factura",          rgb: [5, 150, 105],  hex: "#059669" },
@@ -87,7 +87,13 @@ export const DOC_TYPES: Record<DocTypeKey, { label: string; rgb: RGB; hex: strin
   guarantee: { label: "Fianza",           rgb: [100, 116, 139], hex: "#64748B" },
   box:       { label: "Box",              rgb: [124, 58, 237], hex: "#7C3AED" },
   supplier:  { label: "Proveedor",        rgb: [15, 23, 42],   hex: "#0F172A" },
+  // Equipo
+  crew:      { label: "Documentación de crew", rgb: [107, 163, 25], hex: "#6BA319" },
+  sign:      { label: "Filma Sign",       rgb: [36, 64, 110],  hex: "#24406E" },
 };
+/** Tipos de cada centro de documentación. */
+export const ACCOUNTING_DOC_TYPES: DocTypeKey[] = ["po", "invoice", "proforma", "budget", "guarantee", "box", "supplier"];
+export const TEAM_DOC_TYPES: DocTypeKey[] = ["crew", "sign"];
 
 // ─── Especificación de un documento ──────────────────────────────────────────
 export interface DocProject {

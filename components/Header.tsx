@@ -255,6 +255,7 @@ export default function Header() {
     : pathname.includes("/payroll")   ? "payroll"
     : pathname.includes("/timesheet") ? "timesheet"
     : isSignSection ? "sign"
+    : pathname.includes("/team/document-center") ? "docs"
     : pathname.includes("/config")    ? "config"
     : "panel"
     : null;

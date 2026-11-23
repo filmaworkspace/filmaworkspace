@@ -84,7 +84,8 @@ function approvalsFrom(docId: string, steps: RawStep[] | undefined): DocApproval
 }
 
 // ─── Carga ───────────────────────────────────────────────────────────────────
-export async function loadHub(db: Firestore, projectId: string, scope: DocScope, canSeeBox: boolean) {
+/** Datos del proyecto para la carátula (nombre, código, productora, datos fiscales, portada). */
+export async function loadHubProject(db: Firestore, projectId: string): Promise<HubProject> {
   const base = `projects/${projectId}`;
   const [projSnap, prodCfg, companyCfg] = await Promise.all([
     getDoc(doc(db, "projects", projectId)),
@@ -96,7 +97,7 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
     .map((d) => d?.data()?.name).filter(Boolean) as string[];
   const company = companyCfg?.data() || {};
   const working = (prodCfg?.data()?.workingTitle as string) || "";
-  const project: HubProject = {
+  return {
     name: p.name || projectId,
     code: (working || projectId).toUpperCase(),
     producer: producerNames.join(" · "),
@@ -104,6 +105,11 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
     legal: [company.fiscalName, company.taxId && `NIF ${company.taxId}`, [company.address, [company.postalCode, company.city].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(" · "),
     coverUrl: p.coverUrl || null,
   };
+}
+
+export async function loadHub(db: Firestore, projectId: string, scope: DocScope, canSeeBox: boolean) {
+  const base = `projects/${projectId}`;
+  const project = await loadHubProject(db, projectId);
 
   const [poDocs, invDocs, supSnap] = await Promise.all([
     getScopedDocs(collection(db, `${base}/pos`), scope),
@@ -356,6 +362,13 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
 
 // ─── Generación ──────────────────────────────────────────────────────────────
 const bandCache = new Map<string, string>();
+
+/** Banda de cabecera del proyecto (cacheada) y datos para buildProjectDoc. */
+export async function hubDocProject(project: HubProject, projectId: string): Promise<DocProject> {
+  const key = `${projectId}:${project.coverUrl || ""}`;
+  if (!bandCache.has(key)) bandCache.set(key, await renderProjectBand(projectId, project.coverUrl));
+  return { name: project.name, code: project.code, producer: project.producer, phase: project.phase, seed: projectId, band: bandCache.get(key)!, legal: project.legal };
+}
 
 export async function renderHubItem(item: HubItem, project: HubProject, projectId: string, user: string) {
   const key = `${projectId}:${project.coverUrl || ""}`;
