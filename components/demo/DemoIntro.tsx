@@ -29,33 +29,33 @@ const STEP_MS = 1100; // entre elementos de una lista
 const CLOUD: [number, number, number][] = [[6, 14, .55], [70, 8, .4], [80, 40, .6], [2, 52, .35], [62, 80, .5], [14, 84, .45], [40, 4, .3], [36, 92, .35]];
 
 const slidesFor = (first: string): Slide[] => [
-  { kind: "hero", title: first ? `Hola, ${first}.` : "Hola." },
-  { kind: "hero", title: "Filma Workspace.", text: "Toda la producción en un solo lugar." },
-  { kind: "hero", icon: Layers, title: "Un proyecto.\nDos entornos de trabajo.", text: "Cada equipo en el suyo. La misma información para todos.", tones: [{ theme: "both", at: 600 }] },
-  { kind: "hero", icon: Calculator, title: "Contabilidad.", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
-  { kind: "hero", icon: Users, title: "Equipo.", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
-  { kind: "flow", title: "Nada sale sin aprobar.", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
-  { kind: "cloud", icon: FolderOpen, title: "Filma Hub.", text: "Toda la documentación del proyecto, ordenada y a un clic.",
+  { kind: "hero", title: first ? `Hola, ${first}` : "Hola" },
+  { kind: "hero", title: "Filma Workspace", text: "Toda la producción en un solo lugar." },
+  { kind: "hero", icon: Layers, title: "Un proyecto\nDos entornos de trabajo", text: "Cada equipo en el suyo. La misma información para todos.", tones: [{ theme: "both", at: 600 }] },
+  { kind: "hero", icon: Calculator, title: "Contabilidad", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
+  { kind: "hero", icon: Users, title: "Equipo", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
+  { kind: "flow", title: "Nada sale sin aprobar", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
+  { kind: "cloud", icon: FolderOpen, title: "Filma Hub", text: "Toda la documentación del proyecto, ordenada y a un clic.",
     words: ["Contratos", "Facturas", "Presupuestos", "Certificados", "Órdenes de compra", "Fichas del equipo", "Justificantes", "Informes"], tones: [{ theme: "both" }] },
-  { kind: "list", title: "Cada persona, su lugar.", tones: [{ theme: "both" }], items: [
+  { kind: "list", title: "Cada persona, su lugar", tones: [{ theme: "both" }], items: [
     { title: "La producción", text: "Lo ve todo.", icon: Clapperboard },
     { title: "Cada departamento", text: "Ve lo suyo.", icon: Users },
   ] },
-  { kind: "ladder", title: "Y cada acceso, a medida.", tones: [{ theme: "accounting" }], items: [
+  { kind: "ladder", title: "Y cada acceso, a medida", tones: [{ theme: "accounting" }], items: [
     { title: "Consulta", icon: Eye }, { title: "Propone", icon: PenLine }, { title: "Gestiona", icon: SlidersHorizontal }, { title: "Decide", icon: Stamp },
   ] },
-  { kind: "phone", title: "Y en tu bolsillo.", text: "La app móvil, para decidir desde el rodaje.", tones: [{ theme: "filma" }], items: [
+  { kind: "phone", title: "Y en tu bolsillo", text: "La app móvil, para decidir desde el rodaje.", tones: [{ theme: "filma" }], items: [
     { title: "Aprueba con un gesto", icon: Check },
     { title: "Lo pendiente, siempre a mano", icon: Bell },
     { title: "Encuentra cualquier documento", icon: Search },
     { title: "También sin conexión", icon: WifiOff },
   ] },
-  { kind: "hero", icon: Sparkles, title: "Menos tiempo administrando.\nMás tiempo haciendo cine.", tones: [{ theme: "both", at: 400 }, { theme: "filma", at: 3200 }] },
-  { kind: "list", title: "Y cuando lo necesites, más.", items: [
+  { kind: "hero", icon: Sparkles, title: "Menos tiempo administrando\nMás tiempo haciendo cine", tones: [{ theme: "both", at: 400 }, { theme: "filma", at: 3200 }] },
+  { kind: "list", title: "Y cuando lo necesites, más", items: [
     { title: "Filma Sign", text: "Firma digital, sin salir de la plataforma.", icon: PenTool },
     { title: "Budgeting", text: "El presupuesto, antes de rodar.", icon: Calculator },
   ] },
-  { kind: "end", title: "Tu proyecto de ejemplo está listo.", text: "«El último verano», con datos ficticios para probar sin miedo." },
+  { kind: "end", title: "Tu proyecto de ejemplo está listo", text: "«El último verano», con datos ficticios para probar sin miedo." },
 ];
 
 const durationOf = (s: Slide) =>
