@@ -7,64 +7,73 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { BadgeCheck, Clapperboard, Banknote, Bell, Calculator, Check, Eye, FilePlus2, FolderOpen, Layers, PenLine, PenTool, Search, SlidersHorizontal, Smartphone, Sparkles, Stamp, Users, WifiOff, type LucideIcon } from "lucide-react";
 import { inter } from "@/lib/fonts";
 
-type Item = { title: string; text?: string };
+type Item = { title: string; text?: string; icon?: LucideIcon };
 /** Tono del fondo: el de Filma, el de cada entorno, o los dos a la vez. */
 type Theme = "filma" | "accounting" | "team" | "both";
 /** Cambios de tono dentro de una diapositiva (ms desde que empieza). */
 type Tones = { theme: Theme; at?: number }[];
 type Slide =
-  | { kind: "hero"; title: string; text?: string ; tones?: Tones }
+  | { kind: "hero"; title: string; text?: string; icon?: LucideIcon; tones?: Tones }
   | { kind: "list"; title: string; items: Item[] ; tones?: Tones }
   | { kind: "ladder"; title: string; items: Item[] ; tones?: Tones }
+  | { kind: "flow"; title: string; steps: Item[]; text: string; tones?: Tones }
+  | { kind: "phone"; title: string; text: string; items: Item[]; tones?: Tones }
+  | { kind: "cloud"; title: string; text: string; words: string[]; icon?: LucideIcon; tones?: Tones }
   | { kind: "end"; title: string; text: string ; tones?: Tones };
 
 const STEP_MS = 1100; // entre elementos de una lista
+/** Dónde flotan las palabras de Filma Hub alrededor del título: x %, y %, opacidad. */
+const CLOUD: [number, number, number][] = [[6, 14, .55], [70, 8, .4], [80, 40, .6], [2, 52, .35], [62, 80, .5], [14, 84, .45], [40, 4, .3], [36, 92, .35]];
 
 const slidesFor = (first: string): Slide[] => [
   { kind: "hero", title: first ? `Hola, ${first}.` : "Hola." },
   { kind: "hero", title: "Filma Workspace.", text: "Toda la producción en un solo lugar." },
-  { kind: "hero", title: "Un proyecto.\nDos entornos de trabajo.", text: "Cada equipo trabaja en el suyo, con los mismos datos.", tones: [{ theme: "both", at: 600 }] },
-  { kind: "list", title: "Los entornos", tones: [{ theme: "accounting", at: 500 }, { theme: "team", at: 700 + STEP_MS }], items: [
-    { title: "Contabilidad", text: "POs, facturas, pagos y presupuesto." },
-    { title: "Equipo", text: "Crew, calendario, nóminas y control horario." },
+  { kind: "hero", icon: Layers, title: "Un proyecto.\nDos entornos de trabajo.", text: "Cada equipo en el suyo. La misma información para todos.", tones: [{ theme: "both", at: 600 }] },
+  { kind: "hero", icon: Calculator, title: "Contabilidad.", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
+  { kind: "hero", icon: Users, title: "Equipo.", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
+  { kind: "flow", title: "Nada sale sin aprobar.", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
+  { kind: "cloud", icon: FolderOpen, title: "Filma Hub.", text: "Toda la documentación del proyecto, ordenada y a un clic.",
+    words: ["Contratos", "Facturas", "Presupuestos", "Certificados", "Órdenes de compra", "Fichas del equipo", "Justificantes", "Informes"], tones: [{ theme: "both" }] },
+  { kind: "list", title: "Cada persona, su lugar.", tones: [{ theme: "both" }], items: [
+    { title: "La producción", text: "Lo ve todo.", icon: Clapperboard },
+    { title: "Cada departamento", text: "Ve lo suyo.", icon: Users },
   ] },
-  { kind: "list", title: "El panel de Contabilidad.", tones: [{ theme: "accounting" }], items: [
-    { title: "El circuito de facturas, de recibidas a pagadas." },
-    { title: "El presupuesto comprometido y realizado, al momento." },
-    { title: "Lo que vence esta semana." },
+  { kind: "ladder", title: "Y cada acceso, a medida.", tones: [{ theme: "accounting" }], items: [
+    { title: "Consulta", icon: Eye }, { title: "Propone", icon: PenLine }, { title: "Gestiona", icon: SlidersHorizontal }, { title: "Decide", icon: Stamp },
   ] },
-  { kind: "list", title: "El panel de Equipo.", tones: [{ theme: "team" }], items: [
-    { title: "Crew por departamentos." },
-    { title: "Calendario de rodaje." },
-    { title: "Nóminas, dietas y control horario." },
+  { kind: "phone", title: "Y en tu bolsillo.", text: "La app móvil, para decidir desde el rodaje.", tones: [{ theme: "filma" }], items: [
+    { title: "Aprueba con un gesto", icon: Check },
+    { title: "Lo pendiente, siempre a mano", icon: Bell },
+    { title: "Encuentra cualquier documento", icon: Search },
+    { title: "También sin conexión", icon: WifiOff },
   ] },
-  { kind: "list", title: "Cada persona, su rol.", tones: [{ theme: "both" }], items: [
-    { title: "Proyecto", text: "EP, PM, Controller y PC." },
-    { title: "Departamento", text: "Jefatura, coordinación y crew." },
-  ] },
-  { kind: "list", title: "Cada rol ve lo suyo.", items: [
-    { title: "El proyecto ve todo." },
-    { title: "Jefatura y coordinación ven su departamento." },
-    { title: "El crew ve lo que crea." },
-  ] },
-  { kind: "ladder", title: "En Contabilidad, cuatro niveles de acceso.", tones: [{ theme: "accounting" }], items: [
-    { title: "Visitante", text: "El panel." },
-    { title: "Usuario", text: "Además, proveedores y POs." },
-    { title: "Contabilidad", text: "Además, todas las facturas y los informes." },
-    { title: "Ampliada", text: "Además, presupuesto y usuarios." },
-  ] },
-  { kind: "hero", title: "Nada se paga sin aprobar.", text: "Cada PO y cada factura siguen su circuito, por rol, por departamento o por importe.", tones: [{ theme: "accounting" }] },
+  { kind: "hero", icon: Sparkles, title: "Menos tiempo administrando.\nMás tiempo haciendo cine.", tones: [{ theme: "both", at: 400 }, { theme: "filma", at: 3200 }] },
   { kind: "list", title: "Y cuando lo necesites, más.", items: [
-    { title: "Filma Sign", text: "Firma de contratos y documentos." },
-    { title: "Budgeting", text: "Presupuestos antes de rodar." },
+    { title: "Filma Sign", text: "Firma digital, sin salir de la plataforma.", icon: PenTool },
+    { title: "Budgeting", text: "El presupuesto, antes de rodar.", icon: Calculator },
   ] },
   { kind: "end", title: "Tu proyecto de ejemplo está listo.", text: "«El último verano», con datos ficticios para probar sin miedo." },
 ];
 
 const durationOf = (s: Slide) =>
-  s.kind === "end" ? Infinity : s.kind === "hero" ? (s.text ? 4200 : 2600) : 2400 + s.items.length * (s.kind === "ladder" ? 1500 : STEP_MS + 400);
+  s.kind === "end" ? Infinity
+  : s.kind === "hero" ? (s.text ? 4800 : s.title.includes("\n") ? 4600 : 2600)
+  : s.kind === "flow" ? 7200
+  : s.kind === "cloud" ? 6800
+  : s.kind === "phone" ? 8200
+  : 2400 + s.items.length * (s.kind === "ladder" ? 1300 : STEP_MS + 400);
+
+/** Icono de trazo fino en un círculo translúcido. */
+function Mark({ icon: Icon, size = 56, delay = "0ms", className = "" }: { icon: LucideIcon; size?: number; delay?: string; className?: string }) {
+  return (
+    <span className={`demo-in inline-flex items-center justify-center rounded-full bg-white/[.07] ring-1 ring-white/25 ${className}`} style={{ width: size, height: size, animationDelay: delay }}>
+      <Icon size={Math.round(size * 0.44)} strokeWidth={1.4} />
+    </span>
+  );
+}
 
 export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready = true, error }: {
   name?: string;
@@ -147,9 +156,10 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
 
       {/* Diapositiva */}
       <main className="relative z-10 flex h-full items-center justify-center px-6 sm:px-10" aria-live="polite">
-        <div key={i} className={`w-full ${s.kind === "hero" || s.kind === "end" ? "max-w-5xl" : "max-w-3xl"} [text-wrap:balance] ${leaving ? "demo-out" : ""}`}>
+        <div key={i} className={`w-full ${["hero", "end", "flow", "cloud", "phone"].includes(s.kind) ? "max-w-5xl" : "max-w-3xl"} [text-wrap:balance] ${leaving ? "demo-out" : ""}`}>
           {s.kind === "hero" && (
             <div className="text-center">
+              {s.icon && <Mark icon={s.icon} size={64} className="mb-7" />}
               <h1 className="demo-in whitespace-pre-line text-[40px] font-semibold leading-[1.08] tracking-tight sm:text-[64px]">{s.title}</h1>
               {s.text && <p className="demo-in mx-auto mt-5 max-w-xl text-[18px] leading-relaxed text-white/75 sm:text-[22px]" style={{ animationDelay: "900ms" }}>{s.text}</p>}
             </div>
@@ -162,10 +172,13 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
                 {s.items.map((it, k) => (
                   <li key={k} className="demo-in" style={{ animationDelay: `${700 + k * STEP_MS}ms` }}>
                     {it.text ? (
-                      <>
-                        <p className="text-[24px] font-semibold sm:text-[30px]">{it.title}</p>
-                        <p className="mt-1 text-[17px] text-white/70 sm:text-[19px]">{it.text}</p>
-                      </>
+                      <div className="flex items-start gap-4">
+                        {it.icon && <Mark icon={it.icon} size={48} className="mt-0.5 flex-shrink-0" />}
+                        <div>
+                          <p className="text-[24px] font-semibold sm:text-[30px]">{it.title}</p>
+                          <p className="mt-1 text-[17px] text-white/70 sm:text-[19px]">{it.text}</p>
+                        </div>
+                      </div>
                     ) : (
                       <p className="text-[20px] text-white/85 sm:text-[26px]">{it.title}</p>
                     )}
@@ -181,13 +194,86 @@ export default function DemoIntro({ name, onEnter, enterLabel = "Entrar", ready 
               <ol className="mt-8 space-y-2">
                 {s.items.map((it, k) => (
                   <li key={k} className="demo-step flex items-baseline gap-4 rounded-lg px-4 py-3"
-                    style={{ marginLeft: `${k * 6}%`, animationDelay: `${700 + k * 1500}ms` }}>
+                    style={{ marginLeft: `${k * 8}%`, animationDelay: `${700 + k * 1300}ms` }}>
                     <span className="w-6 text-[15px] tabular-nums text-white/50">{k + 1}</span>
-                    <span className="text-[22px] font-semibold sm:text-[26px]">{it.title}</span>
-                    <span className="text-[15px] text-white/70 sm:text-[17px]">{it.text}</span>
+                    {it.icon && <it.icon size={24} strokeWidth={1.4} className="self-center text-white/80" />}
+                    <span className="text-[26px] font-semibold sm:text-[34px]">{it.title}</span>
+                    {it.text && <span className="text-[15px] text-white/70 sm:text-[17px]">{it.text}</span>}
                   </li>
                 ))}
               </ol>
+            </div>
+          )}
+
+          {s.kind === "flow" && (
+            <div className="text-center">
+              <h1 className="demo-in text-[38px] font-semibold leading-[1.08] tracking-tight sm:text-[60px]">{s.title}</h1>
+              <div className="relative mx-auto mt-14 max-w-2xl">
+                <div aria-hidden="true" className="absolute left-[16.6%] right-[16.6%] top-[28px] h-px bg-white/20" />
+                <div aria-hidden="true" className="demo-line absolute left-[16.6%] top-[28px] h-px bg-white" style={{ animationDelay: "1500ms" }} />
+                <ol className="relative grid grid-cols-3">
+                  {s.steps.map((st, k) => (
+                    <li key={st.title} className="flex flex-col items-center">
+                      <span className="demo-dot relative flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-[#172544]/40" style={{ animationDelay: `${1300 + k * 1100}ms` }}>
+                        {st.icon && <st.icon size={24} strokeWidth={1.4} />}
+                      </span>
+                      <span className="demo-in mt-4 text-[18px] font-medium sm:text-[22px]" style={{ animationDelay: `${1300 + k * 1100}ms` }}>{st.title}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <p className="demo-in mx-auto mt-12 max-w-xl text-[17px] leading-relaxed text-white/75 sm:text-[20px]" style={{ animationDelay: "4600ms" }}>{s.text}</p>
+            </div>
+          )}
+
+          {s.kind === "cloud" && (
+            <div className="relative text-center">
+              <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 h-[70vh] w-[min(1100px,92vw)] -translate-x-1/2 -translate-y-1/2">
+                {s.words.map((w, k) => {
+                  const pos = CLOUD[k % CLOUD.length];
+                  return (
+                    <span key={w} className="demo-float absolute whitespace-nowrap text-[15px] font-medium text-white sm:text-[19px]"
+                      style={{ left: `${pos[0]}%`, top: `${pos[1]}%`, animationDelay: `${300 + k * 380}ms, ${300 + k * 380}ms`, ["--o" as string]: pos[2] }}>{w}</span>
+                  );
+                })}
+              </div>
+              {s.icon && <Mark icon={s.icon} size={64} delay="1300ms" className="relative mb-7" />}
+              <h1 className="demo-in relative text-[44px] font-semibold leading-[1.05] tracking-tight sm:text-[72px]" style={{ animationDelay: "1600ms" }}>{s.title}</h1>
+              <p className="demo-in relative mx-auto mt-5 max-w-xl text-[18px] leading-relaxed text-white/80 sm:text-[22px]" style={{ animationDelay: "2600ms" }}>{s.text}</p>
+            </div>
+          )}
+
+          {s.kind === "phone" && (
+            <div className="grid items-center gap-10 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-16">
+              {/* Teléfono dibujado en línea: una aprobación se desliza y la lista sube */}
+              <div className="demo-in mx-auto hidden h-[440px] w-[220px] rounded-[38px] border border-white/35 bg-white/[.04] p-3 sm:block" aria-hidden="true">
+                <div className="mx-auto mb-4 h-1.5 w-16 rounded-full bg-white/25" />
+                <p className="px-2 text-[11px] font-medium text-white/70">Pendiente de ti</p>
+                <div className="mt-3 space-y-2.5 overflow-hidden">
+                  <div className="demo-swipe relative h-[62px] rounded-2xl bg-white/[.12] px-3 py-2.5">
+                    <div className="h-2 w-20 rounded-full bg-white/60" /><div className="mt-2 h-1.5 w-28 rounded-full bg-white/25" /><div className="mt-2 h-1.5 w-12 rounded-full bg-white/25" />
+                    <span className="demo-ok absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#172544]"><Check size={15} strokeWidth={2.2} /></span>
+                  </div>
+                  {[0, 1, 2].map((k) => (
+                    <div key={k} className="demo-rise h-[62px] rounded-2xl bg-white/[.07] px-3 py-2.5">
+                      <div className="h-2 w-16 rounded-full bg-white/45" /><div className="mt-2 h-1.5 w-24 rounded-full bg-white/20" /><div className="mt-2 h-1.5 w-10 rounded-full bg-white/20" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Mark icon={Smartphone} size={56} className="mb-6" />
+                <h2 className="demo-in text-[34px] font-semibold leading-tight tracking-tight sm:text-[52px]" style={{ animationDelay: "200ms" }}>{s.title}</h2>
+                <p className="demo-in mt-3 text-[18px] text-white/75 sm:text-[21px]" style={{ animationDelay: "600ms" }}>{s.text}</p>
+                <ul className="mt-8 space-y-4">
+                  {s.items.map((it, k) => (
+                    <li key={it.title} className="demo-in flex items-center gap-3.5" style={{ animationDelay: `${1600 + k * 900}ms` }}>
+                      {it.icon && <it.icon size={20} strokeWidth={1.5} className="text-white/80" />}
+                      <span className="text-[18px] sm:text-[21px]">{it.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
 
@@ -242,11 +328,23 @@ const CSS = `
 @keyframes demo-out { to { opacity: 0; filter: blur(8px); transform: translateY(-6px); } }
 .demo-step { opacity: .18; animation: demo-step 700ms ease forwards; }
 @keyframes demo-step { to { opacity: 1; background: rgba(255,255,255,.08); } }
+.demo-line { width: 0; animation: demo-line 2400ms cubic-bezier(.6,0,.2,1) forwards; }
+@keyframes demo-line { to { width: 66.8%; } }
+.demo-dot { animation: demo-dot 600ms ease forwards; }
+@keyframes demo-dot { to { background: rgba(255,255,255,.16); border-color: #fff; box-shadow: 0 0 0 6px rgba(255,255,255,.08), 0 0 28px rgba(255,255,255,.35); } }
+.demo-float { opacity: 0; filter: blur(6px); animation: demo-float-in 1400ms ease forwards, demo-bob 9s ease-in-out infinite alternate; }
+@keyframes demo-float-in { to { opacity: var(--o); filter: blur(0); } }
+@keyframes demo-bob { from { transform: translateY(0); } to { transform: translateY(-14px); } }
+.demo-swipe { animation: demo-swipe 1100ms cubic-bezier(.5,0,.3,1) 2600ms forwards; }
+@keyframes demo-swipe { 60% { transform: translateX(10px); opacity: 1; } to { transform: translateX(120%); opacity: 0; height: 0; margin-bottom: -10px; padding: 0; } }
+.demo-ok { opacity: 0; animation: demo-ok 500ms ease 1900ms forwards; }
+@keyframes demo-ok { to { opacity: 1; } }
+.demo-rise { transition: transform .6s; }
 .demo-fade { opacity: 0; animation: demo-fade 500ms ease forwards; }
 @keyframes demo-fade { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .demo-glow { animation: none; }
   .demo-layer, .demo-glow { transition-duration: 1.2s !important; }
-  .demo-in, .demo-out, .demo-step, .demo-fade { animation-duration: 1ms !important; filter: none !important; transform: none !important; }
+  .demo-in, .demo-out, .demo-step, .demo-fade, .demo-line, .demo-dot, .demo-float, .demo-swipe, .demo-ok { animation-duration: 1ms !important; filter: none !important; transform: none !important; }
 }
 `;
