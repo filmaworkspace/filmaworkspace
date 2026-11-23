@@ -6,12 +6,13 @@
 // estilos en línea) y en scripts (bootstrap de Next sin nonce).
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://cdnjs.cloudflare.com",
+  // cdn.jsdelivr.net: motor de OCR local (tesseract.js: worker, wasm e idioma).
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://firebasestorage.googleapis.com https://*.cloudfunctions.net" +
+  "connect-src 'self' https://cdn.jsdelivr.net https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://firebasestorage.googleapis.com https://*.cloudfunctions.net" +
     // Emuladores de Firebase en desarrollo y pruebas
     (process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "1"
       ? " http://127.0.0.1:* http://localhost:* ws://localhost:* ws://127.0.0.1:*"

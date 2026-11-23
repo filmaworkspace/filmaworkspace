@@ -87,6 +87,7 @@ const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { IBANField } from "@/components/IBANField";
+import { CodingWorkspace } from "@/components/accounting/CodingWorkspace";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -241,7 +242,9 @@ interface Supplier {
   name: string;
   taxId?: string;
   iban?: string;
+  bankAccount?: string;
   bic?: string;
+  certificates?: { bankOwnership?: { uploaded?: boolean; verified?: boolean; expiryDate?: any } };
 }
 
 interface SubAccount {
@@ -534,7 +537,7 @@ export default function InvoiceDetailPage() {
     if (!invoice?.supplierId) return;
     const sup = suppliers.find((s) => s.id === invoice.supplierId);
     if (sup) {
-      setCodingForm((prev) => ({ ...prev, supplierTaxId: sup.taxId || prev.supplierTaxId, supplierIban: sup.iban || prev.supplierIban, supplierBic: sup.bic || prev.supplierBic }));
+      setCodingForm((prev) => ({ ...prev, supplierTaxId: sup.taxId || prev.supplierTaxId, supplierIban: sup.bankAccount || sup.iban || prev.supplierIban, supplierBic: sup.bic || prev.supplierBic }));
     }
   };
 
@@ -881,392 +884,24 @@ export default function InvoiceDetailPage() {
   const StatusIcon = config.icon;
   const totals = calculateTotals();
 
-  // Coding Mode UI
+  // Codificación
   if (codingMode) {
     return (
-      <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-        
-        {/* Coding Header */}
-        <div className="px-6 py-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 bg-slate-900 text-white">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setCodingMode(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X size={20} /></button>
-            <div className="flex items-center gap-3">
-              <Code size={20} />
-              <span className="font-semibold">Codificar</span>
-              <span className="bg-slate-700 px-2 py-0.5 rounded text-[13px]">{invoice.displayNumber}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-slate-400 text-[13px]">Total: <span className="font-bold text-white">{formatCurrency(totals.total)} €</span></span>
-            <button onClick={handleSaveCoding} disabled={saving} className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-900 rounded-md text-[13px] font-semibold hover:bg-[#F4F4F5] disabled:opacity-50 shadow-lg">
-              {saving ? <RefreshCw size={16} className="animate-spin" /> : <FileCheck size={16} />}
-              {saving ? "Guardando..." : "Completar codificación"}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex pt-[52px]" style={{ height: "100vh" }}>
-          {/* Left: Document Preview */}
-          <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-slate-400 text-[13px]">Vista previa del documento</span>
-                {invoice.replacedFromType && invoice.originalAttachmentUrl && (
-                  <button
-                    onClick={() => setShowOriginalDoc(!showOriginalDoc)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${showOriginalDoc ? "border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}
-                  >
-                    {showOriginalDoc ? "Ver factura" : `Ver ${invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original`}
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))} className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ZoomOut size={16} /></button>
-                <span className="text-slate-400 text-xs w-12 text-center">{zoomLevel}%</span>
-                <button onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))} className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ZoomIn size={16} /></button>
-                {(showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl) && (
-                  <a href={showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600"><ExternalLink size={16} /></a>
-                )}
-              </div>
-            </div>
-            {showOriginalDoc && invoice.originalAttachmentUrl && (
-              <div className="bg-slate-700 border border-slate-400 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
-                <FileText size={14} className="text-slate-400" />
-                <span className="text-slate-400 text-xs">
-                  Mostrando {invoice.replacedFromType === "proforma" ? "proforma" : "presupuesto"} original
-                </span>
-              </div>
-            )}
-            <div className="flex-1 bg-slate-900 rounded-md overflow-auto">
-              {(() => {
-                const currentUrl = showOriginalDoc ? invoice.originalAttachmentUrl : invoice.attachmentUrl;
-                return currentUrl ? (
-                  isPDF(currentUrl) ? (
-                    <iframe src={`${currentUrl}#toolbar=0`} className="w-full h-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left", width: `${100 / (zoomLevel / 100)}%`, height: `${100 / (zoomLevel / 100)}%` }} />
-                  ) : (
-                    <img src={currentUrl} alt="Documento" className="max-w-full" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left" }} />
-                  )
-                ) : (
-                  <div className="h-full flex items-center justify-center text-slate-500"><FileUp size={48} className="mb-2" /><p>Sin documento</p></div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Right: Coding Form */}
-          <div className="w-1/2 overflow-y-auto p-6">
-            {/* Header Info */}
-            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Nº Factura proveedor</label>
-                  <input value={codingForm.supplierNumber} onChange={(e) => setCodingForm({ ...codingForm, supplierNumber: e.target.value })} placeholder="Número de proveedor" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Fecha factura</label>
-                  <input type="date" value={codingForm.invoiceDate} onChange={(e) => setCodingForm({ ...codingForm, invoiceDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Fecha vencimiento</label>
-                  <input type="date" value={codingForm.dueDate} onChange={(e) => setCodingForm({ ...codingForm, dueDate: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                <input value={codingForm.description} onChange={(e) => setCodingForm({ ...codingForm, description: e.target.value })} placeholder="Descripción de la factura" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-              </div>
-            </div>
-
-            {/* Supplier Info */}
-            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[13px] font-semibold text-slate-900 flex items-center gap-2"><Building2 size={16} className="text-slate-400" />Proveedor: {invoice.supplier}</h3>
-                <button onClick={loadSupplierData} className="text-xs text-slate-700 hover:underline flex items-center gap-1"><RefreshCw size={12} />Cargar datos</button>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">CIF/NIF</label>
-                  <input value={codingForm.supplierTaxId} onChange={(e) => setCodingForm({ ...codingForm, supplierTaxId: e.target.value })} placeholder="B12345678" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none tabular-nums" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">IBAN / BIC</label>
-                  <IBANField
-                    iban={codingForm.supplierIban}
-                    bic={codingForm.supplierBic}
-                    onIBANChange={(v) => setCodingForm({ ...codingForm, supplierIban: v })}
-                    onBICChange={(v) => setCodingForm({ ...codingForm, supplierBic: v })}
-                    ibanClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900/10 outline-none"
-                    bicClassName="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-900/10 outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Items */}
-            <div className="bg-white rounded-lg p-5 mb-4 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[13px] font-semibold text-slate-900">Líneas de codificación</h3>
-                <div className="flex items-center gap-2">
-                  {linkedPO && linkedPO.items && linkedPO.items.length > 0 && (
-                    <button 
-                      onClick={() => {
-                        const poItems = linkedPO.items!.map((poItem: any, idx: number) => ({
-                          description: poItem.description || "",
-                          subAccountId: poItem.subAccountId || "",
-                          subAccountCode: poItem.subAccountCode || "",
-                          subAccountDescription: poItem.subAccountDescription || "",
-                          quantity: poItem.quantity || 1,
-                          unitPrice: poItem.unitPrice || 0,
-                          vatRate: poItem.vatRate ?? 21,
-                          irpfRate: poItem.irpfRate ?? 0,
-                          poId: linkedPO.id, poNumber: linkedPO.number, poItemId: poItem.id || `item-${idx}`,
-                          poItemIndex: idx,
-                          isNewItem: false,
-                        }));
-                        setCodingItems(poItems);
-                      }} 
-                      className="flex items-center gap-1 px-3 py-1.5 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium hover:bg-[#F4F4F5]"
-                    >
-                      <LinkIcon size={14} />Importar de PO
-                    </button>
-                  )}
-                  <button onClick={addCodingItem} className="flex items-center gap-1 px-3 py-1.5 bg-[#F1F1F3] text-slate-900 rounded-lg text-xs font-medium hover:bg-[#F4F4F5]"><Plus size={14} />Añadir línea</button>
-                </div>
-              </div>
-
-              {/* PO Items selector */}
-              {linkedPO && linkedPO.items && linkedPO.items.length > 0 && (
-                <div className="mb-4 p-3 bg-[#F7F7F8] border border-slate-200 rounded-md">
-                  <p className="text-xs font-medium text-slate-900 mb-2">Añadir línea desde PO-{linkedPO.number}:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {linkedPO.items.map((poItem: any, idx: number) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setCodingItems([...codingItems, {
-                            description: poItem.description || "",
-                            subAccountId: poItem.subAccountId || "",
-                            subAccountCode: poItem.subAccountCode || "",
-                            subAccountDescription: poItem.subAccountDescription || "",
-                            quantity: poItem.quantity || 1,
-                            unitPrice: poItem.unitPrice || 0,
-                            vatRate: poItem.vatRate ?? 21,
-                            irpfRate: poItem.irpfRate ?? 0,
-                            poId: linkedPO.id, poNumber: linkedPO.number, poItemId: poItem.id || `item-${idx}`,
-                            poItemIndex: idx,
-                            isNewItem: false,
-                          }]);
-                        }}
-                        className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs hover:bg-[#F4F4F5] transition-colors"
-                      >
-                        <span className="font-medium text-slate-900">#{idx + 1}</span>
-                        <span className="text-slate-600 truncate max-w-[150px]">{poItem.description || "Sin descripción"}</span>
-                        <span className="tabular-nums text-slate-500">{formatCurrency(poItem.unitPrice || 0)}€</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {codingItems.map((item, idx) => (
-                  <div key={idx} className={`border rounded-md p-4 relative ${item.isNewItem ? "border-amber-200 bg-amber-50/30" : "border-slate-200 bg-[#F7F7F8]"}`}>
-                    <div className="absolute -top-2 left-3 flex items-center gap-2">
-                      <span className="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-500 font-medium">Línea {idx + 1}</span>
-                    </div>
-                    <div className="mb-2 mt-1">
-                      <LineOrigin
-                        link={{ poId: item.poId || (item.isNewItem ? null : linkedPO?.id), poNumber: item.poNumber, poItemIndex: item.poItemIndex, poItemId: item.poItemId, isNewItem: item.isNewItem }}
-                        invoicePO={linkedPO ? { id: linkedPO.id, number: linkedPO.number, supplier: linkedPO.supplier, items: (linkedPO.items || []) as OriginPOItem[] } : null}
-                        pos={originPOs}
-                        onLink={(po, poItem, i) => setCodingItems((prev) => prev.map((x, k) => k !== idx ? x : {
-                          ...x, poId: po.id, poNumber: po.number, poItemIndex: i, poItemId: poItem.id || `item-${i}`, isNewItem: false,
-                          // El concepto se conserva si ya se escribió; el vínculo va por el ítem.
-                          description: x.description.trim() ? x.description : poItem.description || "",
-                          subAccountId: poItem.subAccountId || x.subAccountId, subAccountCode: poItem.subAccountCode || x.subAccountCode, subAccountDescription: poItem.subAccountDescription || x.subAccountDescription,
-                        }))}
-                        onNew={() => setCodingItems((prev) => prev.map((x, k) => k !== idx ? x : { ...x, isNewItem: true, poId: null, poNumber: null, poItemId: null, poItemIndex: undefined }))}
-                      />
-                    </div>
-                    {codingItems.length > 1 && <button onClick={() => removeCodingItem(idx)} className="absolute top-2 right-2 p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
-                    
-                    <div className="grid grid-cols-12 gap-3 mt-2">
-                      <div className="col-span-12">
-                        <label className="text-xs text-slate-500 block mb-1">Descripción</label>
-                        <input value={item.description} onChange={(e) => updateCodingItem(idx, "description", e.target.value)} placeholder="Descripción del concepto" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                      </div>
-                      
-                      <div className="col-span-6">
-                        <label className="text-xs text-slate-500 block mb-1">Cuenta / Partida</label>
-                        <div className="relative">
-                          {item.subAccountId ? (
-                            <div className="flex items-center gap-2 px-3 py-2 bg-[#F7F7F8] border border-slate-200 rounded-lg">
-                              <span className="font-mono text-[13px] text-slate-900">{item.subAccountCode}</span>
-                              <span className="text-xs text-slate-600 truncate flex-1">{item.subAccountDescription}</span>
-                              <button onClick={() => { updateCodingItem(idx, "subAccountId", ""); updateCodingItem(idx, "subAccountCode", ""); updateCodingItem(idx, "subAccountDescription", ""); }} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <input placeholder="Buscar cuenta" value={searchSubAccount} onChange={(e) => setSearchSubAccount(e.target.value)} onFocus={() => setSearchSubAccount("")} className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                              {searchSubAccount && (
-                                <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-xl max-h-48 overflow-y-auto" match="width">
-                                  {subAccounts.filter((s) => s.code.toLowerCase().includes(searchSubAccount.toLowerCase()) || s.description.toLowerCase().includes(searchSubAccount.toLowerCase())).slice(0, 10).map((s) => (
-                                    <button key={s.id} onClick={() => selectSubAccount(idx, s)} className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-[13px]">
-                                      <span className="font-mono text-slate-700">{s.code}</span>
-                                      <span className="text-slate-600 truncate">{s.description}</span>
-                                    </button>
-                                  ))}
-                                </AnchoredPanel>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="text-xs text-slate-500 block mb-1">IVA %</label>
-                        <div className="relative custom-dropdown">
-                          <button
-                            type="button"
-                            onClick={() => setOpenDropdown(openDropdown === `vat-${idx}` ? null : `vat-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
-                          >
-                            <span className="text-slate-900 truncate">{item.vatRate}%</span>
-                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `vat-${idx}` ? "rotate-180" : ""}`} />
-                          </button>
-                          {openDropdown === `vat-${idx}` && (
-                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                              {VAT_RATES.map((r) => (
-                                <button
-                                  key={r}
-                                  type="button"
-                                  onClick={() => { updateCodingItem(idx, "vatRate", Number(r)); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.vatRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                                >
-                                  {r}%
-                                </button>
-                              ))}
-                            </AnchoredPanel>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="text-xs text-slate-500 block mb-1">IRPF %</label>
-                        <div className="relative custom-dropdown">
-                          <button
-                            type="button"
-                            onClick={() => setOpenDropdown(openDropdown === `irpf-${idx}` ? null : `irpf-${idx}`)}
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
-                          >
-                            <span className="text-slate-900 truncate">{item.irpfRate}%</span>
-                            <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === `irpf-${idx}` ? "rotate-180" : ""}`} />
-                          </button>
-                          {openDropdown === `irpf-${idx}` && (
-                            <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                              {IRPF_RATES.map((r) => (
-                                <button
-                                  key={r}
-                                  type="button"
-                                  onClick={() => { updateCodingItem(idx, "irpfRate", Number(r)); setOpenDropdown(null); }}
-                                  className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${item.irpfRate === r ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                                >
-                                  {r}%
-                                </button>
-                              ))}
-                            </AnchoredPanel>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="text-xs text-slate-500 block mb-1">Cantidad</label>
-                        <input type="number" step="0.01" min="0" value={item.quantity || ""} onChange={(e) => updateCodingItem(idx, "quantity", parseFloat(e.target.value) || 0)} placeholder="1" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right tabular-nums" />
-                      </div>
-
-                      <div className="col-span-3">
-                        <label className="text-xs text-slate-500 block mb-1">Precio unit.</label>
-                        <div className="relative">
-                          <input type="number" step="0.01" value={item.unitPrice || ""} onChange={(e) => updateCodingItem(idx, "unitPrice", parseFloat(e.target.value) || 0)} placeholder="0.00" className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none text-right tabular-nums" />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
-                        </div>
-                      </div>
-
-                      <div className="col-span-3">
-                        <label className="text-xs text-slate-500 block mb-1">Total línea</label>
-                        <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] text-right tabular-nums font-semibold text-slate-900">
-                          {formatCurrency(calculateItemTotals(item).total)} €
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Totals */}
-            <div className="bg-[#F7F7F8] border border-slate-200 rounded-lg p-5 mb-4">
-              <div className="grid grid-cols-4 gap-4 text-[13px]">
-                <div className="text-center"><p className="text-slate-700 text-xs mb-1">Base imponible</p><p className="font-bold text-slate-900">{formatCurrency(totals.base)} €</p></div>
-                <div className="text-center"><p className="text-slate-700 text-xs mb-1">IVA</p><p className="font-bold text-emerald-600">+{formatCurrency(totals.vat)} €</p></div>
-                <div className="text-center"><p className="text-slate-700 text-xs mb-1">IRPF</p><p className="font-bold text-red-600">-{formatCurrency(totals.irpf)} €</p></div>
-                <div className="text-center bg-white rounded-md p-3"><p className="text-slate-700 text-xs mb-1">TOTAL</p><p className="font-bold text-xl text-slate-900">{formatCurrency(totals.total)} €</p></div>
-              </div>
-            </div>
-
-            {/* Extra Info */}
-            <div className="bg-white rounded-lg p-5 shadow-sm">
-              <h3 className="text-[13px] font-semibold text-slate-900 mb-4">Información adicional</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">Método de pago</label>
-                  <div className="relative custom-dropdown">
-                    <button
-                      type="button"
-                      onClick={() => setOpenDropdown(openDropdown === "paymentMethod" ? null : "paymentMethod")}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] bg-white text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-colors"
-                    >
-                      <span className="text-slate-900 truncate">{PAYMENT_METHODS.find(m => m.value === codingForm.paymentMethod)?.label ?? codingForm.paymentMethod}</span>
-                      <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${openDropdown === "paymentMethod" ? "rotate-180" : ""}`} />
-                    </button>
-                    {openDropdown === "paymentMethod" && (
-                      <AnchoredPanel className="bg-white border border-slate-200 rounded-md shadow-lg py-1 max-h-48 overflow-y-auto" match="width">
-                        {PAYMENT_METHODS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => { setCodingForm({ ...codingForm, paymentMethod: opt.value }); setOpenDropdown(null); }}
-                            className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${codingForm.paymentMethod === opt.value ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </AnchoredPanel>
-                    )}
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={codingForm.isAsset} onChange={(e) => setCodingForm({ ...codingForm, isAsset: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-slate-700 focus:ring-slate-900/10 text-[13px]" />
-                    <span className="text-[13px] text-slate-700">Es un activo / inventario</span>
-                  </label>
-                </div>
-                {codingForm.isAsset && (
-                  <div className="col-span-2">
-                    <label className="text-xs text-slate-500 block mb-1">Categoría de activo</label>
-                    <input value={codingForm.assetCategory} onChange={(e) => setCodingForm({ ...codingForm, assetCategory: e.target.value })} placeholder="Categoría del activo" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none" />
-                  </div>
-                )}
-                <div className="col-span-2">
-                  <label className="text-xs text-slate-500 block mb-1">Notas internas</label>
-                  <textarea value={codingForm.notes} onChange={(e) => setCodingForm({ ...codingForm, notes: e.target.value })} rows={2} placeholder="Notas para el equipo de contabilidad" className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-slate-900/10 focus:outline-none resize-none" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CodingWorkspace
+        projectId={projectId}
+        invoice={{ id: invoice.id, displayNumber: invoice.displayNumber, supplier: invoice.supplier, supplierId: invoice.supplierId, attachmentUrl: invoice.attachmentUrl, originalAttachmentUrl: invoice.originalAttachmentUrl, replacedFromType: invoice.replacedFromType }}
+        supplier={suppliers.find((s) => s.id === invoice.supplierId) || null}
+        linkedPO={linkedPO ? { id: linkedPO.id, number: linkedPO.number, supplier: linkedPO.supplier, items: (linkedPO.items || []) as OriginPOItem[] } : null}
+        originPOs={originPOs}
+        subAccounts={subAccounts}
+        form={codingForm}
+        setForm={setCodingForm}
+        items={codingItems}
+        setItems={setCodingItems}
+        saving={saving}
+        onSave={handleSaveCoding}
+        onClose={() => setCodingMode(false)}
+      />
     );
   }
 

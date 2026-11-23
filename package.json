@@ -19,9 +19,11 @@
     "next": "^15.5.29",
     "pdf-lib": "^1.17.1",
     "pdf-merger-js": "^5.1.2",
+    "pdfjs-dist": "^6.4.299",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "resend": "^4.5.1"
+    "resend": "^4.5.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22",

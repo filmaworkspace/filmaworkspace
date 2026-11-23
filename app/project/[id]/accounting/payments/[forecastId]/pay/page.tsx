@@ -194,7 +194,7 @@ export default function PaymentPayPage() {
         supplierSnaps.forEach((snap, idx) => {
           if (snap.exists()) {
             const sData = snap.data();
-            suppliersMap[uniqueSupplierIds[idx]] = { id: snap.id, name: sData.name, iban: sData.iban, bic: sData.bic };
+            suppliersMap[uniqueSupplierIds[idx]] = { id: snap.id, name: sData.fiscalName || sData.commercialName || sData.name, iban: (sData.bankAccount || sData.iban || "").replace(/\s+/g, ""), bic: sData.bic };
           }
         });
         setSuppliers(suppliersMap);
