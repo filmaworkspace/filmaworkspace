@@ -7,7 +7,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Button, IconButton, Input } from "@/components/ds";
 import { LinesEditor } from "./LinesEditor";
-import { eur, invoiceTotals, monthName, newLineId, phaseSchedule, type QuotePhase } from "@/lib/billing";
+import { eur, invoiceTotals, newLineId, phaseSchedule, type QuotePhase } from "@/lib/billing";
 
 export const PHASE_COLORS = ["#24406E", "#5B7BB0", "#8FA9D3", "#3F6B5A", "#7A5C99", "#A6683A"];
 
@@ -24,7 +24,8 @@ export function PhasesEditor({ phases, startMonth, onChange, defaultVat, readOnl
   const schedule = phaseSchedule({ startMonth, phases });
   const range = (id: string) => {
     const ms = schedule.filter((s) => s.phase.id === id).map((s) => s.month);
-    return ms.length ? (ms.length === 1 ? monthName(ms[0]) : `${monthName(ms[0])} – ${monthName(ms[ms.length - 1])}`) : "";
+    const short = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("es-ES", { month: "short", year: "2-digit" });
+    return ms.length ? (ms.length === 1 ? short(ms[0]) : `${short(ms[0])} – ${short(ms[ms.length - 1])}`) : "";
   };
 
   return (
@@ -44,9 +45,7 @@ export function PhasesEditor({ phases, startMonth, onChange, defaultVat, readOnl
                 <Input value={String(p.months)} disabled={readOnly} inputMode="numeric" className="text-right tabular-nums"
                   onChange={(e) => set(i, { months: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
               </label>
-              <div className="flex-1 pb-2 text-right text-xs text-slate-500">
-                <span className="capitalize">{range(p.id)}</span>
-              </div>
+              <div className="flex-1 whitespace-nowrap pb-2.5 text-right text-xs text-slate-500">{range(p.id)}</div>
               {!readOnly && (
                 <div className="flex gap-0.5 pb-0.5">
                   <IconButton label="Subir" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={13} /></IconButton>
@@ -56,7 +55,7 @@ export function PhasesEditor({ phases, startMonth, onChange, defaultVat, readOnl
               )}
             </div>
             <div className="py-2 pl-5 pr-3">
-              <LinesEditor lines={p.lines} readOnly={readOnly} defaultVat={defaultVat} onChange={(lines) => set(i, { lines })} />
+              <LinesEditor compact lines={p.lines} readOnly={readOnly} defaultVat={defaultVat} onChange={(lines) => set(i, { lines })} />
               <p className="mt-2 text-right text-[13px] text-slate-500">
                 {eur(m.baseAmount)} / mes × {p.months} {p.months === 1 ? "mes" : "meses"} = <strong className="font-medium text-slate-900">{eur(m.baseAmount * p.months)}</strong> <span className="text-slate-400">+ IVA</span>
               </p>

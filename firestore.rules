@@ -932,6 +932,13 @@ service cloud.firestore {
       allow delete: if isAdmin() && resource.data.status == 'draft';
     }
 
+    // Filma Sign: solo el servidor escribe (enlaces con token cifrado);
+    // los admins consultan las solicitudes y su auditoría.
+    match /signRequests/{requestId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Datos fiscales de personas a las que se factura (Budgeting…): solo admins.
     match /billingClients/{userId} {
       allow read, write: if isAdmin();

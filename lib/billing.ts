@@ -195,6 +195,9 @@ export interface BillingQuote {
   notes: string;
   conditions: string;
   decisionNote?: string | null;
+  /** Filma Sign */
+  signRequestId?: string | null;
+  signStatus?: "pending" | "signed" | "declined" | "cancelled" | null;
   acceptedAt?: { toMillis: () => number } | null;
   sentAt?: { toMillis: () => number } | null;
   sentTo?: string | null;

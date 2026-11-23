@@ -29,6 +29,7 @@ export default function ClientLayout({
     pathname?.startsWith("/timesheet-review") ||
     pathname?.startsWith("/access") ||
     pathname?.startsWith("/caja/") ||
+    pathname?.startsWith("/sign/") ||
     pathname?.startsWith("/guias") ||
     pathname?.startsWith("/budgeting");
 

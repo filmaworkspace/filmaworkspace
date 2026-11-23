@@ -113,7 +113,19 @@ export function DocPreview({ v }: { v: DocView }) {
               <p className="mt-1 whitespace-pre-line text-[9px] leading-relaxed text-slate-600">{v.notes}</p>
             </div>
           )}
-          {v.signature && (
+          {v.signatures?.length ? (
+            <div className="mt-4 grid grid-cols-2 gap-6">
+              {v.signatures.map((sg) => (
+                <div key={sg.label}>
+                  <p className={label}>{sg.label}</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sg.image} alt={`Firma de ${sg.name}`} className="mt-1 h-10 object-contain object-left" />
+                  <div className="border-t border-slate-300 pt-1 text-[8.5px] font-semibold text-slate-900">{sg.name}</div>
+                  <div className="text-[7.5px] text-slate-500">{[sg.role, sg.date].filter(Boolean).join(" · ")}</div>
+                </div>
+              ))}
+            </div>
+          ) : v.signature && (
             <div className="mt-4">
               <p className={label}>Aceptado por el cliente</p>
               <div className="mt-6 grid grid-cols-[1.6fr_1fr] gap-8 text-[7.5px] text-slate-500">

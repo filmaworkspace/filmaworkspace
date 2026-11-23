@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity, BarChart3, Receipt, Briefcase, Building2, CornerDownLeft, Eye, HeadphonesIcon, Home, Mail, Megaphone, Plus, Search, Settings, Users, Wrench,
+  Activity, BarChart3, FileText, Receipt, Briefcase, Building2, CornerDownLeft, Eye, HeadphonesIcon, Home, Mail, Megaphone, Plus, Search, Settings, Users, Wrench,
 } from "lucide-react";
 import { inter } from "@/lib/fonts";
 import { useAdminData } from "./AdminData";
@@ -57,6 +57,7 @@ export default function CommandPalette({ open, onClose, isAdmin }: { open: boole
       { id: "s-ann", group: "Secciones", label: "Avisos", icon: Megaphone, keywords: "comunicados novedades changelog banner", run: go("/admindashboard/announcements") },
       { id: "s-system", group: "Secciones", label: "Sistema", icon: Settings, keywords: "errores seguridad auditoria cron flags", run: go("/admindashboard/system") },
       { id: "s-data", group: "Secciones", label: "Datos", hint: "Recalcular presupuestos, reparar aprobaciones", icon: Wrench, keywords: "mantenimiento recalcular ledger presupuesto flujos aprobaciones reparar", run: go("/admindashboard/data") },
+      { id: "s-sign", group: "Secciones", label: "Filma Sign", hint: "Firmas de presupuestos y documentos", icon: FileText, keywords: "firma firmar sign contrato aceptar", run: go("/admindashboard/sign") },
       { id: "s-billing", group: "Secciones", label: "Facturación", icon: Receipt, keywords: "facturas presupuestos cobros", run: go("/admindashboard/accounts/billing") },
       { id: "s-metrics", group: "Secciones", label: "Métricas", icon: BarChart3, keywords: "embudo retencion cohortes", run: go("/admindashboard/metrics") },
     ];

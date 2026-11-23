@@ -29,6 +29,8 @@ export interface DocView {
   notes: string;
   conditions: string;
   signature: boolean;
+  /** Firmas ya hechas (Filma Sign): sustituyen las líneas en blanco. */
+  signatures?: { label: string; name: string; role: string; image: string; date: string }[];
 }
 
 export function periodLabel(inv: Pick<BillingInvoice, "periodType" | "periodMonth" | "periodMonths" | "projectName">) {
@@ -114,13 +116,13 @@ async function headerImage(): Promise<string | null> {
   } catch { return null; }
 }
 
-export async function buildDocPdf(v: DocView): Promise<jsPDF> {
+export async function buildDocPdf(v: DocView, opts: { header?: string | null } = {}): Promise<jsPDF> {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210, M = 18, BOTTOM = 272;
   const set = (size: number, color: RGB, style: "normal" | "bold" = "normal") => { pdf.setFont("helvetica", style); pdf.setFontSize(size); pdf.setTextColor(...color); };
   const ensure = (h: number) => { if (y + h > BOTTOM) { pdf.addPage(); y = 24; } };
 
-  const img = await headerImage();
+  const img = opts.header !== undefined ? opts.header : await headerImage();
   if (img) pdf.addImage(img, "JPEG", 0, 0, W, 42);
   else { pdf.setFillColor(...ACCENT); pdf.rect(0, 0, W, 42, "F"); }
   set(9, [255, 255, 255]);
@@ -219,7 +221,20 @@ export async function buildDocPdf(v: DocView): Promise<jsPDF> {
   section("Condiciones", [v.conditions], 8.5);
   section(v.notesTitle, [v.notes]);
 
-  if (v.signature) {
+  if (v.signatures?.length) {
+    ensure(46);
+    y += 4;
+    const colW = (W - 2 * M - 10) / 2;
+    v.signatures.forEach((sg, i) => {
+      const x = M + i * (colW + 10);
+      set(7.5, FAINT, "bold"); pdf.text(sg.label.toUpperCase(), x, y, { charSpace: 0.5 });
+      try { pdf.addImage(sg.image, "PNG", x, y + 2, 50, 17); } catch { /* firma no legible */ }
+      pdf.setDrawColor(...LINE); pdf.setLineWidth(0.3); pdf.line(x, y + 21, x + colW, y + 21);
+      set(9, INK, "bold"); pdf.text(sg.name, x, y + 26);
+      set(7.5, MUTED); pdf.text([sg.role, sg.date].filter(Boolean).join(" · "), x, y + 30.5);
+    });
+    y += 38;
+  } else if (v.signature) {
     ensure(34);
     y += 4;
     set(7.5, FAINT, "bold"); pdf.text("ACEPTADO POR EL CLIENTE", M, y, { charSpace: 0.5 });

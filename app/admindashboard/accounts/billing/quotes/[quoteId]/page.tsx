@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
-import { ArrowLeft, Check, Copy, Download, FileText, Mail, MoreHorizontal, Plus, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, FileSignature, Download, FileText, Mail, MoreHorizontal, Plus, Send, Trash2, X } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useUser } from "@/contexts/UserContext";
 import { Badge, Button, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Page, PageLoading, Segmented, Select, Textarea, useToast } from "@/components/ds";
@@ -20,6 +20,7 @@ import { BlockTitle, RowBar } from "@/components/admin/ui";
 import { DocPreview } from "@/components/admin/billing/DocPreview";
 import { LinesEditor } from "@/components/admin/billing/LinesEditor";
 import { ClientCard, SaveState } from "@/components/admin/billing/DocParts";
+import { SendToSignModal } from "@/components/sign/SendToSignModal";
 import { NewDocModal } from "@/components/admin/billing/NewDocModal";
 import { SendDocModal } from "@/components/admin/billing/SendDocModal";
 import { invoiceState, useBilling } from "@/components/admin/billing/useBilling";
@@ -45,6 +46,7 @@ export default function QuotePage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [customNumber, setCustomNumber] = useState("");
+  const [signOpen, setSignOpen] = useState(false);
   const dirty = useRef(false);
 
   useEffect(() => onSnapshot(doc(db, "billingQuotes", quoteId), (s) => {
@@ -149,6 +151,7 @@ export default function QuotePage() {
           ) : (
             <>
               <Button onClick={() => setSendOpen(true)}><Mail size={14} /> Enviar</Button>
+              {q.status !== "rejected" && q.signStatus !== "signed" && q.signStatus !== "pending" && <Button onClick={() => setSignOpen(true)}><FileSignature size={14} /> Firmar con Filma Sign</Button>}
               {q.status === "sent" && <Button onClick={() => setStatus("accepted")}><Check size={14} /> Aceptado</Button>}
               {q.status !== "rejected" && <Button variant="primary" onClick={() => setInvoiceOpen(true)}><FileText size={14} /> Facturar</Button>}
             </>
@@ -165,6 +168,14 @@ export default function QuotePage() {
           </Menu>
         </div>
       </div>
+
+      {q.signStatus && (
+        <Link href="/admindashboard/sign" className={`mt-6 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] ${q.signStatus === "signed" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : q.signStatus === "pending" ? "border-amber-200 bg-[#FFFBEB] text-amber-900" : "border-slate-200 text-slate-600"}`}>
+          <FileSignature size={15} />
+          <span className="flex-1">{q.signStatus === "signed" ? "Firmado por las dos partes con Filma Sign" : q.signStatus === "pending" ? "Enviado a firmar con Filma Sign · pendiente del cliente" : q.signStatus === "declined" ? "El cliente rechazó firmarlo" : "Solicitud de firma cancelada"}</span>
+          <span className="text-xs opacity-70">Ver en Filma Sign →</span>
+        </Link>
+      )}
 
       <div className="mt-8 grid gap-10 xl:grid-cols-[minmax(0,1fr)_560px]">
         <div className="min-w-0 space-y-8">
@@ -306,6 +317,9 @@ export default function QuotePage() {
         onConfirm={async () => { await deleteDoc(doc(db, "billingQuotes", quoteId)); router.push("/admindashboard/accounts/billing?tab=quotes"); }} />
 
       <NewDocModal open={invoiceOpen} onClose={() => setInvoiceOpen(false)} kind="invoice" settings={settings} quotes={quotes} invoices={invoices} quoteId={quoteId} />
+      <SendToSignModal open={signOpen} onClose={() => setSignOpen(false)} kind="quote" quoteId={quoteId}
+        defaultSigner={{ name: acc?.contactName || usr?.name || q.client.name, email: q.client.email || acc?.contactEmail || usr?.email || "", role: q.client.name }}
+        issuerRole={settings.name || "Filma Workspace"} />
       <SendDocModal open={sendOpen} onClose={() => setSendOpen(false)} type="quote" id={quoteId} view={view} defaultTo={q.client.email || acc?.contactEmail || ""}
         onSent={(to) => showToast("success", `Enviado a ${to}`)} />
     </Page>

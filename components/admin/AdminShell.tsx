@@ -10,7 +10,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { collection, getCountFromServer, query, where } from "firebase/firestore";
 import {
-  Activity, AlertOctagon, ArrowLeft, BarChart3, BookOpen, Briefcase, Building2, ChevronsLeft, ChevronsRight, Clock, Database, Flag,
+  Activity, AlertOctagon, ArrowLeft, FileSignature, BarChart3, BookOpen, Briefcase, Building2, ChevronsLeft, ChevronsRight, Clock, Database, Flag,
   HeadphonesIcon, Home, Keyboard, LayoutDashboard, Mail, Megaphone, Newspaper, Receipt, ScrollText, Search, ShieldAlert, Users, Wrench, X,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -108,6 +108,7 @@ export default function AdminShell({ children, isAdmin, onSearch }: { children: 
       { href: "/admindashboard/guides", label: "Guías", icon: BookOpen, key: "g" },
       { href: "/admindashboard/emails", label: "Emails", icon: Mail, key: "e" },
       { href: "/admindashboard/announcements", label: "Avisos", icon: Megaphone, key: "a" },
+      { href: "/admindashboard/sign", label: "Filma Sign", icon: FileSignature, key: "i" },
     ] },
     { label: "Operaciones", items: [
       { href: "/admindashboard/system?tab=status", label: "Estado", icon: Activity, key: "y" },

@@ -12,7 +12,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export const EMAIL_FROM = process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>";
 
 // Plantillas cuyo contenido no se guarda: llevan códigos o enlaces de acceso.
-const SENSITIVE = new Set(["reset-password", "verify-code"]);
+const SENSITIVE = new Set(["reset-password", "verify-code", "sign-request"]);
 
 export interface EmailPayload {
   to: string | string[];
