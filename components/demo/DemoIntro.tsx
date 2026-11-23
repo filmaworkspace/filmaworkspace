@@ -31,7 +31,7 @@ const CLOUD: [number, number, number][] = [[6, 14, .55], [70, 8, .4], [80, 40, .
 const slidesFor = (first: string): Slide[] => [
   { kind: "hero", title: first ? `Hola, ${first}` : "Hola" },
   { kind: "hero", title: "Filma Workspace", text: "Toda la producción en un solo lugar." },
-  { kind: "hero", icon: Layers, title: "Un proyecto\nDos entornos de trabajo", text: "Cada equipo en el suyo. La misma información para todos.", tones: [{ theme: "both", at: 600 }] },
+  { kind: "hero", icon: Layers, title: "Un proyecto\nDos entornos de trabajo", tones: [{ theme: "both", at: 600 }] },
   { kind: "hero", icon: Calculator, title: "Contabilidad", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
   { kind: "hero", icon: Users, title: "Equipo", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
   { kind: "flow", title: "Nada sale sin aprobar", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
