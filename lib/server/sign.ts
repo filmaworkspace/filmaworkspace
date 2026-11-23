@@ -8,7 +8,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase-admin";
-import { sendEmail } from "@/lib/emails/send";
+import { sendEmail, SIGN_EMAIL_FROM } from "@/lib/emails/send";
 import { signRequestHtml, signRequestText, signCompletedHtml, signCompletedText } from "@/lib/emails/sign";
 import { buildSignedPdf, signedFileName } from "@/lib/sign/render";
 import { plain, stableJson } from "@/lib/sign/hash";
@@ -98,6 +98,7 @@ export async function createSignRequest(input: CreateInput, meta: { ip: string; 
     html: signRequestHtml({ title, signerName: parties[1].name, issuerName: input.issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
     text: signRequestText({ title, signerName: parties[1].name, issuerName: input.issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
     tags: [{ name: "type", value: "sign-request" }],
+    from: SIGN_EMAIL_FROM, replyTo: input.issuer.email || undefined,
   }, undefined, { signRequestId: ref.id });
   await ref.update({ events: FieldValue.arrayUnion({ at: Date.now(), type: "sent", party: "signer", detail: error ? `Error al enviar: ${error.message}` : email }) });
   return { id: ref.id, url, emailError: error?.message || null };
@@ -199,6 +200,7 @@ export async function sendSignedCopies(ref: FirebaseFirestore.DocumentReference,
     html: signCompletedHtml({ title: r.title, parties: r.parties.map((p) => ({ name: p.name, at: p.signature?.signedAt || null })), docHash: r.docHash, attached: !!attachment }),
     text: signCompletedText({ title: r.title, parties: r.parties.map((p) => ({ name: p.name, at: p.signature?.signedAt || null })), docHash: r.docHash, attached: !!attachment }),
     tags: [{ name: "type", value: "sign-completed" }],
+    from: SIGN_EMAIL_FROM, replyTo: r.parties.find((p) => p.side === "issuer")?.email || undefined,
     attachments: attachment ? [attachment] : undefined,
   }, undefined, { signRequestId: ref.id });
   await ref.update({ events: FieldValue.arrayUnion({ at: Date.now(), type: "copy_sent", detail: error ? `Error: ${error.message}` : to.join(", ") }) });
@@ -226,6 +228,7 @@ export async function adminAction(id: string, action: "cancel" | "remind" | "res
       html: signRequestHtml({ title: data.title, signerName: signer.name, issuerName: issuer.name, message: data.message, url, expiresAt: Math.max(data.expiresAt, Date.now() + 7 * DAY), reminder: true }),
       text: signRequestText({ title: data.title, signerName: signer.name, issuerName: issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
       tags: [{ name: "type", value: "sign-request" }],
+      from: SIGN_EMAIL_FROM, replyTo: issuer.email || undefined,
     }, undefined, { signRequestId: id });
     if (error) throw new Error(error.message);
     await ref.update({ events: FieldValue.arrayUnion({ at: Date.now(), type: "reminded", by, detail: signer.email }) });

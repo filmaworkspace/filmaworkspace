@@ -11,6 +11,14 @@ import { emailAttachments } from "./headerImage";
 const resend = new Resend(process.env.RESEND_API_KEY);
 export const EMAIL_FROM = process.env.RESEND_FROM ?? "Filma Workspace <onboarding@resend.dev>";
 
+/**
+ * Remitente de Filma Sign: RESEND_FROM_SIGN si está definido (p. ej.
+ * "Filma Sign <sign@filmaworkspace.com>", del mismo dominio verificado en
+ * Resend); si no, la dirección de siempre con el nombre "Filma Sign".
+ */
+export const SIGN_EMAIL_FROM = process.env.RESEND_FROM_SIGN
+  || `Filma Sign <${(EMAIL_FROM.match(/<([^>]+)>/)?.[1] || EMAIL_FROM).trim()}>`;
+
 // Plantillas cuyo contenido no se guarda: llevan códigos o enlaces de acceso.
 const SENSITIVE = new Set(["reset-password", "verify-code", "sign-request"]);
 
@@ -21,6 +29,8 @@ export interface EmailPayload {
   text?: string;
   from?: string;
   tags?: { name: string; value: string }[];
+  /** Responder a (p. ej. quien envía un documento a firmar). */
+  replyTo?: string | string[];
   /** Adjuntos además de la cabecera (p. ej. el PDF de una factura), en base64. */
   attachments?: { filename: string; content: string; contentType?: string }[];
 }
@@ -32,6 +42,8 @@ function logEntry(p: EmailPayload, result: { id?: string | null; error?: string 
   const keep = !SENSITIVE.has(template);
   return {
     to: Array.isArray(p.to) ? p.to : [p.to],
+    from: p.from || EMAIL_FROM,
+    replyTo: p.replyTo || null,
     subject: p.subject,
     template,
     status: result.error ? "failed" : "sent",
@@ -62,7 +74,7 @@ async function writeLog(entries: ReturnType<typeof logEntry>[]) {
 /** Envía un email (cabecera incrustada) y lo registra. Devuelve lo mismo que Resend. */
 export async function sendEmail(p: EmailPayload, opts?: { idempotencyKey?: string }, meta?: Record<string, unknown>) {
   const res = await resend.emails.send(
-    { from: p.from || EMAIL_FROM, to: p.to, subject: p.subject, html: p.html, text: p.text || "", tags: p.tags, attachments: [...emailAttachments(), ...(p.attachments || [])] },
+    { from: p.from || EMAIL_FROM, to: p.to, subject: p.subject, html: p.html, text: p.text || "", tags: p.tags, replyTo: p.replyTo, attachments: [...emailAttachments(), ...(p.attachments || [])] },
     opts?.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined,
   );
   await writeLog([logEntry(p, { id: res.data?.id, error: res.error?.message }, meta)]);
@@ -92,7 +104,7 @@ export async function resendLogged(logId: string) {
   const d = snap.data();
   if (!d || !d.html) throw new Error("Este email no se puede reenviar");
   return sendEmail(
-    { to: d.to, subject: d.subject, html: d.html, text: d.text || "", tags: [{ name: "type", value: d.template }] },
+    { to: d.to, subject: d.subject, html: d.html, text: d.text || "", tags: [{ name: "type", value: d.template }], from: d.from || undefined, replyTo: d.replyTo || undefined },
     undefined,
     { ...(d.meta || {}), resentFrom: logId },
   );
