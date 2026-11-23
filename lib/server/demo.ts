@@ -103,6 +103,13 @@ export async function createDemoProject(uid: string, person: { name: string; ema
   // Paso de aprobación pendiente: aprueba la propia persona de la demo.
   const step = () => ({ id: "s1", order: 1, approverType: "role", roles: ["PM"], requireAll: false, approvers: [uid], approverNames: [person.name], approvedBy: [], rejectedBy: [], status: "pending" });
 
+  // Autoría por departamento (compañeros ficticios); el borrador de la PO-0006 es de la propia persona.
+  const AUTHOR: Record<string, [string, string]> = { "Fotografía": ["demo-hod-foto", "Lucía Prieto"], "Arte": ["demo-hod-arte", "Diego Vidal"], "Producción": ["demo-ep", "Carmen Ibáñez"] };
+  const authorOf = (department: string, own = false) => {
+    const [id, name] = own ? [uid, person.name] : AUTHOR[department] || [uid, person.name];
+    return { createdBy: id, createdByName: name };
+  };
+
   // POs
   const poItem = (d: string, code: string, amount: number, vat = 21) => ({
     description: d, subAccountId: subs[code].id, subAccountCode: code, subAccountDescription: subs[code].description,
@@ -122,7 +129,7 @@ export async function createDemoProject(uid: string, person: { name: string; ema
       number, version: 1, supplier: sup(sid)[2], supplierId: sid, department, generalDescription: desc, items,
       baseAmount, vatAmount: vat, irpfAmount: 0, totalAmount: +(baseAmount + vat).toFixed(2),
       committedAmount: baseAmount, invoicedAmount: 0, remainingAmount: baseAmount,
-      createdAt: ts(-28 + Number(number)), createdBy: uid, createdByName: person.name, ...extra,
+      createdAt: ts(-28 + Number(number)), ...authorOf(department, id === "po6"), ...extra,
     });
   }
   set(base.collection("counters").doc("pos"), { last: 6 });
@@ -137,7 +144,7 @@ export async function createDemoProject(uid: string, person: { name: string; ema
       poId, poNumber: poId ? pos.find((p) => p[0] === poId)![1] : null, description: desc, items: [it],
       baseAmount: it.baseAmount, vatAmount: it.vatAmount, irpfAmount: 0, totalAmount: it.totalAmount,
       invoiceDate: ts(invoiceDay), dueDate: ts(dueDay), attachmentUrl: "",
-      createdAt: ts(invoiceDay + 1), createdBy: uid, createdByName: person.name, ...extra,
+      createdAt: ts(invoiceDay + 1), ...authorOf(poId ? pos.find((p) => p[0] === poId)![3] : "Producción"), ...extra,
     });
   };
   inv(1, "po1", "sup-rental", "Cámara y ópticas · semanas 1 y 2", "05.01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-12), codedAt: ts(-11), paidAt: ts(-4), paymentDate: ts(-4) }, -14, 16);

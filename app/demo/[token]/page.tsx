@@ -1,71 +1,62 @@
 "use client";
 
 // ─── Entrada a la demo ───────────────────────────────────────────────────────
-// Enlace personal que envía el admin. Al entrar se prepara (la primera vez) un
-// proyecto de ejemplo con datos ficticios y se inicia sesión sin contraseña.
+// Enlace personal que envía el admin: intro a pantalla completa y, mientras se
+// ve, se prepara (la primera vez) el proyecto de ejemplo. «Entrar» inicia
+// sesión sin contraseña y abre el panel de Contabilidad.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import AuthShell, { AuthError, Spinner, authStyles } from "@/components/AuthShell";
+import { inter } from "@/lib/fonts";
+import DemoIntro from "@/components/demo/DemoIntro";
+
+const post = (body: object) =>
+  fetch("/api/demo/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "No se ha podido abrir la demo"); return d; });
 
 export default function DemoEntryPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
-  const [info, setInfo] = useState<{ name: string; expiresAt: string; started: boolean } | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<{ name: string } | null>(null);
+  const [fatal, setFatal] = useState("");
+  const [session, setSession] = useState<{ customToken: string; projectId: string } | null>(null);
+  const [prepError, setPrepError] = useState("");
+  const started = useRef(false);
 
   useEffect(() => {
-    fetch("/api/demo/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, check: true }) })
-      .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error); setInfo(d); })
-      .catch((e) => setError(e.message || "Enlace no válido"));
+    post({ token, check: true }).then((d) => {
+      setInfo(d);
+      // El proyecto se prepara mientras se ve la intro.
+      if (started.current) return;
+      started.current = true;
+      post({ token }).then(setSession).catch((e) => setPrepError(e.message));
+    }).catch((e) => setFatal(e.message));
   }, [token]);
 
   const enter = async () => {
-    setBusy(true); setError("");
+    if (!session) return;
     try {
-      const r = await fetch("/api/demo/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
       if (auth.currentUser) await signOut(auth);
-      await signInWithCustomToken(auth, d.customToken);
-      router.replace(`/project/${d.projectId}/accounting`);
-    } catch (e) {
-      setError((e as Error).message || "No se ha podido entrar");
-      setBusy(false);
+      await signInWithCustomToken(auth, session.customToken);
+      setTimeout(() => router.replace(`/project/${session.projectId}/accounting`), 450);
+    } catch {
+      setPrepError("No se ha podido entrar. Vuelve a abrir el enlace.");
     }
   };
 
-  const first = (info?.name || "").split(" ")[0];
-  const until = info ? new Date(info.expiresAt).toLocaleDateString("es-ES", { day: "numeric", month: "long" }) : "";
-
-  return (
-    <AuthShell>
-      {!info && !error && <div className="flex justify-center"><Spinner /></div>}
-      {error && !info && (
-        <div className="space-y-4">
-          <h1 className={authStyles.title}>Demo de Filma Workspace</h1>
-          <AuthError>{error}</AuthError>
-          <p className="text-sm text-slate-500">Si necesitas un enlace nuevo, pídeselo a quien te lo envió.</p>
+  if (fatal) {
+    return (
+      <div className={`fixed inset-0 flex items-center justify-center px-6 text-center text-white ${inter.className}`}
+        style={{ background: "linear-gradient(135deg, #172544 0%, #24406E 55%, #3B5D96 100%)" }}>
+        <div>
+          <h1 className="text-[32px] font-semibold tracking-tight sm:text-[44px]">{fatal}</h1>
+          <p className="mt-4 text-[17px] text-white/75">Si necesitas un enlace nuevo, pídeselo a quien te lo envió.</p>
         </div>
-      )}
-      {info && (
-        <div className="space-y-6">
-          <div>
-            <h1 className={authStyles.title}>{first ? `Hola, ${first}` : "Demo de Filma Workspace"}</h1>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Vas a entrar en un proyecto de ejemplo con presupuesto, órdenes de compra, facturas y equipo. Los datos son ficticios: puedes crear, aprobar y codificar sin miedo.
-            </p>
-          </div>
-          {error && <AuthError>{error}</AuthError>}
-          <button onClick={enter} disabled={busy} className={authStyles.primaryButton}>
-            {busy ? <><Spinner dark={false} /> {info.started ? "Entrando…" : "Preparando tu proyecto…"}</> : info.started ? "Volver a la demo" : "Entrar en la demo"}
-          </button>
-          <p className="text-xs text-slate-500">Enlace personal · funciona hasta el {until}.</p>
-        </div>
-      )}
-    </AuthShell>
-  );
+      </div>
+    );
+  }
+  if (!info) return <div className="fixed inset-0" style={{ background: "linear-gradient(135deg, #172544 0%, #24406E 55%, #3B5D96 100%)" }} />;
+  return <DemoIntro name={info.name} onEnter={enter} ready={!!session} error={prepError} />;
 }

@@ -28,6 +28,12 @@ export default function SupportChat() {
   const { user } = useUser();
 
   const [open,           setOpen]           = useState(false);
+  // Otras pantallas (p. ej. la guía de la demo) pueden abrir el chat.
+  useEffect(() => {
+    const o = () => setOpen(true);
+    window.addEventListener("filma:open-support", o);
+    return () => window.removeEventListener("filma:open-support", o);
+  }, []);
   const [messages,       setMessages]       = useState<Message[]>([]);
   const [input,          setInput]          = useState("");
   const [sending,        setSending]        = useState(false);
