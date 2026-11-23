@@ -656,7 +656,8 @@ export default function CrewPage() {
     try {
       const pin = String(Math.floor(1000 + Math.random() * 9000));
       const expires = new Date();
-      expires.setDate(expires.getDate() + 14);
+      const fc = await getDoc(doc(db, `projects/${id}/teamConfig`, "formConfig")).catch(() => null);
+      expires.setDate(expires.getDate() + (Number(fc?.data()?.linkDays) || 14));
       const docRef = await addDoc(collection(db, "forms"), {
         type: "crew_onboarding",
         pin,
@@ -1371,7 +1372,7 @@ export default function CrewPage() {
                   </div>
 
                   <p className="text-xs text-slate-400 bg-amber-50 border border-amber-100 rounded-md px-3 py-2.5">
-                    Se generará un enlace único y un código de 4 dígitos válido durante 14 días.
+                    Se generará un enlace único y un código de 4 dígitos con caducidad (Configuración de equipo).
                   </p>
                 </>
               ) : (
@@ -1428,7 +1429,7 @@ export default function CrewPage() {
                   </div>
 
                   <p className="text-xs text-slate-400 text-center">
-                    Válido durante 14 días · El código solo sirve para este formulario
+                    El código solo sirve para este formulario
                   </p>
                 </div>
               )}

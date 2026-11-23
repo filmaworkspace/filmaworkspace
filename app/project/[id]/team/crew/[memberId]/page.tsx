@@ -408,7 +408,8 @@ export default function CrewMemberPage() {
       // Create the form document and generate the real URL + PIN
       const pin = String(Math.floor(1000 + Math.random() * 9000));
       const expires = new Date();
-      expires.setDate(expires.getDate() + 14);
+      const fc = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "formConfig")).catch(() => null);
+      expires.setDate(expires.getDate() + (Number(fc?.data()?.linkDays) || 14));
       const formRef = await addDoc(collection(db, "forms"), {
         type: "crew_onboarding",
         pin,

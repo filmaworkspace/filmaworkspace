@@ -11,6 +11,7 @@ import {
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   Timestamp,
   updateDoc,
@@ -110,6 +111,8 @@ export default function TeamApprovalsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason]     = useState("");
   const [processing, setProcessing]         = useState(false);
+  // Aprobadores de altas (Configuración de equipo). Sin lista: cualquiera con acceso.
+  const [approvers, setApprovers]           = useState<{ ids: string[]; names: Record<string, string> }>({ ids: [], names: {} });
 
   const userId   = user?.uid  || "";
   const userName = user?.name || "Usuario";
@@ -125,6 +128,10 @@ export default function TeamApprovalsPage() {
 
   const loadData = async () => {
     try {
+      getDoc(doc(db, `projects/${projectId}/teamConfig`, "approvals")).then((a) => {
+        const d = a.data();
+        if (d?.requireApproval) setApprovers({ ids: d.approverUserIds || [], names: d.approverNames || {} });
+      }).catch(() => {});
       const snap = await getDocs(collection(db, `projects/${projectId}/crew`));
       const all: PendingMember[] = snap.docs
         .filter((d) => d.data().approvalStatus)
@@ -388,7 +395,10 @@ export default function TeamApprovalsPage() {
 
                     {/* Action area */}
                     <div className="flex-shrink-0">
-                      {selected.approvalStatus === "pending_approval" && (
+                      {selected.approvalStatus === "pending_approval" && approvers.ids.length > 0 && !approvers.ids.includes(userId) && (
+                        <p className="text-xs text-slate-500">Aprueba {approvers.ids.map((i) => approvers.names[i] || "—").join(", ")}</p>
+                      )}
+                      {selected.approvalStatus === "pending_approval" && (approvers.ids.length === 0 || approvers.ids.includes(userId)) && (
                         <div className="flex items-center gap-2">
                           <button onClick={() => setShowRejectModal(true)}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-md text-[13px] font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors">

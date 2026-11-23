@@ -1,1358 +1,570 @@
 "use client";
-import { toast as appToast } from "@/lib/toast";
 
-import { useState, useEffect } from "react";
+// ─── Equipo › Configuración ──────────────────────────────────────────────────
+// Mismo esquema que Contabilidad › Configuración: pestañas, bloques con título
+// y tablas. Altas (aprobadores, caducidad del enlace y campos del formulario),
+// Nóminas (tarifas), Departamentos (orden) y Accesos de coordinación.
+
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { inter } from "@/lib/fonts";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { ArrowDown, ArrowUp, ExternalLink, Lock, MoreHorizontal, Plus, RotateCcw, Search, X } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
-import {
-  onAuthStateChanged,
-} from "firebase/auth";
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  query,
-  orderBy as fbOrderBy,
-  setDoc,
-  deleteDoc,
-  where,
-  Timestamp,
-} from "firebase/firestore";
-import {
-  AlertCircle,
-  ArrowDown,
-  ArrowUp,
-  Banknote,
-  Car,
-  Check,
-  CheckCircle2,
-  ClipboardList,
-  Copy,
-  ExternalLink,
-  FileCheck,
-  FileDown,
-  Globe,
-  GripVertical,
-  Home,
-  Info,
-  Link2,
-  Lock,
-  Plane,
-  Plus,
-  Save,
-  Shield,
-  Trash2,
-  Utensils,
-  User,
-  Users,
-  X,
-} from "lucide-react";
+import { toast } from "@/lib/toast";
 import { useUser } from "@/contexts/UserContext";
+import { Button, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select } from "@/components/ds";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Tipos y valores por defecto ─────────────────────────────────────────────
 
-interface ProjectMember {
-  userId: string;
-  name: string;
-  email: string;
-  role?: string;
-  department?: string;
-}
-
-interface ApprovalConfig {
-  approverUserIds: string[];
-  approverNames: Record<string, string>;
-  requireApproval: boolean;
-  updatedAt?: Date;
-  updatedBy?: string;
-}
-
-interface ExportConfig {
-  includePhoto: boolean;
-  includePhone: boolean;
-  includeEmail: boolean;
-  includeAddress: boolean;
-  includeDni: boolean;
-  includeIban: boolean;
-  includeSsNumber: boolean;
-  includeSalary: boolean;
-  includeNotes: boolean;
-  groupBySection: boolean;
-  groupByDepartment: boolean;
-}
-
-interface FormBuilderConfig {
-  showPhoto: boolean;
-  showLastName2: boolean;
-  showArtisticName: boolean;
-  showDocExpiry: boolean;
-  showBirthPlace: boolean;
-  showNationality: boolean;
-  showProvince: boolean;
-  showCountry: boolean;
-  showIrpfRate: boolean;
-  showContractReason: boolean;
-  showBankName: boolean;
-  showAccountHolder: boolean;
-  showBankCert: boolean;
-  showCv: boolean;
-}
-
-interface FormField {
-  key: keyof FormBuilderConfig | null;
-  label: string;
-  description?: string;
-  required?: boolean;
-}
-
-interface FormSection {
-  id: string;
-  label: string;
-  fields: FormField[];
-}
-
-type AKey = "meals"|"halfPerDiem"|"perDiem"|"halfIntlPerDiem"|"intlPerDiem"|"accommodation"|"car";
-
-const ACCESS_ALLOWANCES: { key: AKey; label: string }[] = [
-  { key: "meals",           label: "Comidas"               },
-  { key: "halfPerDiem",     label: "½ Dieta nacional"      },
-  { key: "perDiem",         label: "Dieta nacional"        },
-  { key: "halfIntlPerDiem", label: "½ Dieta internacional" },
-  { key: "intlPerDiem",     label: "Dieta internacional"   },
-  { key: "accommodation",   label: "Alojamiento"           },
-  { key: "car",             label: "Vehículo"              },
-];
-
+interface Member { userId: string; name: string; email: string; role?: string }
+interface CrewEntry { id: string; firstName: string; lastName1: string; role: string; department: string; section: string }
+type AKey = "meals" | "halfPerDiem" | "perDiem" | "halfIntlPerDiem" | "intlPerDiem" | "accommodation" | "car";
 interface AccessEntry {
-  id: string;
-  name: string;
-  people: Array<{ memberId: string; firstName: string; lastName1: string; department?: string; section?: string }>;
-  pin: string | null;
-  allowedTypes: AKey[];
-  active: boolean;
-  createdAt?: Date;
+  id: string; name: string; pin: string | null; allowedTypes: AKey[]; active: boolean; createdAt?: Date;
+  people: { memberId: string; firstName: string; lastName1: string; department?: string; section?: string }[];
 }
 
-interface CrewEntry {
-  id: string;
-  firstName: string;
-  lastName1: string;
-  role: string;
-  department?: string;
-  section: string;
-  status: string;
-}
-
-function genCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const TEAM_COLOR = "#0F172A";
-
-const CONFIG_SECTIONS = [
-  { id: "approvals",    label: "Aprobaciones",  icon: FileCheck,     description: "Flujo de aprobación para altas de crew" },
-  { id: "departments",  label: "Departamentos", icon: GripVertical,  description: "Orden de los departamentos en listados" },
-  { id: "payroll",      label: "Nóminas",       icon: Banknote,      description: "Tarifas globales de dietas y complementos" },
-  { id: "accesos",      label: "Accesos",       icon: Link2,         description: "Links de coordinación para marcar complementos" },
-  { id: "form",         label: "Formulario",    icon: ClipboardList, description: "Preguntas del formulario de alta de crew" },
-  { id: "export",       label: "Exportación",   icon: FileDown,      description: "Configuración de exportaciones de crew" },
+const ALLOWANCES: { key: AKey; label: string }[] = [
+  { key: "meals", label: "Comidas" }, { key: "halfPerDiem", label: "½ dieta nacional" }, { key: "perDiem", label: "Dieta nacional" },
+  { key: "halfIntlPerDiem", label: "½ dieta internacional" }, { key: "intlPerDiem", label: "Dieta internacional" },
+  { key: "accommodation", label: "Alojamiento" }, { key: "car", label: "Vehículo" },
 ];
 
-interface PayrollRatesConfig {
-  mealRate:                   number;
-  halfPerDiemRate:            number;
-  halfPerDiemRateArtistic:    number;
-  perDiemRate:                number;
-  perDiemRateArtistic:        number;
-  halfIntlPerDiemRate:        number;
-  halfIntlPerDiemRateArtistic:number;
-  intlPerDiemRate:            number;
-  intlPerDiemRateArtistic:    number;
-  accommodationRate:          number;
-  carRate:                    number;
+interface Rates {
+  mealRate: number; halfPerDiemRate: number; halfPerDiemRateArtistic: number; perDiemRate: number; perDiemRateArtistic: number;
+  halfIntlPerDiemRate: number; halfIntlPerDiemRateArtistic: number; intlPerDiemRate: number; intlPerDiemRateArtistic: number;
+  accommodationRate: number; carRate: number;
 }
-
-const DEFAULT_PAYROLL_RATES: PayrollRatesConfig = {
-  mealRate: 15,
-  halfPerDiemRate: 18.5,    halfPerDiemRateArtistic: 18.5,
-  perDiemRate: 37,          perDiemRateArtistic: 37,
-  halfIntlPerDiemRate: 47.5, halfIntlPerDiemRateArtistic: 47.5,
-  intlPerDiemRate: 95,      intlPerDiemRateArtistic: 95,
-  accommodationRate: 80, carRate: 40,
+const DEFAULT_RATES: Rates = {
+  mealRate: 15, halfPerDiemRate: 18.5, halfPerDiemRateArtistic: 18.5, perDiemRate: 37, perDiemRateArtistic: 37,
+  halfIntlPerDiemRate: 47.5, halfIntlPerDiemRateArtistic: 47.5, intlPerDiemRate: 95, intlPerDiemRateArtistic: 95, accommodationRate: 80, carRate: 40,
 };
-
-const FORM_BUILDER_DEFAULTS: FormBuilderConfig = {
-  showPhoto: true,
-  showLastName2: true,
-  showArtisticName: false,
-  showDocExpiry: true,
-  showBirthPlace: false,
-  showNationality: true,
-  showProvince: true,
-  showCountry: true,
-  showIrpfRate: true,
-  showContractReason: false,
-  showBankName: false,
-  showAccountHolder: false,
-  showBankCert: false,
-  showCv: false,
-};
-
-const FORM_SECTIONS: FormSection[] = [
-  {
-    id: "identity",
-    label: "Datos personales",
-    fields: [
-      { key: "showPhoto",        label: "Foto de perfil",           description: "El crew puede subir una foto" },
-      { key: null,               label: "Nombre",                   required: true },
-      { key: "showLastName2",    label: "Segundo apellido" },
-      { key: "showArtisticName", label: "Nombre artístico / en créditos", description: "Nombre que aparecerá en los créditos" },
-      { key: null,               label: "Tipo de documento",        required: true },
-      { key: null,               label: "Número de documento",      required: true },
-      { key: "showDocExpiry",    label: "Caducidad del documento" },
-      { key: null,               label: "Fecha de nacimiento",      required: true },
-      { key: "showBirthPlace",   label: "Lugar de nacimiento" },
-      { key: "showNationality",  label: "Nacionalidad" },
-    ],
-  },
-  {
-    id: "contact",
-    label: "Contacto",
-    fields: [
-      { key: null, label: "Email",          required: true },
-      { key: null, label: "Teléfono",       required: true },
-      { key: null, label: "Dirección",      required: true },
-      { key: null, label: "Código postal",  required: true },
-      { key: null, label: "Ciudad",         required: true },
-      { key: "showProvince", label: "Provincia" },
-      { key: "showCountry",  label: "País" },
-    ],
-  },
-  {
-    id: "fiscal",
-    label: "Fiscal y bancario",
-    fields: [
-      { key: null, label: "Nº Seguridad Social", required: true },
-      { key: null, label: "Régimen de la SS",    required: true },
-      { key: "showIrpfRate",       label: "% IRPF aplicable" },
-      { key: "showContractReason", label: "Causa del contrato" },
-      { key: null, label: "IBAN", required: true },
-      { key: "showBankName",       label: "Nombre del banco" },
-      { key: "showAccountHolder",  label: "Titular de la cuenta" },
-    ],
-  },
-  {
-    id: "documents",
-    label: "Documentos adjuntos",
-    fields: [
-      { key: null,             label: "DNI / NIE (anverso y reverso)", required: true },
-      { key: "showBankCert",   label: "Certificado de cuenta bancaria" },
-      { key: "showCv",         label: "Curriculum Vitae" },
-    ],
-  },
+// Concepto → [técnicos, artísticos] (una sola clave: igual para todos)
+const RATE_ROWS: { label: string; unit: string; tech: keyof Rates; art?: keyof Rates }[] = [
+  { label: "Comida", unit: "día", tech: "mealRate" },
+  { label: "½ dieta nacional", unit: "día", tech: "halfPerDiemRate", art: "halfPerDiemRateArtistic" },
+  { label: "Dieta nacional", unit: "día", tech: "perDiemRate", art: "perDiemRateArtistic" },
+  { label: "½ dieta internacional", unit: "día", tech: "halfIntlPerDiemRate", art: "halfIntlPerDiemRateArtistic" },
+  { label: "Dieta internacional", unit: "día", tech: "intlPerDiemRate", art: "intlPerDiemRateArtistic" },
+  { label: "Alojamiento", unit: "noche", tech: "accommodationRate" },
+  { label: "Vehículo", unit: "día", tech: "carRate" },
 ];
 
-const DEFAULT_EXPORT: ExportConfig = {
-  includePhoto: true,
-  includePhone: true,
-  includeEmail: true,
-  includeAddress: false,
-  includeDni: false,
-  includeIban: false,
-  includeSsNumber: false,
-  includeSalary: false,
-  includeNotes: true,
-  groupBySection: true,
-  groupByDepartment: true,
+interface FormCfg {
+  showPhoto: boolean; showLastName2: boolean; showArtisticName: boolean; showDocExpiry: boolean; showBirthPlace: boolean; showNationality: boolean;
+  showProvince: boolean; showCountry: boolean; showIrpfRate: boolean; showContractReason: boolean; showBankName: boolean; showAccountHolder: boolean;
+  showBankCert: boolean; showCv: boolean; linkDays: number;
+}
+const DEFAULT_FORM: FormCfg = {
+  showPhoto: true, showLastName2: true, showArtisticName: false, showDocExpiry: true, showBirthPlace: false, showNationality: true,
+  showProvince: true, showCountry: true, showIrpfRate: true, showContractReason: false, showBankName: false, showAccountHolder: false,
+  showBankCert: false, showCv: false, linkDays: 14,
 };
+type FormKey = Exclude<keyof FormCfg, "linkDays">;
+const FORM_GROUPS: { label: string; fields: { key: FormKey | null; label: string }[] }[] = [
+  { label: "Datos personales", fields: [
+    { key: null, label: "Nombre y primer apellido" }, { key: "showLastName2", label: "Segundo apellido" }, { key: "showArtisticName", label: "Nombre artístico" },
+    { key: "showPhoto", label: "Foto" }, { key: null, label: "Documento de identidad" }, { key: "showDocExpiry", label: "Caducidad del documento" },
+    { key: null, label: "Fecha de nacimiento" }, { key: "showBirthPlace", label: "Lugar de nacimiento" }, { key: "showNationality", label: "Nacionalidad" },
+  ] },
+  { label: "Contacto", fields: [
+    { key: null, label: "Email y teléfono" }, { key: null, label: "Dirección, CP y ciudad" }, { key: "showProvince", label: "Provincia" }, { key: "showCountry", label: "País" },
+  ] },
+  { label: "Fiscal y bancario", fields: [
+    { key: null, label: "Nº Seguridad Social y régimen" }, { key: "showIrpfRate", label: "% IRPF" }, { key: "showContractReason", label: "Causa del contrato" },
+    { key: null, label: "IBAN" }, { key: "showBankName", label: "Banco" }, { key: "showAccountHolder", label: "Titular de la cuenta" },
+  ] },
+  { label: "Documentos", fields: [
+    { key: null, label: "DNI / NIE" }, { key: "showBankCert", label: "Certificado de titularidad bancaria" }, { key: "showCv", label: "CV" },
+  ] },
+];
+
+const SECTION_LABELS: Record<string, string> = { technical: "Equipo técnico", cast: "Cast", specialists: "Especialistas" };
+const deptOf = (c: { department?: string; section?: string }) => (c.department || "").trim() || SECTION_LABELS[c.section || "technical"] || "Equipo técnico";
+const genCode = () => Array.from({ length: 8 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"[Math.floor(Math.random() * 55)]).join("");
+const TH = "border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500";
+const ago = (d?: Date) => {
+  if (!d) return "";
+  const m = Math.round((Date.now() - d.getTime()) / 60000);
+  return m < 1 ? "ahora" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+};
+
+type Tab = "altas" | "payroll" | "departments" | "access";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TeamConfigPage() {
   const { id } = useParams();
-  const router = useRouter();
   const projectId = id as string;
-  const { user, isLoading: userLoading } = useUser();
-
-  const [loading, setLoading]                   = useState(true);
-  const [saving, setSaving]                     = useState(false);
-  // Los avisos van por lib/toast.
-  const setSuccessMessage = (m: string) => { if (m) appToast.success(m); };
-  const setErrorMessage = (m: string) => { if (m) appToast.error(m); };
-  const [activeSection, setActiveSection]       = useState("approvals");
-
-  // Data
-  const [members, setMembers]                   = useState<ProjectMember[]>([]);
-  const [approvalConfig, setApprovalConfig]     = useState<ApprovalConfig>({
-    approverUserIds: [], approverNames: {}, requireApproval: false,
-  });
-  const [departments, setDepartments]           = useState<string[]>([]);
-  const [exportConfig, setExportConfig]         = useState<ExportConfig>(DEFAULT_EXPORT);
-  const [formBuilderConfig, setFormBuilderConfig] = useState<FormBuilderConfig>(FORM_BUILDER_DEFAULTS);
-  const [payrollRates, setPayrollRates]           = useState<PayrollRatesConfig>(DEFAULT_PAYROLL_RATES);
-  const [showMemberPicker, setShowMemberPicker] = useState(false);
-
-  // Accesos
-  const [accesos,          setAccesos]          = useState<AccessEntry[]>([]);
-  const [crew,             setCrew]             = useState<CrewEntry[]>([]);
-  const [projectName,      setProjectName]      = useState("");
-  const [showAccessModal,  setShowAccessModal]  = useState(false);
-  const [accessDraftName,  setAccessDraftName]  = useState("");
-  const [accessDraftPeople,setAccessDraftPeople]= useState<Set<string>>(new Set());
-  const [accessDraftPIN,   setAccessDraftPIN]   = useState("");
-  const [accessDraftUsePIN,setAccessDraftUsePIN]= useState(false);
-  const [accessDraftTypes, setAccessDraftTypes] = useState<Set<AKey>>(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
-  const [savingAccess,     setSavingAccess]     = useState(false);
-  const [confirmDialog,    setConfirmDialog]    = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
-
+  const router = useRouter();
+  const { user } = useUser();
   const userId = user?.uid || "";
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<Tab>("altas");
+  const [projectName, setProjectName] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [crew, setCrew] = useState<CrewEntry[]>([]);
+  const [accesses, setAccesses] = useState<AccessEntry[]>([]);
+  const [lastSaved, setLastSaved] = useState<{ at?: Date; by?: string } | null>(null);
+
+  // Ajustes (borrador y guardado, para saber si hay cambios)
+  type Settings = { requireApproval: boolean; approverUserIds: string[]; approverNames: Record<string, string>; form: FormCfg; rates: Rates; departments: string[] };
+  const [saved, setSaved] = useState<Settings | null>(null);
+  const [s, setS] = useState<Settings | null>(null);
+  const dirty = !!s && !!saved && JSON.stringify(s) !== JSON.stringify(saved);
+
+  // Accesos: modal de creación
+  const [accessModal, setAccessModal] = useState(false);
+  const [draft, setDraft] = useState({ name: "", people: new Set<string>(), usePin: true, pin: "", types: new Set<AKey>(ALLOWANCES.map((a) => a.key)) });
+  const [peopleQ, setPeopleQ] = useState("");
+  const [savingAccess, setSavingAccess] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<AccessEntry | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) { router.push("/"); return; }
-      await loadData();
+      await load();
       setLoading(false);
     });
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const loadData = async () => {
-    try {
-      // Members
-      const membersSnap = await getDocs(collection(db, `projects/${projectId}/members`));
-      setMembers(membersSnap.docs.map((d) => ({
-        userId: d.data().userId || d.id,
-        name: d.data().name || d.data().displayName || "Usuario",
-        email: d.data().email || "",
-        role: d.data().role || "",
-        department: d.data().department || "",
-      })));
-
-      // Approval config
-      const appSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "approvals"));
-      if (appSnap.exists()) {
-        const d = appSnap.data();
-        setApprovalConfig({
-          approverUserIds: d.approverUserIds || [],
-          approverNames: d.approverNames || {},
-          requireApproval: d.requireApproval ?? false,
-          updatedAt: d.updatedAt?.toDate(),
-          updatedBy: d.updatedBy || "",
-        });
-      }
-
-      // Departments — extract from crew members (same source as crew list)
-      const SECTION_LABELS: Record<string, string> = {
-        technical: "Equipo técnico", cast: "Cast", specialists: "Especialistas",
-      };
-      const crewSnap = await getDocs(
-        query(collection(db, `projects/${projectId}/crew`), fbOrderBy("createdAt", "desc"))
-      );
-      const crewDepts = Array.from(
-        new Set(
-          crewSnap.docs
-            .filter((d) => (d.data().status || "active") !== "inactive")
-            .map((d) => {
-              const dept = (d.data().department || "").trim();
-              return dept || SECTION_LABELS[d.data().section || "technical"] || "Equipo técnico";
-            })
-        )
-      );
-
-      // Apply saved order
-      const deptOrderSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder"));
-      if (deptOrderSnap.exists()) {
-        const savedOrder: string[] = deptOrderSnap.data().order || [];
-        const ordered = [
-          ...savedOrder.filter((d) => crewDepts.includes(d)),
-          ...crewDepts.filter((d) => !savedOrder.includes(d)),
-        ];
-        setDepartments(ordered);
-      } else {
-        setDepartments(crewDepts);
-      }
-
-      // Export config
-      const expSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "exportConfig"));
-      if (expSnap.exists()) {
-        setExportConfig({ ...DEFAULT_EXPORT, ...expSnap.data() });
-      }
-
-      // Form builder config
-      const formSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "formConfig"));
-      if (formSnap.exists()) {
-        setFormBuilderConfig({ ...FORM_BUILDER_DEFAULTS, ...formSnap.data() });
-      }
-
-      // Payroll rates
-      const payrollSnap = await getDoc(doc(db, `projects/${projectId}/teamConfig`, "payrollConfig"));
-      if (payrollSnap.exists()) {
-        setPayrollRates({ ...DEFAULT_PAYROLL_RATES, ...payrollSnap.data() });
-      }
-
-      // Project name
-      const projSnap = await getDoc(doc(db, "projects", projectId));
-      if (projSnap.exists()) setProjectName(projSnap.data().name || projSnap.data().title || "");
-
-      // Crew list for people picker
-      const crewSnap2 = await getDocs(collection(db, `projects/${projectId}/crew`));
-      setCrew(crewSnap2.docs
-        .filter(d => (d.data().status || "active") !== "inactive")
-        .map(d => ({
-          id: d.id,
-          firstName:  d.data().firstName  || d.data().name || "",
-          lastName1:  d.data().lastName1  || "",
-          role:       d.data().role       || "",
-          department: d.data().department || "",
-          section:    d.data().section    || "technical",
-          status:     d.data().status     || "active",
-        }))
-        .sort((a, b) => `${a.firstName} ${a.lastName1}`.localeCompare(`${b.firstName} ${b.lastName1}`)));
-
-      // Accesos
-      await loadAccesos();
-    } catch (e) { console.error(e); }
+  const load = async () => {
+    const cfg = (name: string) => getDoc(doc(db, `projects/${projectId}/teamConfig`, name)).then((x) => x.data() || null).catch(() => null);
+    const [membersSnap, crewSnap, proj, appr, order, form, payroll] = await Promise.all([
+      getDocs(collection(db, `projects/${projectId}/members`)),
+      getDocs(collection(db, `projects/${projectId}/crew`)),
+      getDoc(doc(db, "projects", projectId)),
+      cfg("approvals"), cfg("departmentOrder"), cfg("formConfig"), cfg("payrollConfig"),
+    ]);
+    setProjectName(proj.data()?.name || proj.data()?.title || "");
+    setMembers(membersSnap.docs.map((d) => ({ userId: d.data().userId || d.id, name: d.data().name || d.data().displayName || d.data().email || "Usuario", email: d.data().email || "", role: d.data().role || d.data().position || "" }))
+      .sort((a, b) => a.name.localeCompare(b.name)));
+    const c = crewSnap.docs.filter((d) => (d.data().status || "active") !== "inactive").map((d) => ({
+      id: d.id, firstName: d.data().firstName || d.data().name || "", lastName1: d.data().lastName1 || "", role: d.data().role || "",
+      department: d.data().department || "", section: d.data().section || "technical",
+    })).sort((a, b) => `${a.firstName} ${a.lastName1}`.localeCompare(`${b.firstName} ${b.lastName1}`));
+    setCrew(c);
+    const depts = Array.from(new Set(c.map(deptOf)));
+    const savedOrder: string[] = order?.order || [];
+    const settings: Settings = {
+      requireApproval: appr?.requireApproval ?? false,
+      approverUserIds: appr?.approverUserIds || [],
+      approverNames: appr?.approverNames || {},
+      form: { ...DEFAULT_FORM, ...(form || {}) } as FormCfg,
+      rates: { ...DEFAULT_RATES, ...(payroll || {}) } as Rates,
+      departments: [...savedOrder.filter((d) => depts.includes(d)), ...depts.filter((d) => !savedOrder.includes(d))],
+    };
+    // Solo las claves conocidas (los documentos llevan además updatedAt/updatedBy)
+    settings.form = Object.fromEntries(Object.keys(DEFAULT_FORM).map((k) => [k, (settings.form as never)[k]])) as unknown as FormCfg;
+    settings.rates = Object.fromEntries(Object.keys(DEFAULT_RATES).map((k) => [k, Number((settings.rates as never)[k]) || 0])) as unknown as Rates;
+    setSaved(settings); setS(settings);
+    const stamps = [appr, order, form, payroll].filter(Boolean).map((x) => ({ at: x!.updatedAt?.toDate?.() as Date | undefined, by: x!.updatedByName as string | undefined })).filter((x) => x.at);
+    stamps.sort((a, b) => b.at!.getTime() - a.at!.getTime());
+    setLastSaved(stamps[0] || null);
+    await loadAccesses();
   };
 
-  const loadAccesos = async () => {
-    try {
-      const snap = await getDocs(query(collection(db, "access"), where("projectId", "==", projectId)));
-      setAccesos(snap.docs.map(d => ({
-        id:           d.id,
-        name:         d.data().name         || "",
-        people:       d.data().people       || [],
-        pin:          d.data().pin          || null,
-        allowedTypes: d.data().allowedTypes || [],
-        active:       d.data().active       ?? true,
-        createdAt:    d.data().createdAt?.toDate(),
-      })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
-    } catch (e) { console.error(e); }
+  const loadAccesses = async () => {
+    const snap = await getDocs(query(collection(db, "access"), where("projectId", "==", projectId))).catch(() => null);
+    setAccesses((snap?.docs || []).map((d) => ({
+      id: d.id, name: d.data().name || "", people: d.data().people || [], pin: d.data().pin || null,
+      allowedTypes: d.data().allowedTypes || [], active: d.data().active ?? true, createdAt: d.data().createdAt?.toDate(),
+    })).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)));
   };
 
-  const showSuccess = (msg: string) => {
-    setSuccessMessage(msg);
-  };
-  const showError = (msg: string) => {
-    setErrorMessage(msg);
-  };
-
-  const handleSave = async () => {
+  const saveAll = async () => {
+    if (!s) return;
+    if (s.requireApproval && s.approverUserIds.length === 0) { toast.error("Añade al menos un aprobador o desactiva la aprobación"); return; }
     setSaving(true);
     try {
-      // Approval config
-      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "approvals"), {
-        ...approvalConfig,
-        updatedAt: Timestamp.now(),
-        updatedBy: userId,
-      });
-      // Department order
-      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "departmentOrder"), {
-        order: departments,
-        updatedAt: Timestamp.now(),
-        updatedBy: userId,
-      });
-      // Export config
-      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "exportConfig"), {
-        ...exportConfig,
-        updatedAt: Timestamp.now(),
-        updatedBy: userId,
-      });
-      // Form builder config
-      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "formConfig"), {
-        ...formBuilderConfig,
-        updatedAt: Timestamp.now(),
-        updatedBy: userId,
-      });
-      // Payroll rates
-      await setDoc(doc(db, `projects/${projectId}/teamConfig`, "payrollConfig"), {
-        ...payrollRates,
-        updatedAt: Timestamp.now(),
-        updatedBy: userId,
-      });
-      showSuccess("Configuración guardada");
-    } catch (e) {
-      console.error(e);
-      showError("Error al guardar");
-    } finally { setSaving(false); }
+      const meta = { updatedAt: Timestamp.now(), updatedBy: userId, updatedByName: user?.name || user?.email || "" };
+      const base = `projects/${projectId}/teamConfig`;
+      await Promise.all([
+        setDoc(doc(db, base, "approvals"), { requireApproval: s.requireApproval, approverUserIds: s.approverUserIds, approverNames: s.approverNames, ...meta }),
+        setDoc(doc(db, base, "departmentOrder"), { order: s.departments, ...meta }),
+        setDoc(doc(db, base, "formConfig"), { ...s.form, linkDays: Math.min(90, Math.max(1, Math.round(s.form.linkDays) || 14)), ...meta }),
+        setDoc(doc(db, base, "payrollConfig"), { ...s.rates, ...meta }),
+      ]);
+      setSaved(s); setLastSaved({ at: new Date(), by: meta.updatedByName });
+      toast.success("Configuración guardada");
+    } catch (e) { toast.error(e); } finally { setSaving(false); }
   };
 
-  // Approvals helpers
-  const addApprover = (m: ProjectMember) => {
-    if (approvalConfig.approverUserIds.includes(m.userId)) return;
-    setApprovalConfig((c) => ({
-      ...c,
-      approverUserIds: [...c.approverUserIds, m.userId],
-      approverNames: { ...c.approverNames, [m.userId]: m.name },
-    }));
-    setShowMemberPicker(false);
+  // ── Accesos ────────────────────────────────────────────────────────────────
+  const openAccess = () => {
+    setDraft({ name: "", people: new Set(), usePin: true, pin: String(Math.floor(1000 + Math.random() * 9000)), types: new Set(ALLOWANCES.map((a) => a.key)) });
+    setPeopleQ(""); setAccessModal(true);
   };
-  const removeApprover = (uid: string) => {
-    setApprovalConfig((c) => {
-      const names = { ...c.approverNames };
-      delete names[uid];
-      return { ...c, approverUserIds: c.approverUserIds.filter((x) => x !== uid), approverNames: names };
-    });
-  };
-
-  // Department order helpers
-  const moveDept = (index: number, dir: -1 | 1) => {
-    const next = index + dir;
-    if (next < 0 || next >= departments.length) return;
-    setDepartments((prev) => {
-      const arr = [...prev];
-      [arr[index], arr[next]] = [arr[next], arr[index]];
-      return arr;
-    });
-  };
-
-  // Export toggle helper
-  const toggleExport = (key: keyof ExportConfig) =>
-    setExportConfig((c) => ({ ...c, [key]: !c[key] }));
-
-  // ── Access helpers ─────────────────────────────────────────────────────────
-
-  const openCreateAccess = () => {
-    setAccessDraftName("");
-    setAccessDraftPeople(new Set());
-    setAccessDraftPIN("");
-    setAccessDraftUsePIN(false);
-    setAccessDraftTypes(new Set(ACCESS_ALLOWANCES.map(a => a.key)));
-
-    setShowAccessModal(true);
-  };
-
-  const saveAccess = async () => {
-    if (!accessDraftName.trim() || accessDraftPeople.size === 0) return;
+  const createAccess = async () => {
+    if (!draft.name.trim() || draft.people.size === 0 || draft.types.size === 0) return;
     setSavingAccess(true);
     try {
       const code = genCode();
-      const people = crew
-        .filter(m => accessDraftPeople.has(m.id))
-        .map(m => ({
-          memberId:   m.id,
-          firstName:  m.firstName,
-          lastName1:  m.lastName1,
-          department: m.department || "",
-          section:    m.section    || "",
-        }));
       await setDoc(doc(db, "access", code), {
-        code,
-        name:         accessDraftName.trim(),
-        projectId,
-        projectName,
-        color:        TEAM_COLOR,
-        people,
-        pin:          accessDraftUsePIN && accessDraftPIN.trim() ? accessDraftPIN.trim() : null,
-        allowedTypes: Array.from(accessDraftTypes),
-        active:       true,
-        createdAt:    Timestamp.now(),
-        createdBy:    userId,
+        code, name: draft.name.trim(), projectId, projectName, color: "#0F172A",
+        people: crew.filter((m) => draft.people.has(m.id)).map((m) => ({ memberId: m.id, firstName: m.firstName, lastName1: m.lastName1, department: m.department, section: m.section })),
+        pin: draft.usePin && /^\d{4}$/.test(draft.pin) ? draft.pin : null,
+        allowedTypes: ALLOWANCES.map((a) => a.key).filter((k) => draft.types.has(k)),
+        active: true, createdAt: Timestamp.now(), createdBy: userId,
       });
-      setShowAccessModal(false);
-      await loadAccesos();
-    } catch (e) { console.error(e); showError("Error al crear el acceso"); }
-    finally { setSavingAccess(false); }
+      setAccessModal(false);
+      await loadAccesses();
+      toast.success("Acceso creado");
+    } catch (e) { toast.error(e); } finally { setSavingAccess(false); }
+  };
+  const accessUrl = (a: AccessEntry) => `${window.location.origin}/access/${a.id}`;
+  const copyAccess = (a: AccessEntry) => {
+    navigator.clipboard.writeText([`Enlace para marcar complementos (${projectName}):`, accessUrl(a), ...(a.pin ? [`PIN: ${a.pin}`] : [])].join("\n"));
+    toast.success("Enlace copiado");
+  };
+  const toggleAccess = async (a: AccessEntry) => {
+    await setDoc(doc(db, "access", a.id), { active: !a.active }, { merge: true });
+    await loadAccesses();
+  };
+  const removeAccess = async (a: AccessEntry) => {
+    await deleteDoc(doc(db, "access", a.id));
+    setConfirmDelete(null);
+    await loadAccesses();
   };
 
-  const toggleAccessActive = async (entry: AccessEntry) => {
-    await setDoc(doc(db, "access", entry.id), { active: !entry.active }, { merge: true });
-    await loadAccesos();
-  };
+  const crewByDept = useMemo(() => {
+    const m = new Map<string, number>();
+    crew.forEach((c) => m.set(deptOf(c), (m.get(deptOf(c)) || 0) + 1));
+    return m;
+  }, [crew]);
+  const peopleFiltered = crew.filter((c) => `${c.firstName} ${c.lastName1} ${c.role} ${deptOf(c)}`.toLowerCase().includes(peopleQ.toLowerCase()));
 
-  const deleteAccess = (id: string, name: string) => {
-    setConfirmDialog({
-      title: "Eliminar acceso",
-      message: `¿Eliminar "${name}"? El enlace dejará de funcionar y no se puede deshacer.`,
-      confirmLabel: "Eliminar",
-      onConfirm: async () => {
-        setConfirmDialog(null);
-        await deleteDoc(doc(db, "access", id));
-        await loadAccesos();
-      },
-    });
-  };
-
-  const copyLink = (entry: AccessEntry) => {
-    const url = `${window.location.origin}/access/${entry.id}`;
-    const lines = [
-      `Hola, aquí tienes el enlace para marcar los complementos:`,
-      ``,
-      url,
-    ];
-    if (entry.pin) {
-      lines.push(``, `PIN: ${entry.pin}`);
-    }
-    navigator.clipboard.writeText(lines.join("\n"));
-    showSuccess("Mensaje copiado");
-  };
-
-  const toggleAccessType = (key: AKey) => {
-    setAccessDraftTypes(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
-  const toggleAccessPerson = (id: string) => {
-    setAccessDraftPeople(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-const renderAccesos = () => (
-    <div className="space-y-4">
-      {/* Header card */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-900">Accesos de coordinación</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Links para que coordinadores marquen complementos sin acceso a la plataforma
-            </p>
-          </div>
-          <button
-            onClick={openCreateAccess}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: TEAM_COLOR }}>
-            <Plus size={13} /> Nuevo acceso
-          </button>
-        </div>
-
-        {accesos.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="hidden">
-              <Link2 size={20} className="text-slate-400" />
-            </div>
-            <p className="text-[13px] text-slate-500">No hay accesos creados</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Crea un acceso y comparte el enlace con tu coordinador
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {accesos.map(entry => (
-              <div key={entry.id} className={`px-6 py-4 ${!entry.active ? "opacity-50" : ""}`}>
-                <div className="flex items-start gap-4">
-                  {/* Color dot + info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[13px] font-semibold text-slate-900">{entry.name}</p>
-                      {!entry.active && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full uppercase tracking-wide">
-                          Inactivo
-                        </span>
-                      )}
-                      {entry.pin && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full flex items-center gap-1">
-                          <Lock size={9} /> PIN
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {entry.people.length} {entry.people.length === 1 ? "persona" : "personas"} ·{" "}
-                      {entry.allowedTypes.length} complemento{entry.allowedTypes.length !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-[10px] font-mono text-slate-300 mt-1 truncate">
-                      /access/{entry.id}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {/* Copy link */}
-                    <button
-                      onClick={() => copyLink(entry)}
-                      title="Copiar mensaje con enlace"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                      <Copy size={14} />
-                    </button>
-                    {/* Open */}
-                    <a
-                      href={`/access/${entry.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Abrir acceso"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                      <ExternalLink size={14} />
-                    </a>
-                    {/* Toggle active */}
-                    <button
-                      onClick={() => toggleAccessActive(entry)}
-                      title={entry.active ? "Desactivar" : "Activar"}
-                      className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ml-1"
-                      style={{ backgroundColor: entry.active ? TEAM_COLOR : "#e2e8f0" }}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${entry.active ? "left-0.5 translate-x-4" : "left-0.5"}`} />
-                    </button>
-                    {/* Delete */}
-                    <button
-                      onClick={() => deleteAccess(entry.id, entry.name)}
-                      title="Eliminar"
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* People pills */}
-                {entry.people.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {entry.people.slice(0, 8).map(p => (
-                      <span key={p.memberId}
-                        className="text-[11px] font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
-                        {p.firstName} {p.lastName1}
-                      </span>
-                    ))}
-                    {entry.people.length > 8 && (
-                      <span className="text-[11px] font-medium px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full">
-                        +{entry.people.length - 8} más
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+  if (loading || !s) return <PageLoading />;
+  const set = (patch: Partial<Settings>) => setS({ ...s, ...patch });
+  const H2 = ({ children, count, action }: { children: React.ReactNode; count?: number; action?: React.ReactNode }) => (
+    <div className="mb-2 flex min-h-8 items-center justify-between">
+      <h2 className="text-[13px] font-semibold text-slate-900">{children}{count !== undefined && <span className="ml-1.5 font-normal text-slate-400">{count}</span>}</h2>
+      {action}
     </div>
   );
+  const moveDept = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= s.departments.length) return;
+    const arr = [...s.departments];
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    set({ departments: arr });
+  };
+  const freeMembers = members.filter((m) => !s.approverUserIds.includes(m.userId));
 
-  // ── Render sections ────────────────────────────────────────────────────────
+  return (
+    <Page>
+      <PageHeader
+        title="Configuración"
+        actions={tab !== "access" ? (
+          <>
+            {lastSaved?.at && !dirty && <span className="text-xs text-slate-500">Guardado {ago(lastSaved.at)}{lastSaved.by ? ` por ${lastSaved.by}` : ""}</span>}
+            {dirty && <Button variant="ghost" onClick={() => setS(saved)}>Descartar</Button>}
+            <Button variant="primary" onClick={saveAll} disabled={saving || !dirty}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
+          </>
+        ) : undefined}
+      />
 
-  const renderApprovals = () => (
-    <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <Shield size={18} className="text-amber-500" />
-          <div>
-            <p className="text-[13px] font-semibold text-slate-900">Aprobación de altas</p>
-            <p className="text-xs text-slate-500 mt-0.5">Requiere aprobación manual antes de activar una alta de crew</p>
-          </div>
-          <div className="ml-auto">
-            <button
-              onClick={() => setApprovalConfig((c) => ({ ...c, requireApproval: !c.requireApproval }))}
-              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${approvalConfig.requireApproval ? "" : "bg-slate-200"}`}
-              style={approvalConfig.requireApproval ? { backgroundColor: TEAM_COLOR } : {}}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${approvalConfig.requireApproval ? "translate-x-5" : ""}`} />
-            </button>
-          </div>
-        </div>
-        {!approvalConfig.requireApproval && (
-          <div className="px-6 py-4 flex items-start gap-2 bg-slate-50">
-            <Info size={14} className="text-slate-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-slate-500">Sin aprobación activa, las altas se crean directamente como activas.</p>
-          </div>
-        )}
+      <div className="mt-6">
+        <Segmented value={tab} onChange={setTab} options={[
+          { value: "altas", label: "Altas" }, { value: "payroll", label: "Nóminas" },
+          { value: "departments", label: "Departamentos" }, { value: "access", label: `Accesos · ${accesses.filter((a) => a.active).length}` },
+        ]} />
       </div>
 
-      {approvalConfig.requireApproval && (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users size={16} className="text-slate-400" />
-              <p className="text-[13px] font-semibold text-slate-900">Aprobadores</p>
-            </div>
-            <button onClick={() => setShowMemberPicker(true)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors">
-              <Plus size={13} /> Añadir aprobador
-            </button>
-          </div>
-
-          {approvalConfig.approverUserIds.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <div className="hidden">
-                <User size={20} className="text-slate-400" />
+      {/* ── Altas ───────────────────────────────────────────────────────── */}
+      {tab === "altas" && (
+        <div className="mt-6 flex flex-col gap-8">
+          <section>
+            <H2>Aprobación</H2>
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <p className="text-[13px] font-medium text-slate-900">Las altas se aprueban antes de activarse</p>
+                <Segmented value={s.requireApproval ? "yes" : "no"} onChange={(v) => set({ requireApproval: v === "yes" })} options={[{ value: "no", label: "No" }, { value: "yes", label: "Sí" }]} />
               </div>
-              <p className="text-[13px] text-slate-500">No hay aprobadores configurados</p>
-              <p className="text-xs text-slate-400 mt-1">Añade al menos un aprobador para que el flujo funcione</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {approvalConfig.approverUserIds.map((uid) => {
-                const member = members.find((m) => m.userId === uid);
-                const name = approvalConfig.approverNames[uid] || member?.name || uid;
-                return (
-                  <div key={uid} className="flex items-center justify-between px-6 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-medium text-slate-900">{name}</p>
-                        {member?.role && <p className="text-xs text-slate-400">{member.role}</p>}
-                      </div>
-                    </div>
-                    <button onClick={() => removeApprover(uid)}
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={13} />
-                    </button>
+              {s.requireApproval && (
+                <div className="px-4 py-3">
+                  <p className="mb-2 text-xs text-slate-500">Aprueban</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {s.approverUserIds.map((uid) => (
+                      <span key={uid} className="flex h-7 items-center gap-1.5 rounded-md border border-slate-200 pl-2.5 pr-1 text-[12.5px] text-slate-800">
+                        {s.approverNames[uid] || members.find((m) => m.userId === uid)?.name || "—"}
+                        <button aria-label="Quitar aprobador" onClick={() => { const n = { ...s.approverNames }; delete n[uid]; set({ approverUserIds: s.approverUserIds.filter((x) => x !== uid), approverNames: n }); }}
+                          className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-[#F1F1F3] hover:text-slate-700"><X size={12} /></button>
+                      </span>
+                    ))}
+                    {freeMembers.length > 0 && (
+                      <div className="w-56"><Select value="" onChange={(e) => { const m = members.find((x) => x.userId === e.target.value); if (m) set({ approverUserIds: [...s.approverUserIds, m.userId], approverNames: { ...s.approverNames, [m.userId]: m.name } }); }} className="h-7 text-[12.5px]">
+                        <option value="">Añadir aprobador…</option>
+                        {freeMembers.map((m) => <option key={m.userId} value={m.userId}>{m.name}{m.role ? ` · ${m.role}` : ""}</option>)}
+                      </Select></div>
+                    )}
+                    {s.approverUserIds.length === 0 && <span className="text-xs text-amber-800">Sin aprobadores</span>}
                   </div>
-                );
-              })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <H2>Formulario de alta</H2>
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3">
+              <p className="text-[13px] font-medium text-slate-900">Caducidad del enlace</p>
+              <div className="flex items-center gap-2">
+                <Input type="number" min={1} max={90} value={String(s.form.linkDays)} onChange={(e) => set({ form: { ...s.form, linkDays: Number(e.target.value) || 0 } })} className="h-8 w-20 text-right tabular-nums" aria-label="Días de validez" />
+                <span className="text-[13px] text-slate-500">días</span>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {FORM_GROUPS.map((g) => (
+                <div key={g.label} className="overflow-hidden rounded-lg border border-slate-200">
+                  <p className={`${TH} px-4 py-2 font-medium`}>{g.label}</p>
+                  {g.fields.map((f) => {
+                    const on = f.key ? s.form[f.key] : true;
+                    return (
+                      <label key={f.label} className={`flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2 text-[13px] last:border-0 ${f.key ? "cursor-pointer hover:bg-[#FAFAFA]" : ""}`}>
+                        <span className={on ? "text-slate-900" : "text-slate-500"}>{f.label}</span>
+                        {f.key
+                          ? <input type="checkbox" checked={!!on} onChange={() => set({ form: { ...s.form, [f.key!]: !on } })} className="h-4 w-4 accent-slate-900" />
+                          : <span className="flex items-center gap-1 text-[11px] text-slate-500"><Lock size={11} /> Obligatorio</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ── Nóminas ─────────────────────────────────────────────────────── */}
+      {tab === "payroll" && (
+        <div className="mt-6">
+          <H2 action={JSON.stringify(s.rates) !== JSON.stringify(DEFAULT_RATES) ? <Button variant="ghost" size="sm" onClick={() => set({ rates: DEFAULT_RATES })}><RotateCcw size={13} /> Tarifas por defecto</Button> : undefined}>
+            Tarifas de dietas y complementos
+          </H2>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[560px] border-collapse text-[13px]">
+              <thead>
+                <tr className={TH}>
+                  <th scope="col" className="px-4 py-2 text-left font-medium">Concepto</th>
+                  <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Por</th>
+                  <th scope="col" className="w-40 px-3 py-2 text-right font-medium">Técnicos</th>
+                  <th scope="col" className="w-40 px-4 py-2 text-right font-medium">Artísticos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {RATE_ROWS.map((r) => {
+                  const cell = (k: keyof Rates, label: string) => (
+                    <div className="relative ml-auto w-28">
+                      <Input inputMode="decimal" aria-label={`${r.label} · ${label}`} value={String(s.rates[k])}
+                        onChange={(e) => set({ rates: { ...s.rates, [k]: parseFloat(e.target.value.replace(",", ".")) || 0 } })}
+                        className={`h-8 pr-6 text-right tabular-nums ${s.rates[k] !== DEFAULT_RATES[k] ? "font-medium" : ""}`} />
+                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">€</span>
+                    </div>
+                  );
+                  return (
+                    <tr key={r.label} className="border-b border-slate-100 last:border-0">
+                      <td className="px-4 py-1.5 text-slate-900">{r.label}</td>
+                      <td className="px-3 py-1.5 text-slate-500">{r.unit}</td>
+                      {r.art ? (
+                        <>
+                          <td className="px-3 py-1.5">{cell(r.tech, "técnicos")}</td>
+                          <td className="px-4 py-1.5">{cell(r.art, "artísticos")}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-1.5">{cell(r.tech, "todos")}</td>
+                          <td className="px-4 py-1.5 text-right text-xs text-slate-500">La misma</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Departamentos ───────────────────────────────────────────────── */}
+      {tab === "departments" && (
+        <div className="mt-6">
+          <H2 count={s.departments.length} action={s.departments.length > 1 ? (
+            <Button variant="ghost" size="sm" onClick={() => set({ departments: [...s.departments].sort((a, b) => a.localeCompare(b, "es")) })}>Orden alfabético</Button>
+          ) : undefined}>
+            Orden en listados, nóminas y crew list
+          </H2>
+          {s.departments.length === 0 ? (
+            <EmptyState title="Sin departamentos: asigna departamento al crew" />
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className={TH}>
+                    <th scope="col" className="w-12 px-4 py-2 text-left font-medium">#</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Departamento</th>
+                    <th scope="col" className="w-24 px-3 py-2 text-right font-medium">Personas</th>
+                    <th scope="col" className="w-24 py-2 pr-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.departments.map((d, i) => (
+                    <tr key={d} className="border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA]">
+                      <td className="px-4 py-1.5 tabular-nums text-slate-500">{i + 1}</td>
+                      <td className="px-3 py-1.5 text-slate-900">{d}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-slate-600">{crewByDept.get(d) || 0}</td>
+                      <td className="py-1.5 pr-3">
+                        <div className="flex justify-end gap-0.5">
+                          <IconButton label={`Subir ${d}`} onClick={() => moveDept(i, -1)} disabled={i === 0}><ArrowUp size={14} /></IconButton>
+                          <IconButton label={`Bajar ${d}`} onClick={() => moveDept(i, 1)} disabled={i === s.departments.length - 1}><ArrowDown size={14} /></IconButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       )}
-    </div>
-  );
 
-  const renderDepartments = () => (
-    <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
-          <p className="text-[13px] font-semibold text-slate-900">Orden de departamentos</p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Define el orden en que aparecen en los listados y exportaciones.
-          </p>
-        </div>
-
-        {departments.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <p className="text-[13px] text-slate-500">No hay crew con departamentos asignados</p>
-            <p className="text-xs text-slate-400 mt-1">Añade miembros al crew y asígnales departamento</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {departments.map((dept, i) => {
-              const canMoveUp = i > 0;
-              const canMoveDown = i < departments.length - 1;
-              return (
-                <div key={dept} className="flex items-center gap-3 px-6 py-3">
-                  <span className="w-5 text-center text-xs tabular-nums text-slate-400 flex-shrink-0">{i + 1}</span>
-                  <div
-                    className="w-0.5 h-6 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: TEAM_COLOR }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-slate-900">{dept}</p>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <button onClick={() => moveDept(i, -1)} disabled={!canMoveUp}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                      <ArrowUp size={13} />
-                    </button>
-                    <button onClick={() => moveDept(i, 1)} disabled={!canMoveDown}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-20 transition-colors">
-                      <ArrowDown size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
-        <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
-        <span>Este orden se aplica automáticamente en los listados de crew y en las exportaciones PDF.</span>
-      </div>
-    </div>
-  );
-
-  const setPayrollRate = (key: keyof PayrollRatesConfig, value: number) =>
-    setPayrollRates(r => ({ ...r, [key]: value }));
-
-  const renderPayrollRates = () => {
-    type RateGroup = {
-      label: string; description: string; icon: React.ReactNode;
-      fields: { key: keyof PayrollRatesConfig; badge: string; badgeColor: string }[];
-    };
-    const groups: RateGroup[] = [
-      {
-        label: "Comidas", description: "Por día o comida", icon: <Utensils size={15} className="text-orange-500" />,
-        fields: [{ key: "mealRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
-      },
-      {
-        label: "Media dieta nacional", description: "Nacional — media dieta por día", icon: <Plane size={15} className="text-sky-300" />,
-        fields: [
-          { key: "halfPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-          { key: "halfPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-        ],
-      },
-      {
-        label: "Dieta nacional", description: "Nacional — dieta completa/día", icon: <Plane size={15} className="text-sky-500" />,
-        fields: [
-          { key: "perDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-          { key: "perDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-        ],
-      },
-      {
-        label: "Media dieta internacional", description: "Internacional — media dieta/día", icon: <Globe size={15} className="text-slate-400" />,
-        fields: [
-          { key: "halfIntlPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-          { key: "halfIntlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-        ],
-      },
-      {
-        label: "Dieta internacional", description: "Internacional — dieta completa", icon: <Globe size={15} className="text-slate-500" />,
-        fields: [
-          { key: "intlPerDiemRate", badge: "Técnicos", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-          { key: "intlPerDiemRateArtistic", badge: "Actores", badgeColor: "bg-[#F7F7F8] text-slate-700" },
-        ],
-      },
-      {
-        label: "Alojamiento", description: "Por noche", icon: <Home size={15} className="text-slate-500" />,
-        fields: [{ key: "accommodationRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
-      },
-      {
-        label: "Vehículo", description: "Por día (o €/km si se prefiere)", icon: <Car size={15} className="text-emerald-500" />,
-        fields: [{ key: "carRate", badge: "Todos", badgeColor: "bg-slate-100 text-slate-500" }],
-      },
-    ];
-    return (
-      <div className="space-y-4">
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <p className="text-[13px] font-semibold text-slate-900">Tarifas globales</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Importes por defecto en Nóminas. Las dietas tienen tarifa separada para Técnicos y Actores.
-            </p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {groups.map(({ label, description, icon, fields }) => (
-              <div key={label} className="flex items-center gap-4 px-6 py-3.5">
-                <div className="hidden">
-                  {icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {fields.map(({ key, badge, badgeColor }) => (
-                    <div key={key} className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${badgeColor}`}>{badge}</span>
-                      <div className="flex items-center border border-slate-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-slate-300">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={payrollRates[key]}
-                          onChange={e => setPayrollRate(key, parseFloat(e.target.value) || 0)}
-                          className="w-20 text-[13px] text-right px-2.5 py-1.5 focus:outline-none text-slate-900 font-medium"
-                        />
-                        <span className="px-2.5 py-2 text-[13px] text-slate-400 bg-slate-50 border-l border-slate-200">€</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
-          <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
-          <span>
-            Al modificar estas tarifas solo afecta a los nuevos registros. Los días ya guardados con importe personalizado mantienen su valor.
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  const toggleFormField = (key: keyof FormBuilderConfig) =>
-    setFormBuilderConfig((c) => ({ ...c, [key]: !c[key] }));
-
-  const renderFormBuilder = () => {
-    const enabledCount = (Object.values(formBuilderConfig) as boolean[]).filter(Boolean).length;
-    const totalToggleable = Object.keys(FORM_BUILDER_DEFAULTS).length;
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <p className="text-xs text-slate-500">
-            {enabledCount} de {totalToggleable} campos opcionales activos
-          </p>
-          <button
-            onClick={() => setFormBuilderConfig(FORM_BUILDER_DEFAULTS)}
-            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            Restaurar por defecto
-          </button>
-        </div>
-
-        {FORM_SECTIONS.map((section) => (
-          <div key={section.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{section.label}</p>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {section.fields.map((field, idx) => {
-                const isLocked = field.key === null || field.required;
-                const isOn = field.key ? formBuilderConfig[field.key] : true;
-                return (
-                  <div key={idx} className="flex items-center gap-4 px-6 py-3.5">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] font-medium ${isLocked && !isOn ? "text-slate-400" : "text-slate-900"}`}>
-                        {field.label}
-                      </p>
-                      {field.description && (
-                        <p className="text-xs text-slate-400 mt-0.5">{field.description}</p>
-                      )}
-                    </div>
-                    {isLocked ? (
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <Lock size={11} className="text-slate-300" />
-                        <span className="text-xs text-slate-300">Obligatorio</span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => toggleFormField(field.key!)}
-                        className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${isOn ? "" : "bg-slate-200"}`}
-                        style={isOn ? { backgroundColor: TEAM_COLOR } : {}}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? "translate-x-5" : ""}`} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
-          <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
-          <span>Los cambios se aplican a todos los nuevos formularios enviados desde este proyecto. Los formularios ya enviados no se ven afectados.</span>
-        </div>
-      </div>
-    );
-  };
-
-  const renderExport = () => {
-    const fieldToggles: { key: keyof ExportConfig; label: string; description?: string }[] = [
-      { key: "includePhoto",     label: "Foto de perfil",     description: "Incluye la foto en fichas PDF y exportaciones" },
-      { key: "includePhone",     label: "Teléfono"            },
-      { key: "includeEmail",     label: "Email"               },
-      { key: "includeAddress",   label: "Dirección"           },
-      { key: "includeDni",       label: "DNI / Pasaporte"     },
-      { key: "includeSsNumber",  label: "Número Seguridad Social" },
-      { key: "includeIban",      label: "IBAN / Cuenta bancaria" },
-      { key: "includeSalary",    label: "Remuneración / Salario" },
-      { key: "includeNotes",     label: "Notas internas"      },
-    ];
-    const structureToggles: { key: keyof ExportConfig; label: string; description: string }[] = [
-      { key: "groupBySection",     label: "Agrupar por sección",     description: "Técnico / Cast / Especialistas" },
-      { key: "groupByDepartment",  label: "Agrupar por departamento", description: "Usando el orden definido en Departamentos" },
-    ];
-
-    return (
-      <div className="space-y-4">
-        {/* Campos */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <p className="text-[13px] font-semibold text-slate-900">Campos a incluir</p>
-            <p className="text-xs text-slate-500 mt-0.5">Selecciona qué campos aparecen en fichas PDF y listados exportados</p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {fieldToggles.map(({ key, label, description }) => (
-              <div key={key} className="flex items-center justify-between px-6 py-3.5 gap-4">
-                <div>
-                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
-                  {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
-                </div>
-                <button onClick={() => toggleExport(key)}
-                  className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors ${exportConfig[key] ? "" : "bg-slate-200"}`}
-                  style={exportConfig[key] ? { backgroundColor: TEAM_COLOR } : {}}>
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${exportConfig[key] ? "translate-x-5" : ""}`} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Estructura */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <p className="text-[13px] font-semibold text-slate-900">Estructura del listado</p>
-            <p className="text-xs text-slate-500 mt-0.5">Cómo se organizan los miembros en los documentos exportados</p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {structureToggles.map(({ key, label, description }) => (
-              <div key={key} className="flex items-center justify-between px-6 py-3.5 gap-4">
-                <div>
-                  <p className="text-[13px] font-medium text-slate-900">{label}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{description}</p>
-                </div>
-                <button onClick={() => toggleExport(key)}
-                  className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors ${exportConfig[key] ? "" : "bg-slate-200"}`}
-                  style={exportConfig[key] ? { backgroundColor: TEAM_COLOR } : {}}>
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${exportConfig[key] ? "translate-x-5" : ""}`} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-start gap-2 text-xs text-slate-500 px-1">
-          <Info size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
-          <span>Los cambios aquí afectan a las exportaciones de listado y a las fichas PDF generadas desde la app.</span>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  if (loading || userLoading) {
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`min-h-screen bg-white ${inter.className}`}>
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="mt-[53px]">
-        <div className="px-6 pt-8 sm:px-10">
-          <div className="relative flex min-h-[44px] items-center justify-start border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Configuración de equipo</h1>
-            </div>
-            <button onClick={handleSave} disabled={saving}
-              className="absolute right-0 flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
-              {saving
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</>
-                : <><Save size={16} />Guardar</>}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Toasts ─────────────────────────────────────────────────────────── */}
-
-      {/* ── Main layout ────────────────────────────────────────────────────── */}
-      <main className="px-6 sm:px-10 py-8">
-        <div className="flex flex-row gap-6">
-
-          {/* Sidebar */}
-          <div className="w-52 flex-shrink-0">
-            <div className="sticky top-20">
-              <nav className="flex flex-col gap-1 overflow-x-auto overflow-x-visible pb-2 pb-0">
-                {CONFIG_SECTIONS.map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button key={section.id} onClick={() => setActiveSection(section.id)}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all whitespace-nowrap ${
-                        isActive ? "bg-[#F1F1F3] text-slate-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      } text-[13px]`}>
-                      <Icon size={16} className={isActive ? "text-slate-900" : "text-slate-400"} />
-                      <span className={`text-[13px] font-medium ${isActive ? "text-slate-900" : ""}`}>{section.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {activeSection === "approvals"   && renderApprovals()}
-            {activeSection === "departments" && renderDepartments()}
-            {activeSection === "payroll"     && renderPayrollRates()}
-            {activeSection === "accesos"     && renderAccesos()}
-            {activeSection === "form"        && renderFormBuilder()}
-            {activeSection === "export"      && renderExport()}
-          </div>
-        </div>
-      </main>
-
-      {/* ── Create access modal ─────────────────────────────────────────── */}
-      {showAccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-0 p-4">
-          <div className="bg-white rounded-t-3xl rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
-
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
-              <p className="text-base font-bold text-slate-900">Nuevo acceso</p>
-              <button onClick={() => setShowAccessModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal body */}
-            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
-
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nombre del acceso</label>
-                <input
-                  type="text"
-                  value={accessDraftName}
-                  onChange={e => setAccessDraftName(e.target.value)}
-                  placeholder="Título del evento"
-                  className="w-full text-[13px] border border-slate-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900"
-                />
-              </div>
-
-              {/* People */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Personas ({accessDraftPeople.size} seleccionadas)
-                </label>
-                <div className="border border-slate-200 rounded-md overflow-hidden max-h-48 overflow-y-auto">
-                  {crew.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-[13px] text-slate-400">No hay crew activo</p>
-                  ) : crew.map(m => {
-                    const sel = accessDraftPeople.has(m.id);
-                    return (
-                      <button key={m.id} onClick={() => toggleAccessPerson(m.id)}
-                        className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors border-b border-slate-50 last:border-0 ${sel ? "bg-green-50" : "hover:bg-slate-50"}`}>
-                        <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${sel ? "border-transparent" : "border-slate-300"}`}
-                          style={sel ? { backgroundColor: TEAM_COLOR } : {}}>
-                          {sel && <Check size={12} className="text-white" strokeWidth={2.5} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-slate-900 truncate">{m.firstName} {m.lastName1}</p>
-                          {(m.role || m.department) && (
-                            <p className="text-xs text-slate-400 truncate">{m.role}{m.department ? ` · ${m.department}` : ""}</p>
+      {/* ── Accesos ─────────────────────────────────────────────────────── */}
+      {tab === "access" && (
+        <div className="mt-6">
+          <H2 count={accesses.length} action={<Button variant="secondary" size="sm" onClick={openAccess} disabled={crew.length === 0}><Plus size={13} /> Nuevo acceso</Button>}>
+            Enlaces de coordinación para marcar complementos
+          </H2>
+          {accesses.length === 0 ? (
+            <p className="border-y border-slate-200 py-8 text-center text-[13px] text-slate-500">Sin accesos</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                <thead>
+                  <tr className={TH}>
+                    <th scope="col" className="px-4 py-2 text-left font-medium">Acceso</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Personas</th>
+                    <th scope="col" className="px-3 py-2 text-left font-medium">Complementos</th>
+                    <th scope="col" className="w-20 px-3 py-2 text-left font-medium">PIN</th>
+                    <th scope="col" className="w-24 px-3 py-2 text-left font-medium">Estado</th>
+                    <th scope="col" className="w-12 py-2 pr-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {accesses.map((a) => (
+                    <tr key={a.id} className={`border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${a.active ? "" : "text-slate-500"}`}>
+                      <td className="px-4 py-1.5">
+                        <p className={`font-medium ${a.active ? "text-slate-900" : "text-slate-500"}`}>{a.name}</p>
+                        <p className="font-mono text-[11px] text-slate-500">/access/{a.id}</p>
+                      </td>
+                      <td className="px-3 py-1.5" title={a.people.map((p) => `${p.firstName} ${p.lastName1}`).join(", ")}>
+                        <span className="tabular-nums">{a.people.length}</span>
+                        <span className="ml-1.5 text-xs text-slate-500">{Array.from(new Set(a.people.map(deptOf))).slice(0, 2).join(", ")}</span>
+                      </td>
+                      <td className="px-3 py-1.5 text-xs text-slate-600">
+                        {a.allowedTypes.length === ALLOWANCES.length ? "Todos" : a.allowedTypes.map((k) => ALLOWANCES.find((x) => x.key === k)?.label).filter(Boolean).join(", ")}
+                      </td>
+                      <td className="px-3 py-1.5 font-mono text-xs">{a.pin || <span className="font-sans text-slate-400">—</span>}</td>
+                      <td className="px-3 py-1.5">
+                        <span className="flex items-center gap-1.5 text-xs"><span className={`h-1.5 w-1.5 rounded-full ${a.active ? "bg-emerald-500" : "bg-slate-300"}`} />{a.active ? "Activo" : "Pausado"}</span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-right">
+                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                          {(close) => (
+                            <>
+                              <MenuItem onClick={() => { close(); copyAccess(a); }}>Copiar enlace{a.pin ? " y PIN" : ""}</MenuItem>
+                              <MenuItem onClick={() => { close(); window.open(accessUrl(a), "_blank", "noopener"); }}>Abrir <ExternalLink size={12} className="ml-1 inline" /></MenuItem>
+                              <MenuItem onClick={() => { close(); toggleAccess(a); }}>{a.active ? "Pausar" : "Reactivar"}</MenuItem>
+                              <MenuSeparator />
+                              <MenuItem danger onClick={() => { close(); setConfirmDelete(a); }}>Eliminar</MenuItem>
+                            </>
                           )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Complement types */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Complementos visibles</label>
-                <div className="flex flex-wrap gap-2">
-                  {ACCESS_ALLOWANCES.map(a => {
-                    const on = accessDraftTypes.has(a.key);
-                    return (
-                      <button key={a.key} onClick={() => toggleAccessType(a.key)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${on ? "border-transparent text-white" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
-                        style={on ? { backgroundColor: TEAM_COLOR } : {}}>
-                        {a.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* PIN */}
-              <div className="bg-slate-50 rounded-md p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[13px] font-semibold text-slate-800">Proteger con PIN</p>
-                    <p className="text-xs text-slate-400 mt-0.5">El coordinador deberá introducir un PIN para acceder</p>
-                  </div>
-                  <button onClick={() => {
-                    const next = !accessDraftUsePIN;
-                    setAccessDraftUsePIN(next);
-                    if (next && !accessDraftPIN) {
-                      setAccessDraftPIN(String(Math.floor(1000 + Math.random() * 9000)));
-                    }
-                  }}
-                    className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
-                    style={{ backgroundColor: accessDraftUsePIN ? TEAM_COLOR : "#e2e8f0" }}>
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${accessDraftUsePIN ? "left-0.5 translate-x-5" : "left-0.5"}`} />
-                  </button>
-                </div>
-                {accessDraftUsePIN && (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={8}
-                    value={accessDraftPIN}
-                    onChange={e => setAccessDraftPIN(e.target.value.replace(/\D/g, ""))}
-                    placeholder="PIN numérico"
-                    className="w-full text-[13px] tabular-nums tracking-widest border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 bg-white"
-                  />
-                )}
-              </div>
-
+                        </Menu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-white">
-              <button onClick={() => setShowAccessModal(false)}
-                className="text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors">
-                Cancelar
-              </button>
-              <button
-                onClick={saveAccess}
-                disabled={savingAccess || !accessDraftName.trim() || accessDraftPeople.size === 0}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                style={{ backgroundColor: TEAM_COLOR }}>
-                {savingAccess ? (
-                  <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creando…</>
-                ) : (
-                  <><Link2 size={14} /> Crear acceso</>
-                )}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Member picker modal */}
-      {showMemberPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <p className="text-[13px] font-semibold text-slate-900">Seleccionar aprobador</p>
-              <button onClick={() => setShowMemberPicker(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="max-h-72 overflow-y-auto">
-              {members.length === 0 ? (
-                <p className="px-5 py-8 text-center text-[13px] text-slate-400">No hay miembros del proyecto</p>
-              ) : members.map((m) => {
-                const already = approvalConfig.approverUserIds.includes(m.userId);
+      {/* Nuevo acceso */}
+      <Modal open={accessModal} onClose={() => setAccessModal(false)} title="Nuevo acceso" width="max-w-2xl"
+        footer={<>
+          <Button variant="ghost" onClick={() => setAccessModal(false)}>Cancelar</Button>
+          <Button variant="primary" onClick={createAccess} disabled={savingAccess || !draft.name.trim() || draft.people.size === 0 || draft.types.size === 0 || (draft.usePin && !/^\d{4}$/.test(draft.pin))}>
+            {savingAccess ? "Creando…" : `Crear acceso${draft.people.size ? ` · ${draft.people.size}` : ""}`}
+          </Button>
+        </>}>
+        <div className="space-y-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_160px] gap-3">
+            <Field label="Nombre"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Coordinación de cámara" autoFocus /></Field>
+            <Field label="PIN">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={draft.usePin} onChange={(e) => setDraft({ ...draft, usePin: e.target.checked })} aria-label="Usar PIN" className="h-4 w-4 accent-slate-900" />
+                <Input value={draft.pin} disabled={!draft.usePin} inputMode="numeric" maxLength={4} onChange={(e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })} className="font-mono tabular-nums" />
+              </div>
+            </Field>
+          </div>
+          <div>
+            <p className="mb-1.5 text-[12px] font-medium text-slate-600">Complementos</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ALLOWANCES.map((a) => {
+                const on = draft.types.has(a.key);
                 return (
-                  <button key={m.userId} onClick={() => addApprover(m)} disabled={already}
-                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 disabled:opacity-50 transition-colors border-b border-slate-50 last:border-0">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
-                      {m.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-[13px] font-medium text-slate-900">{m.name}</p>
-                      {m.role && <p className="text-xs text-slate-400">{m.role}</p>}
-                    </div>
-                    {already && <Check size={14} style={{ color: TEAM_COLOR }} className="flex-shrink-0" />}
-                  </button>
+                  <button key={a.key} type="button" aria-pressed={on} onClick={() => { const n = new Set(draft.types); if (on) n.delete(a.key); else n.add(a.key); setDraft({ ...draft, types: n }); }}
+                    className={`h-7 rounded-md border px-2.5 text-[12.5px] ${on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{a.label}</button>
                 );
               })}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── Confirm dialog ─────────────────────────────────────────────────── */}
-      {confirmDialog && (
-        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDialog(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 mb-2">{confirmDialog.title}</h3>
-            <p className="text-[13px] text-slate-600 mb-6">{confirmDialog.message}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirmDialog(null)}
-                className="flex-1 px-4 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium">
-                Cancelar
-              </button>
-              <button onClick={confirmDialog.onConfirm}
-                className="flex-1 px-4 py-1.5 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700">
-                {confirmDialog.confirmLabel || "Confirmar"}
-              </button>
+          <div>
+            <div className="mb-1.5 flex items-center gap-2">
+              <p className="text-[12px] font-medium text-slate-600">Personas</p>
+              <span className="text-xs tabular-nums text-slate-500">{draft.people.size}/{crew.length}</span>
+              <div className="relative ml-auto w-56">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input value={peopleQ} onChange={(e) => setPeopleQ(e.target.value)} placeholder="Buscar" className="h-8 pl-7" aria-label="Buscar personas" />
+              </div>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {Array.from(crewByDept.keys()).map((d) => {
+                const ids = crew.filter((c) => deptOf(c) === d).map((c) => c.id);
+                const all = ids.every((i) => draft.people.has(i));
+                return (
+                  <button key={d} type="button" onClick={() => { const n = new Set(draft.people); ids.forEach((i) => (all ? n.delete(i) : n.add(i))); setDraft({ ...draft, people: n }); }}
+                    className={`rounded px-2 py-0.5 text-[11.5px] ${all ? "bg-slate-900 text-white" : "bg-[#F1F1F3] text-slate-600 hover:text-slate-900"}`}>{d} · {ids.length}</button>
+                );
+              })}
+            </div>
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
+              {peopleFiltered.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-slate-500">Sin resultados</p>}
+              {peopleFiltered.map((c) => (
+                <label key={c.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-1.5 text-[13px] last:border-0 hover:bg-[#FAFAFA]">
+                  <input type="checkbox" checked={draft.people.has(c.id)} onChange={() => { const n = new Set(draft.people); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); setDraft({ ...draft, people: n }); }} className="h-4 w-4 accent-slate-900" />
+                  <span className="flex-1 truncate text-slate-900">{c.firstName} {c.lastName1}</span>
+                  <span className="truncate text-xs text-slate-500">{c.role}</span>
+                  <span className="w-32 truncate text-right text-xs text-slate-500">{deptOf(c)}</span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Eliminar acceso"
+        footer={<>
+          <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
+          <Button variant="danger" onClick={() => confirmDelete && removeAccess(confirmDelete)}>Eliminar</Button>
+        </>}>
+        <p className="text-[13px] text-slate-700">El enlace de «{confirmDelete?.name}» dejará de funcionar.</p>
+      </Modal>
+    </Page>
   );
 }
