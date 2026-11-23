@@ -113,7 +113,7 @@ export async function createDemoProject(uid: string, person: { name: string; ema
     ["po2", "0002", "sup-luz", "Fotografía", "Iluminación y grupo electrógeno", [poItem("Material de iluminación", "05.02", 12400), poItem("Grupo electrógeno", "05.02", 2900)], { status: "approved", approvedAt: ts(-22) }],
     ["po3", "0003", "sup-carpinteria", "Arte", "Construcción del decorado de la casa", [poItem("Construcción decorado", "04.01", 21500)], { status: "approved", approvedAt: ts(-18) }],
     ["po4", "0004", "sup-catering", "Producción", "Catering semanas 1 a 4", [poItem("Catering 45 personas", "08.03", 15800, 10)], { status: "approved", approvedAt: ts(-15) }],
-    ["po5", "0005", "sup-hotel", "Producción", "Alojamiento del equipo en exteriores", [poItem("Habitaciones 12 noches", "08.01", 9600, 10)], { status: "pending", approvalSteps: [step()], currentApprovalStep: 0 }],
+    ["po5", "0005", "sup-hotel", "Producción", "Alojamiento del equipo en exteriores", [poItem("Habitaciones 12 noches", "08.01", 9600, 10)], { status: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }],
     ["po6", "0006", "sup-carpinteria", "Arte", "Atrezo de época", [poItem("Atrezo", "04.02", 3200)], { status: "draft" }],
   ];
   for (const [id, number, sid, department, desc, items, extra] of pos) {
@@ -140,12 +140,12 @@ export async function createDemoProject(uid: string, person: { name: string; ema
       createdAt: ts(invoiceDay + 1), createdBy: uid, createdByName: person.name, ...extra,
     });
   };
-  inv(1, "po1", "sup-rental", "Cámara y ópticas · semanas 1 y 2", "05.01", 6200, 21, { status: "submitted", approvedAt: ts(-12), codedAt: ts(-11), paidAt: ts(-4), paymentDate: ts(-4) }, -14, 16);
-  inv(2, "po1", "sup-rental", "Cámara y ópticas · semanas 3 y 4", "05.01", 6200, 21, { status: "submitted", approvedAt: ts(-2), codedAt: ts(-1) }, -3, 27);
-  inv(3, "po3", "sup-carpinteria", "Primer pago decorado (50 %)", "04.01", 10750, 21, { status: "submitted", approvedAt: ts(-6) }, -8, 2);
-  inv(4, "po4", "sup-catering", "Catering semanas 1 y 2", "08.03", 7900, 10, { status: "submitted", approvedAt: ts(-9), codedAt: ts(-8) }, -10, -1);
-  inv(5, "po2", "sup-luz", "Iluminación · primera quincena", "05.02", 7650, 21, { status: "submitted", approvalSteps: [step()], currentApprovalStep: 0 }, -2, 28);
-  inv(6, null, "sup-hotel", "Alojamiento localizaciones", "08.01", 1840, 10, { status: "submitted" }, -1, 29);
+  inv(1, "po1", "sup-rental", "Cámara y ópticas · semanas 1 y 2", "05.01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-12), codedAt: ts(-11), paidAt: ts(-4), paymentDate: ts(-4) }, -14, 16);
+  inv(2, "po1", "sup-rental", "Cámara y ópticas · semanas 3 y 4", "05.01", 6200, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-2), codedAt: ts(-1) }, -3, 27);
+  inv(3, "po3", "sup-carpinteria", "Primer pago decorado (50 %)", "04.01", 10750, 21, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-6) }, -8, 2);
+  inv(4, "po4", "sup-catering", "Catering semanas 1 y 2", "08.03", 7900, 10, { status: "submitted", approvalStatus: "approved", approvedAt: ts(-9), codedAt: ts(-8) }, -10, -1);
+  inv(5, "po2", "sup-luz", "Iluminación · primera quincena", "05.02", 7650, 21, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -2, 28);
+  inv(6, null, "sup-hotel", "Alojamiento localizaciones", "08.01", 1840, 10, { status: "submitted", approvalStatus: "pending", approvalSteps: [step()], currentApprovalStep: 0, approverIds: [uid] }, -1, 29);
   set(base.collection("counters").doc("invoices"), { last: 6 });
 
   // Crew
@@ -186,6 +186,29 @@ export async function createDemoProject(uid: string, person: { name: string; ema
   // Comprometido, realizado y facturado por PO a partir de los documentos.
   await syncProjectLedger(projectId, { write: true }).catch(() => {});
   return projectId;
+}
+
+/**
+ * Demos creadas antes de que los pendientes llevaran approvalStatus y
+ * approverIds: se completan al volver a entrar, para que se puedan aprobar.
+ */
+export async function repairDemoApprovals(projectId: string, uid: string) {
+  const base = db.collection("projects").doc(projectId);
+  const [pos, invs] = await Promise.all([base.collection("pos").where("status", "==", "pending").get(), base.collection("invoices").get()]);
+  const batch = db.batch();
+  let n = 0;
+  for (const d of pos.docs) if (!d.data().approverIds) { batch.update(d.ref, { approverIds: [uid] }); n++; }
+  for (const d of invs.docs) {
+    const x = d.data();
+    if (x.approvalStatus) continue;
+    if (x.approvedAt) batch.update(d.ref, { approvalStatus: "approved" });
+    else batch.update(d.ref, {
+      approvalStatus: "pending", currentApprovalStep: 0, approverIds: [uid],
+      approvalSteps: x.approvalSteps?.length ? x.approvalSteps : [{ id: "s1", order: 1, approverType: "role", roles: ["PM"], requireAll: false, approvers: [uid], approverNames: [""], approvedBy: [], rejectedBy: [], status: "pending" }],
+    });
+    n++;
+  }
+  if (n) await batch.commit();
 }
 
 /** Usuario desechable para la demo. */

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { createDemoProject, createDemoUser, hashToken } from "@/lib/server/demo";
+import { createDemoProject, createDemoUser, hashToken, repairDemoApprovals } from "@/lib/server/demo";
 
 export async function POST(req: NextRequest) {
   if (!(await rateLimit(`demo-start:${clientIp(req)}`, 20, 10 * 60 * 1000))) {
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       projectId = await createDemoProject(uid, { name: link.name, email: user.email });
       await db.collection("users").doc(uid).update({ demoProjectId: projectId, demoLinkId: ref.id });
       await ref.update({ uid, projectId, creating: FieldValue.delete(), firstOpenedAt: FieldValue.serverTimestamp() });
+    } else {
+      await repairDemoApprovals(projectId, uid).catch(() => {});
     }
     await ref.update({ lastOpenedAt: FieldValue.serverTimestamp(), opens: FieldValue.increment(1) });
     const customToken = await adminAuth.createCustomToken(uid, { demo: true });

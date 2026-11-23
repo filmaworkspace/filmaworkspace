@@ -17,8 +17,9 @@ import { inter } from "@/lib/fonts";
 const STEPS = [
   { path: "/accounting", exact: true, title: "Panel de contabilidad", hint: "Presupuesto, comprometido, realizado y lo que vence esta semana." },
   { path: "/accounting/budget", title: "Presupuesto", hint: "Cuentas y subcuentas con lo comprometido por las POs y lo realizado." },
-  { path: "/accounting/pos", title: "Órdenes de compra", hint: "La PO-0005 espera tu aprobación." },
-  { path: "/accounting/invoices", title: "Facturas", hint: "Aprueba la FAC-0005 y codifica la FAC-0006." },
+  { path: "/accounting/approvals", title: "Aprobaciones", hint: "La PO-0005 y las facturas FAC-0005 y FAC-0006 esperan tu aprobación." },
+  { path: "/accounting/pos", title: "Órdenes de compra", hint: "Crea una PO o abre una: si te toca aprobar, verás el botón en la ficha." },
+  { path: "/accounting/invoices", title: "Facturas", hint: "Codifica la FAC-0003, ya aprobada." },
   { path: "/accounting/payments", title: "Pagos", hint: "Prepara una remesa y descarga el fichero SEPA." },
   { path: "/team/crew", title: "Equipo", hint: "Crew por departamentos, fichas y formularios de alta." },
   { path: "/team/payroll", title: "Nóminas", hint: "Días trabajados, dietas y complementos del mes." },

@@ -840,6 +840,9 @@ export default function PODetailPage() {
       <main className="px-6 sm:px-10 py-8">
         <SupplierHeader projectId={projectId} supplierId={po.supplierId} name={po.supplier}
           meta={po.department || undefined} />
+        {po.status === "pending" && (
+          <div className="mb-6"><PendingApprovalNotice doc={po as any} onlyMine approve={permissions.userId ? { projectId, kind: "po", docId: poId, user: { uid: permissions.userId, name: permissions.userName || "" }, onDone: () => loadData() } : undefined} /></div>
+        )}
         <div className="grid grid-cols-3 gap-8">
           <div className="col-span-2 space-y-6">
             {po.generalDescription && (

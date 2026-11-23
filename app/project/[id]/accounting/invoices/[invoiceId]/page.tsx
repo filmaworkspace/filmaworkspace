@@ -285,7 +285,7 @@ interface GuaranteeReturn {
 // Keyed by display state (see getInvoiceDisplayState).
 const STATUS_CONFIG: Record<InvoiceDisplayState, { bg: string; text: string; label: string; icon: typeof Clock }> = {
   draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit },
-  submitted: { bg: "bg-amber-50", text: "text-amber-700", label: "En sistema", icon: Clock },
+  submitted: { bg: "bg-amber-50", text: "text-amber-700", label: "Pend. aprobación", icon: Clock },
   approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Aprobada", icon: CheckCircle },
   coded: { bg: "bg-[#F7F7F8]", text: "text-slate-900", label: "Codificada", icon: Code },
   accounted: { bg: "bg-teal-50", text: "text-teal-700", label: "Contabilizada", icon: Lock },
@@ -1009,6 +1009,9 @@ export default function InvoiceDetailPage() {
       <main className="px-6 sm:px-10 py-8">
         <SupplierHeader projectId={projectId} supplierId={invoice.supplierId} name={invoice.supplier}
           meta={[invoice.supplierNumber ? `Nº proveedor ${invoice.supplierNumber}` : null, invoice.poNumber ? `PO-${invoice.poNumber}` : null].filter(Boolean).join(" · ")} />
+        {!invoice.approvedAt && invoice.status !== "rejected" && invoice.approvalStatus !== "rejected" && (
+          <div className="mb-6"><PendingApprovalNotice doc={invoice as any} onlyMine approve={permissions.userId ? { projectId, kind: "invoice", docId: invoiceId, user: { uid: permissions.userId, name: permissions.userName || "" }, onDone: () => loadData() } : undefined} /></div>
+        )}
         {/* Banner de delegación a contabilidad */}
         {invoice.status === "coding" && invoice.delegatedToAccounting && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-md px-5 py-4">

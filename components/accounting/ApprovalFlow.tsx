@@ -4,7 +4,11 @@
 // estado, quién falta, pasos omitidos con su motivo y flujo bloqueado.
 
 import { Check, Minus, X, AlertTriangle, Clock } from "lucide-react";
-import { pendingSummary, stepLabel, type ApprovalStepState } from "@/lib/approvalFlow";
+import { useState } from "react";
+import { canApprove, pendingSummary, stepLabel, type ApprovalStepState } from "@/lib/approvalFlow";
+import { approveDoc, rejectDoc } from "@/lib/approvalOps";
+import { Button, Modal, Textarea } from "@/components/ds";
+import { toast } from "@/lib/toast";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -80,17 +84,51 @@ export function ApprovalSteps({ steps, current, department, preview = false, act
 }
 
 /** Banda "Pendiente de: …" para la cabecera de un documento. */
-export function PendingApprovalNotice({ doc, onRepair }: { doc: Parameters<typeof pendingSummary>[0]; onRepair?: () => void }) {
+/** Quien aprueba puede hacerlo desde la propia ficha del documento. */
+export interface ApproveContext { projectId: string; kind: "po" | "invoice"; docId: string; user: { uid: string; name: string }; onDone: () => void }
+
+export function PendingApprovalNotice({ doc, onRepair, approve, onlyMine }: { doc: Parameters<typeof pendingSummary>[0]; onRepair?: () => void; approve?: ApproveContext; /** Solo se pinta si le toca aprobar a quien mira. */ onlyMine?: boolean }) {
   const p = pendingSummary(doc);
+  const [busy, setBusy] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const mine = !!approve && canApprove(doc as never, approve.user.uid);
+  if (onlyMine && (!mine || p.state !== "pending")) return null;
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await fn(); toast.success(ok); setRejecting(false); setReason(""); approve!.onDone(); }
+    catch (e) { toast.error(e); }
+    finally { setBusy(false); }
+  };
   if (p.state === "pending") {
     return (
-      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-        <Clock size={15} className="mt-0.5 shrink-0" />
-        <div className="min-w-0">
-          <span className="font-medium">Pendiente de {p.waitingFor.map((w) => w.name).join(", ")}</span>
-          <span className="text-amber-700"> · Nivel {p.currentIndex + 1} de {(doc.approvalSteps || []).length}{p.rule ? ` · ${p.rule}` : ""}{p.remainingSteps.length ? ` · faltan ${p.remainingSteps.length} nivel${p.remainingSteps.length > 1 ? "es" : ""} más` : ""}</span>
+      <>
+        <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-[13px] ${mine ? "border-slate-300 bg-white text-slate-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+          <Clock size={15} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span className="font-medium">{mine ? "Te toca aprobar" : `Pendiente de ${p.waitingFor.map((w) => w.name).join(", ")}`}</span>
+            <span className={mine ? "text-slate-500" : "text-amber-700"}> · Nivel {p.currentIndex + 1} de {(doc.approvalSteps || []).length}{p.rule ? ` · ${p.rule}` : ""}{p.remainingSteps.length ? ` · faltan ${p.remainingSteps.length} nivel${p.remainingSteps.length > 1 ? "es" : ""} más` : ""}</span>
+          </div>
+          {mine && (
+            <span className="flex gap-2">
+              <Button variant="danger" size="sm" disabled={busy} onClick={() => setRejecting(true)}><X size={13} /> Rechazar</Button>
+              <Button variant="primary" size="sm" disabled={busy}
+                onClick={() => run(async () => { const r = await approveDoc(approve!.projectId, approve!.kind, approve!.docId, approve!.user); return r; }, "Aprobado")}>
+                <Check size={13} /> {busy ? "Aprobando…" : "Aprobar"}
+              </Button>
+            </span>
+          )}
         </div>
-      </div>
+        {mine && (
+          <Modal open={rejecting} onClose={() => setRejecting(false)} title="Rechazar"
+            footer={<>
+              <Button variant="ghost" onClick={() => setRejecting(false)}>Cancelar</Button>
+              <Button variant="danger" disabled={busy || !reason.trim()} onClick={() => run(() => rejectDoc(approve!.projectId, approve!.kind, approve!.docId, approve!.user, reason.trim()), "Rechazado")}>Rechazar</Button>
+            </>}>
+            <Textarea rows={3} autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo del rechazo" aria-label="Motivo del rechazo" />
+          </Modal>
+        )}
+      </>
     );
   }
   if (p.state === "blocked") {
