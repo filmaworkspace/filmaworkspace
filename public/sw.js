@@ -2,7 +2,7 @@
 // - Páginas: primero la red; sin conexión, la última copia o la página offline.
 // - Recursos de Next (/_next/static, inmutables) e iconos: primero la caché.
 // - Nada de Firebase ni de las APIs: siempre a la red (datos al día y privados).
-const VERSION = "filma-v1";
+const VERSION = "filma-v2";
 const SHELL = ["/offline.html", "/icons/icon-192.png", "/icons/apple-touch-icon.png", "/logodark.svg"];
 
 self.addEventListener("install", (e) => {
