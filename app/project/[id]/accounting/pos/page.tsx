@@ -8,6 +8,7 @@ import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { Modal, AnchoredPanel, Checkbox, EmptyState, IconButton, Menu, MenuItem, MenuSeparator, Page, PageHeader, PageLoading, Segmented, Select, buttonClass } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { ColumnFiltersBar, ColumnsMenu, SmartTable, useTableConfig, type Column } from "@/components/SmartTable";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ export default function POsPage() {
   } = useAccountingPermissions(id);
 
   const [projectName, setProjectName] = useState<string>("");
+  const [projectDepartments, setProjectDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [pos, setPos] = useState<PO[]>([]);
   const [filteredPOs, setFilteredPOs] = useState<PO[]>([]);
@@ -208,7 +210,7 @@ export default function POsPage() {
     try {
       setLoading(true);
       const projectDoc = await getDoc(doc(db, "projects", id));
-      if (projectDoc.exists()) setProjectName(projectDoc.data().name || "Proyecto");
+      if (projectDoc.exists()) { setProjectName(projectDoc.data().name || "Proyecto"); setProjectDepartments(projectDoc.data().departments || []); }
 
       // Solo lo que este usuario puede leer (ver lib/accountingScope)
       const posDocs = sortByTime(await getScopedDocs(collection(db, `projects/${id}/pos`), scopeFromPermissions(permissions)));
@@ -557,6 +559,116 @@ export default function POsPage() {
   };
 
 
+  // ── Tabla: columnas, orden, filtros y edición en línea ────────────────────
+  const canEditDept = (po: PO) => po.status !== "cancelled" && (permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)));
+  const PO_STATE_T: Record<POStatus, { label: string; dot: string; text: string }> = {
+    draft: { label: "Borrador", dot: "bg-slate-300", text: "text-slate-600" },
+    pending: { label: "Pend. aprobación", dot: "bg-amber-500", text: "text-amber-800" },
+    approved: { label: "Aprobada", dot: "bg-emerald-500", text: "text-emerald-800" },
+    closed: { label: "Cerrada", dot: "bg-slate-400", text: "text-slate-600" },
+    cancelled: { label: "Anulada", dot: "bg-slate-300", text: "text-slate-500 line-through" },
+  };
+  const poBase = (po: PO) => po.baseAmount || po.totalAmount || 0;
+  const livePOs = (rs: PO[]) => rs.filter((p) => p.status !== "cancelled");
+  const PO_COLUMNS: Column<PO>[] = [
+    {
+      key: "number", label: "Nº", locked: true, width: "w-28", className: "whitespace-nowrap",
+      sortValue: (p) => p.number, filter: { type: "text", value: (p) => `PO-${p.number}` },
+      render: (po) => {
+        const st = PO_STATE_T[po.status] || PO_STATE_T.draft;
+        return (
+          <>
+            <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
+            <span className="flex items-center gap-1.5">
+              <span className={`font-mono text-xs font-medium ${po.status === "cancelled" ? "line-through" : ""}`}>PO-{po.number}</span>
+              {po.version > 1 && <span className="font-mono text-[10px] text-slate-500">v{po.version}</span>}
+            </span>
+          </>
+        );
+      },
+    },
+    {
+      key: "state", label: "Estado", width: "w-36", className: "whitespace-nowrap",
+      sortValue: (p) => (PO_STATE_T[p.status] || PO_STATE_T.draft).label, filter: { type: "values", value: (p) => (PO_STATE_T[p.status] || PO_STATE_T.draft).label },
+      render: (p) => { const st = PO_STATE_T[p.status] || PO_STATE_T.draft; return <span className={`inline-flex items-center gap-1.5 text-xs ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span>; },
+    },
+    {
+      key: "supplier", label: "Proveedor y concepto", width: "min-w-[260px]",
+      sortValue: (p) => p.supplier || "", filter: { type: "values", value: (p) => p.supplier || "" },
+      render: (po) => (
+        <div className="max-w-[380px]" title={[po.supplier, po.generalDescription || po.description].filter(Boolean).join(" · ")}>
+          <div className={`truncate font-medium ${po.status === "cancelled" ? "" : po.supplier ? "text-slate-900" : "text-slate-500"}`}>{po.supplier || "Sin proveedor"}</div>
+          <div className="truncate text-xs text-slate-500">{po.generalDescription || po.description || <span className="text-slate-400">Sin concepto</span>}</div>
+        </div>
+      ),
+    },
+    {
+      key: "department", label: "Departamento", width: "w-40", className: "whitespace-nowrap text-slate-600",
+      sortValue: (p) => p.department || "", filter: { type: "values", value: (p) => p.department || "" },
+      render: (p) => p.department || <span className="text-slate-400">—</span>,
+      edit: {
+        type: "select", can: canEditDept, value: (p) => p.department || "",
+        options: Array.from(new Set([...projectDepartments, ...pos.map((p) => p.department || "").filter(Boolean)])).sort((a, b) => a.localeCompare(b, "es")),
+        save: async (p, v) => {
+          try {
+            await updateDoc(doc(db, `projects/${id}/pos`, p.id), { department: v, updatedAt: Timestamp.now(), updatedBy: permissions.userId });
+            setPos((list) => list.map((x) => (x.id === p.id ? { ...x, department: v } : x)));
+          } catch (e) { appToast.error(e); throw e; }
+        },
+      },
+    },
+    {
+      key: "account", label: "Cuentas", defaultHidden: true, className: "whitespace-nowrap",
+      filter: { type: "text", value: (p) => (p.items || []).map((x) => `${x.subAccountCode || ""} ${(x as any).subAccountDescription || ""}`).join(" ") },
+      render: (p) => {
+        const codes = Array.from(new Set((p.items || []).map((x) => x.subAccountCode).filter(Boolean)));
+        return codes.length ? <span className="font-mono text-xs text-slate-700">{codes.slice(0, 3).join(", ")}{codes.length > 3 ? ` +${codes.length - 3}` : ""}</span> : <span className="text-slate-400">—</span>;
+      },
+    },
+    {
+      key: "createdBy", label: "Creada por", defaultHidden: true, className: "whitespace-nowrap text-slate-600",
+      sortValue: (p) => p.createdByName || "", filter: { type: "values", value: (p) => p.createdByName || "" }, render: (p) => p.createdByName || "—",
+    },
+    {
+      key: "createdAt", label: "Fecha", className: "whitespace-nowrap tabular-nums text-slate-600", width: "w-32",
+      sortValue: (p) => p.createdAt?.getTime() ?? null, render: (p) => (p.createdAt ? formatDate(p.createdAt) : "—"),
+    },
+    {
+      key: "base", label: "Base", align: "right", className: "whitespace-nowrap tabular-nums text-xs font-medium",
+      sortValue: poBase, render: (p) => formatCurrency(poBase(p)),
+      footer: (rs) => formatCurrency(livePOs(rs).reduce((a, p) => a + poBase(p), 0)),
+    },
+    {
+      key: "total", label: "Total", align: "right", defaultHidden: true, className: "whitespace-nowrap tabular-nums text-xs text-slate-600",
+      sortValue: (p) => p.totalAmount || 0, render: (p) => formatCurrency(p.totalAmount),
+      footer: (rs) => formatCurrency(livePOs(rs).reduce((a, p) => a + (p.totalAmount || 0), 0)),
+    },
+    {
+      key: "invoiced", label: "Facturado", width: "w-36",
+      sortValue: (p) => (poBase(p) > 0 ? (p.invoicedAmount || 0) / poBase(p) : 0),
+      render: (po) => {
+        const base = poBase(po);
+        const pct = base > 0 ? Math.round(((po.invoicedAmount || 0) / base) * 100) : 0;
+        return po.status === "approved" || po.status === "closed" ? (
+          <span className="flex items-center gap-2" title={`${formatCurrency(po.invoicedAmount || 0)} facturado`}>
+            <span aria-hidden="true" className="flex h-[3px] w-16 overflow-hidden rounded-full bg-[#F1F1F3]">
+              <span className={pct >= 100 ? "bg-slate-500" : pct >= 90 ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(pct, 100)}%` }} />
+            </span>
+            <span className={`w-9 text-right text-xs tabular-nums ${pct >= 90 && pct < 100 ? "text-amber-800" : "text-slate-600"}`}>{pct} %</span>
+          </span>
+        ) : <span className="text-slate-400">—</span>;
+      },
+      footer: (rs) => <span className="font-normal text-slate-600">{formatCurrency(livePOs(rs).reduce((a, p) => a + (p.invoicedAmount || 0), 0))}</span>,
+    },
+    {
+      key: "remaining", label: "Pendiente", align: "right", defaultHidden: true, className: "whitespace-nowrap tabular-nums text-xs text-slate-600",
+      sortValue: (p) => poBase(p) - (p.invoicedAmount || 0),
+      render: (p) => (p.status === "approved" ? formatCurrency(poBase(p) - (p.invoicedAmount || 0)) : <span className="text-slate-400">—</span>),
+      footer: (rs) => formatCurrency(rs.filter((p) => p.status === "approved").reduce((a, p) => a + poBase(p) - (p.invoicedAmount || 0), 0)),
+    },
+  ];
+  const table = useTableConfig<PO>(`filma:table:pos:${permissions.userId || "anon"}`, PO_COLUMNS);
+
   if (permissionsLoading || loading) {
     return (
       <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
@@ -623,6 +735,7 @@ export default function POsPage() {
       const d = (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
       return poSort === "old" ? -d : d;
     });
+  const tableRows = table.apply(rows);
   const statusCount = (s: "all" | POStatus) => (s === "all" ? pos.length : pos.filter((p) => p.status === s).length);
   const supplierName = supplierParam ? pos.find((p) => p.supplierId === supplierParam)?.supplier : null;
   const filtersActive = deptFilter !== "all" || onlyMine || nearlyExhausted || !!supplierParam;
@@ -675,20 +788,13 @@ export default function POsPage() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <SearchBar fields={PO_FIELDS} field={poField} onField={setPoField} value={searchTerm} onChange={setSearchTerm} count={rows.length} />
+        <SearchBar fields={PO_FIELDS} field={poField} onField={setPoField} value={searchTerm} onChange={setSearchTerm} count={tableRows.length} />
         <div className="flex flex-wrap items-center justify-end gap-3">
-        {departments.length > 1 && (
-          <div className="w-44">
-            <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-              <option value="all">Todos los dptos.</option>
-              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-            </Select>
-          </div>
-        )}
-        <Segmented value={poSort} onChange={setPoSort} options={[{ value: "recent", label: "Recientes" }, { value: "old", label: "Antiguas" }, { value: "amount", label: "Importe" }]} />
+        <ColumnsMenu table={table} />
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-end gap-4">
+        <span className="mr-auto flex flex-wrap gap-2"><ColumnFiltersBar table={table} /></span>
         <Checkbox label="Solo mías" checked={onlyMine} onChange={setOnlyMine} />
         <Checkbox label="Casi agotadas (≥ 90 % facturado)" checked={nearlyExhausted} onChange={setNearlyExhausted} />
         {supplierName && (
@@ -696,96 +802,49 @@ export default function POsPage() {
             Proveedor: {supplierName} <X size={11} />
           </button>
         )}
-        {filtersActive && (
-          <button onClick={() => { setDeptFilter("all"); setOnlyMine(false); setNearlyExhausted(false); if (supplierParam) router.replace(`/project/${id}/accounting/pos`); }} className="text-xs text-slate-500 hover:text-slate-900">Quitar filtros</button>
+        {(filtersActive || table.activeFilters > 0) && (
+          <button onClick={() => { setDeptFilter("all"); setOnlyMine(false); setNearlyExhausted(false); table.clearFilters(); if (supplierParam) router.replace(`/project/${id}/accounting/pos`); }} className="text-xs text-slate-500 hover:text-slate-900">Quitar filtros</button>
         )}
       </div>
 
       <div className="mt-4">
-        {rows.length === 0 ? (
+        {tableRows.length === 0 ? (
           <EmptyState
             title={pos.length ? "Sin resultados" : "Sin órdenes de compra"}
             action={!pos.length && permissions.canCreatePO ? <Link href={`/project/${id}/accounting/pos/new`} className={buttonClass("primary", "sm")}>Nueva PO</Link> : undefined}
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="tbl w-full min-w-[1000px] border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                  <th scope="col" className="w-28 px-4 py-2 text-left font-medium">Nº</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Proveedor y concepto</th>
-                  <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Departamento</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium">Facturado</th>
-                  <th scope="col" className="w-12 py-2 pr-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((po) => {
-                  const base = po.baseAmount || po.totalAmount || 0;
-                  const pct = base > 0 ? Math.round((po.invoicedAmount / base) * 100) : 0;
-                  const st = PO_STATE[po.status] || PO_STATE.draft;
-                  const href = `/project/${id}/accounting/pos/${po.id}`;
-                  const poPerms = getPOPermissions(po);
-                  const dead = po.status === "cancelled";
-                  return (
-                    <tr key={po.id} className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${dead ? "text-slate-400" : ""}`} onClick={() => router.push(href)}>
-                      <td className="relative whitespace-nowrap px-4 py-1.5" title={st.label}>
-                        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${st.dot}`} />
-                        <span className="sr-only">{st.label}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className={`font-mono text-xs font-medium ${dead ? "line-through" : ""}`}>PO-{po.number}</span>
-                          {po.version > 1 && <span className="font-mono text-[10px] text-slate-500">v{po.version}</span>}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5" title={[po.supplier, po.generalDescription || po.description].filter(Boolean).join(" · ")}>
-                        <div className={`truncate font-medium ${dead ? "" : po.supplier ? "text-slate-900" : "text-slate-400"}`}>{po.supplier || "Sin proveedor"}</div>
-                        <div className="truncate text-xs text-slate-500">{po.generalDescription || po.description || <span className="text-slate-300">Sin concepto</span>}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-slate-600">{po.department || "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-xs font-medium">{formatCurrency(base)}</td>
-                      <td className="px-3 py-1.5">
-                        {po.status === "approved" || po.status === "closed" ? (
-                          <span className="flex items-center gap-2">
-                            <span aria-hidden="true" className="flex h-[3px] w-16 overflow-hidden rounded-full bg-[#F1F1F3]">
-                              <span className={pct >= 100 ? "bg-slate-500" : pct >= 90 ? "bg-amber-600" : "bg-[#2F52E0]"} style={{ width: `${Math.min(pct, 100)}%` }} />
-                            </span>
-                            <span className={`w-9 text-right text-xs tabular-nums ${pct >= 90 && pct < 100 ? "text-amber-800" : "text-slate-600"}`}>{pct} %</span>
-                          </span>
-                        ) : <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-1.5 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
-                          {(close) => (
-                            <>
-                              <MenuItem onClick={() => { close(); setPreviewPO(po); }}>Vista rápida</MenuItem>
-                              <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
-                              <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/document-center?doc=po:${po.id}`); }}>Ver en documentación</MenuItem>
-                              {po.status === "draft" && poPerms.canEdit && <MenuItem onClick={() => { close(); handleEditDraft(po); }}>Editar borrador</MenuItem>}
-                              {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
-                              {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}
-                              {(permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)) || po.createdBy === permissions.userId) && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
-                              {po.status === "approved" && poPerms.canClose && <MenuItem onClick={() => { close(); handleClosePO(po); }}>Cerrar</MenuItem>}
-                              {po.status === "approved" && poPerms.canCancel && (po.invoicedAmount || 0) === 0 && <MenuItem danger onClick={() => { close(); handleCancelPO(po); }}>Anular</MenuItem>}
-                              {po.status === "closed" && poPerms.canReopen && <MenuItem onClick={() => { close(); handleReopenPO(po); }}>Reabrir</MenuItem>}
-                            </>
-                          )}
-                        </Menu>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-slate-200 bg-[#F4F4F5] text-xs">
-                  <td className="px-4 py-2 font-semibold" colSpan={3}>Total {rows.length === pos.length ? "" : "filtrado "}sin anuladas</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(totals.base)}</td>
-                  <td className="px-3 py-2 tabular-nums text-slate-600">{formatCurrency(totals.invoiced)} facturado</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <SmartTable
+            table={table}
+            rows={tableRows}
+            allRows={rows}
+            rowKey={(p) => p.id}
+            onRowClick={(p) => router.push(`/project/${id}/accounting/pos/${p.id}`)}
+            rowClassName={(p) => (p.status === "cancelled" ? "text-slate-400" : "")}
+            footerLabel={`Total ${tableRows.length === pos.length ? "" : "filtrado "}sin anuladas`}
+            actions={(po) => {
+              const href = `/project/${id}/accounting/pos/${po.id}`;
+              const poPerms = getPOPermissions(po);
+              return (
+                <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle} className="-my-1"><MoreHorizontal size={15} /></IconButton>}>
+                  {(close) => (
+                    <>
+                      <MenuItem onClick={() => { close(); setPreviewPO(po); }}>Vista rápida</MenuItem>
+                      <MenuItem onClick={() => { close(); router.push(href); }}>Abrir</MenuItem>
+                      <MenuItem onClick={() => { close(); router.push(`/project/${id}/accounting/document-center?doc=po:${po.id}`); }}>Ver en documentación</MenuItem>
+                      {po.status === "draft" && poPerms.canEdit && <MenuItem onClick={() => { close(); handleEditDraft(po); }}>Editar borrador</MenuItem>}
+                      {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
+                      {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}
+                      {(permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)) || po.createdBy === permissions.userId) && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
+                      {po.status === "approved" && poPerms.canClose && <MenuItem onClick={() => { close(); handleClosePO(po); }}>Cerrar</MenuItem>}
+                      {po.status === "approved" && poPerms.canCancel && (po.invoicedAmount || 0) === 0 && <MenuItem danger onClick={() => { close(); handleCancelPO(po); }}>Anular</MenuItem>}
+                      {po.status === "closed" && poPerms.canReopen && <MenuItem onClick={() => { close(); handleReopenPO(po); }}>Reabrir</MenuItem>}
+                    </>
+                  )}
+                </Menu>
+              );
+            }}
+          />
         )}
       </div>
 
