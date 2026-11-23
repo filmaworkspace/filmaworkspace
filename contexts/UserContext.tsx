@@ -1,13 +1,14 @@
 "use client";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { arrayUnion, doc, getDoc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { roleRedirect } from "@/lib/homePath";
 
 interface UserData {
   uid: string;
@@ -34,6 +35,8 @@ interface UserContextType {
   updateUserName: (name: string) => void;
   refreshUser: () => Promise<void>;
   maintenance: MaintenanceState;
+  /** Hay una redirección en marcha: no pintar la página actual. */
+  redirecting: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -148,55 +151,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Redirecciones por rol — se ejecutan una vez que isLoading es false
+  // Redirecciones por rol. Se calculan al pintar (no después), y mientras
+  // haya una pendiente la app no enseña la página (MaintenanceGate), así no
+  // se ve ni un instante una pantalla que no corresponde.
+  const redirectTo = useMemo(() => {
+    if (isLoading) return null;
+    if (!user) return requiresAuth ? "/login" : null;
+    return roleRedirect(user, pathname);
+  }, [isLoading, user, pathname, requiresAuth]);
+
   useEffect(() => {
-    if (isLoading) return;
-
-    if (!user && requiresAuth) {
-      router.push("/login");
-      return;
-    }
-
-    if (!user) return;
-
-    const { role, companyId } = user;
-    const isAdmin = role === "admin";
-    const isSupportAgent = role === "support_agent";
-    const isCompanyUser = !!companyId;
-    const isAdminPage = pathname.startsWith("/admin");
-    const isDashboardPage = pathname === "/dashboard";
-    const isCompanyPage = pathname.startsWith("/companydashboard");
-
-    if (isAdmin) {
-      if (isDashboardPage) router.push("/admindashboard");
-      return;
-    }
-
-    if (isSupportAgent) {
-      // Los agentes de soporte solo operan desde /admindashboard (pestaña Soporte)
-      if (isDashboardPage || isCompanyPage) router.push("/admindashboard");
-      return;
-    }
-
-    if (isCompanyUser) {
-      if (isDashboardPage || isAdminPage) {
-        router.push(`/companydashboard/${companyId}`);
-        return;
-      }
-      if (isCompanyPage) {
-        const companyIdFromUrl = pathname.split("/")[2];
-        if (companyId !== companyIdFromUrl) {
-          router.push(`/companydashboard/${companyId}`);
-        }
-      }
-      return;
-    }
-
-    // Usuario normal
-    if (isAdminPage || isCompanyPage) {
-      router.push("/dashboard");
-    }
-  }, [isLoading, user, pathname]);
+    if (redirectTo) router.replace(redirectTo);
+  }, [redirectTo, router]);
 
   // Función para actualizar el nombre localmente (sin esperar a Firebase)
   const updateUserName = (name: string) => {
@@ -214,7 +180,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, isLoading, updateUserName, refreshUser, maintenance }}>
+    <UserContext.Provider value={{ user, isLoading, updateUserName, refreshUser, maintenance, redirecting: !!redirectTo }}>
       {children}
     </UserContext.Provider>
   );

@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { homePathFor } from "@/lib/homePath";
 import {
   browserLocalPersistence,
   browserSessionPersistence,
@@ -53,7 +55,7 @@ export default function LoginPage() {
       // a transient null auth state redirects the user back to login.
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
 
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
 
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email);
@@ -61,7 +63,10 @@ export default function LoginPage() {
         localStorage.removeItem("rememberedEmail");
       }
 
-      router.push("/dashboard");
+      // Directo a su página (admin, productora, usuario o móvil): nada de
+      // pasar por /dashboard y redirigir después.
+      const profile = await getDoc(doc(db, "users", cred.user.uid)).then((d) => d.data() || {}).catch(() => ({} as Record<string, unknown>));
+      router.replace(homePathFor({ role: profile.role as string, companyId: profile.companyId as string }, { mobile: window.innerWidth < 768 }));
     } catch (err: any) {
       const errorMessages: Record<string, string> = {
         "auth/invalid-email": "Email no válido",

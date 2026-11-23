@@ -1,6 +1,6 @@
 "use client";
 // ─── Framework ────────────────────────────────────────────────────────────────
-import { useEffect } from "react";
+import { useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { UserProvider } from "@/contexts/UserContext";
@@ -39,14 +39,20 @@ export default function ClientLayout({
 
   // En el móvil se usa la versión móvil (/m). Los enlaces a aprobaciones
   // (por ejemplo desde un email) van directos a la bandeja móvil; el resto de
-  // pantallas, al inicio móvil.
-  useEffect(() => {
-    if (isAuthPage) return;
-    if (pathname === "/mobile") { router.replace("/m"); return; }
-    if (isMobilePage) return;
-    if (window.innerWidth >= MOBILE_BREAKPOINT) return;
-    const appr = pathname?.match(/^\/project\/([^/]+)\/accounting\/approvals/);
-    router.replace(appr ? "/m/aprobaciones" : "/m");
+  // pantallas, al inicio móvil. Se decide antes de pintar (useLayoutEffect) y
+  // mientras se redirige no se enseña la versión de escritorio.
+  const [hold, setHold] = useState(false);
+  useLayoutEffect(() => {
+    let target: string | null = null;
+    if (!isAuthPage) {
+      if (pathname === "/mobile") target = "/m";
+      else if (!isMobilePage && window.innerWidth < MOBILE_BREAKPOINT) {
+        const appr = pathname?.match(/^\/project\/([^/]+)\/accounting\/approvals/);
+        target = appr ? "/m/aprobaciones" : "/m";
+      }
+    }
+    setHold(!!target);
+    if (target) router.replace(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -55,7 +61,7 @@ export default function ClientLayout({
       <ErrorReporter />
       <AppBanners isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard} />
       <MaintenanceGate isAuthPage={isAuthPage} isMobilePage={isMobilePage} isAdminDashboard={isAdminDashboard}>
-        {children}
+        {hold ? <div className="min-h-screen bg-white" /> : children}
       </MaintenanceGate>
       <Toaster />
     </UserProvider>

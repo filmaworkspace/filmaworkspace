@@ -34,7 +34,7 @@ export default function MaintenanceGate({
   isMobilePage: boolean;
   isAdminDashboard: boolean;
 }) {
-  const { user, maintenance } = useUser();
+  const { user, isLoading, maintenance, redirecting } = useUser();
   const pathname = usePathname();
 
   // Solo se activa el "tick" mientras el mantenimiento está programado —
@@ -51,6 +51,10 @@ export default function MaintenanceGate({
   const isActive = maintenance.enabled && startAtMs !== null && now >= startAtMs;
   const isExemptRoute = pathname === "/login";
   const isBlocked = isActive && !isAdmin && !isExemptRoute;
+
+  // Mientras se sabe quién es (y si hay que llevarle a otra página), pantalla
+  // en blanco: ni la cabecera ni la página que no le corresponde.
+  if (redirecting || (isLoading && !isAuthPage)) return <div className="min-h-screen bg-white" />;
 
   if (isBlocked) {
     return (
