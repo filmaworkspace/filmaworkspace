@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { db as adminDb } from "@/lib/firebase-admin";
 import { verifyCodeHtml, verifyCodeText } from "@/lib/emails/verify-code";
@@ -31,8 +34,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await sendEmail({
     to:      [email],
-    subject: `Filma Workspace | ${code} es tu código de verificación`,
-    html:    verifyCodeHtml({ name, code }),
+    subject: fillText(textOf("verify-code", "subject", await emailTexts("verify-code")), { nombre: (name || "").split(" ")[0], codigo: code }),
+    html:    verifyCodeHtml({ name, code }, await emailTexts("verify-code")),
     text:    verifyCodeText({ name, code }),
     tags:    [{ name: "type", value: "verify-code" }],
   });

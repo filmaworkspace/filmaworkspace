@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
@@ -85,12 +88,13 @@ export async function POST(req: NextRequest) {
       }
 
       const formUrl = `${base}/timesheet/${formId}`;
-      const subject = `${projectLabel} | Control horario ${formattedDate} #${jornada} (recordatorio)`;
+      const tx = await emailTexts("horario");
+      const subject = fillText(textOf("horario", "subject", tx), { nombre: recipient.name, proyecto: projectLabel, fecha: formattedDate, jornada }) + " (recordatorio)";
 
       const { error } = await sendEmail({
         to: [recipient.email],
         subject,
-        html: horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
+        html: horarioInviteHtml({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }, tx),
         text: horarioInviteText({ recipientName: recipient.name, projectName, projectLabel, date: formattedDate, jornada, formUrl, emailBody, contactName, contactMail }),
         tags: [{ name: "type", value: "horario-resend" }],
       });

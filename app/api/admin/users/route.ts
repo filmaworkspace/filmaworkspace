@@ -5,6 +5,9 @@ import { requireAdmin } from "@/lib/require-admin";
 import { logSecurityEvent } from "@/lib/server/securityLog";
 import { auditFromServer } from "@/lib/server/audit";
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { resetPasswordHtml, resetPasswordText } from "@/lib/emails/reset-password";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -105,8 +108,8 @@ export async function POST(req: NextRequest) {
         const resetUrl = await adminAuth.generatePasswordResetLink(target.email, { url: `${BASE_URL}/login` });
         const { error } = await sendEmail({
           to: [target.email],
-          subject: "Filma Workspace | Restablecer tu contraseña",
-          html: resetPasswordHtml({ name: target.name || "", resetUrl }),
+          subject: fillText(textOf("reset-password", "subject", await emailTexts("reset-password")), { nombre: (target.name || "").split(" ")[0] }),
+          html: resetPasswordHtml({ name: target.name || "", resetUrl }, await emailTexts("reset-password")),
           text: resetPasswordText({ name: target.name || "", resetUrl }),
           tags: [{ name: "type", value: "reset-password" }],
         }, undefined, { userId: uid, sentByAdmin: admin.uid });

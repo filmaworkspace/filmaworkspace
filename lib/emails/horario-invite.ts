@@ -1,3 +1,4 @@
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, codeBox, emailLayout, esc, escMultiline, facts, linkFallback, p, safeUrl, strong } from "./layout";
 
 interface HorarioInviteProps {
@@ -17,8 +18,11 @@ const DEFAULT_BODY = "Por favor, completa tu parte del control horario de hoy. S
 export function horarioInviteHtml({
   recipientName, projectName, date, jornada, formUrl,
   emailBody, contactName, contactMail,
-}: HorarioInviteProps): string {
-  const body = emailBody?.trim() || DEFAULT_BODY;
+}: HorarioInviteProps, custom?: EmailTexts): string {
+  const v = { nombre: recipientName, proyecto: projectName, fecha: date, jornada };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("horario", f, custom);
+  // El mensaje del proyecto (si lo hay) manda sobre el texto general.
+  const body = emailBody?.trim() || fillText(T("intro"), v) || DEFAULT_BODY;
   const contact = contactName || contactMail
     ? `Contacto: ${contactName ? esc(contactName) : ""}${contactName && contactMail ? " · " : ""}${contactMail ? `<a href="mailto:${esc(contactMail)}" style="color:#64748B;">${esc(contactMail)}</a>` : ""}<br/>`
     : "";
@@ -26,14 +30,14 @@ export function horarioInviteHtml({
     title: `Control horario ${date}`,
     preheader: `Rellena tu control horario del ${date}`,
     eyebrow: projectName,
-    heading: `Control horario · ${date}`,
+    heading: fillText(T("heading"), v),
     body:
       p(`Hola ${strong(esc(recipientName))},`) +
       p(escMultiline(body)) +
       facts([["Fecha", date], ["Jornada", `#${jornada}`]]) +
-      button(formUrl, "Rellenar control horario") +
+      button(formUrl, fillText(T("button"), v)) +
       linkFallback(formUrl),
-    footer: `${contact}Este enlace es personal: no lo reenvíes.`,
+    footer: `${contact}${fillInline(T("footer"), v)}`,
   });
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 // ─── Admin · Emails ──────────────────────────────────────────────────────────
 // Registro de todos los emails que envía Filma (a quién, qué plantilla,
 // cuándo) con su estado de entrega desde Resend (entregado, rebotado, spam,
@@ -11,10 +12,10 @@ import { useSearchParams } from "next/navigation";
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { Eye, RefreshCw, Send } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { Button, DataList, EmptyState, IconButton, Modal, Page, PageHeader, PageLoading, Select, useToast } from "@/components/ds";
+import { buttonClass, Button, DataList, EmptyState, IconButton, Modal, Page, PageHeader, PageLoading, Select, useToast } from "@/components/ds";
 import SearchBar, { SearchField } from "@/components/SearchBar";
 import { EMAIL_STATUS, TEMPLATE_LABEL } from "@/components/admin/emailStatus";
-import { EMAIL_SAMPLES, previewHtml } from "@/components/admin/emailSamples";
+import { previewHtml } from "@/components/admin/emailSamples";
 import { adminFetch, fmtDate, Pills, RowBar, timeAgo } from "@/components/admin/ui";
 
 interface Mail {
@@ -51,7 +52,6 @@ function EmailsInner() {
   const [template, setTemplate] = useState("all");
   const [period, setPeriod] = useState("30");
   const [openId, setOpenId] = useState<string | null>(params.get("open"));
-  const [preview, setPreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const load = async () => {
@@ -110,7 +110,7 @@ function EmailsInner() {
               </span>
             )}
             <IconButton label="Actualizar" onClick={load}><RefreshCw size={15} /></IconButton>
-            <Button onClick={() => setPreview(EMAIL_SAMPLES[0].id)}><Eye size={14} /> Plantillas</Button>
+            <Link href="/admindashboard/emails/templates" className={buttonClass("secondary")}><Eye size={14} /> Plantillas</Link>
           </>
         }
       />
@@ -184,17 +184,6 @@ function EmailsInner() {
         )}
       </Modal>
 
-      <Modal open={!!preview} onClose={() => setPreview(null)} title="Plantillas" width="max-w-3xl">
-        <div className="flex flex-col gap-3">
-          <div className="w-72">
-            <Select value={preview || ""} onChange={(e) => setPreview(e.target.value)}>
-              {EMAIL_SAMPLES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </Select>
-          </div>
-          {preview && <iframe title="Plantilla" srcDoc={previewHtml(EMAIL_SAMPLES.find((s) => s.id === preview)!.html())} className="h-[520px] w-full rounded-md border border-slate-200 bg-[#F4F4F5]" sandbox="" />}
-          <p className="text-xs text-slate-400">Con datos de ejemplo. Los datos reales de cada envío se escapan antes de meterlos en el email.</p>
-        </div>
-      </Modal>
     </Page>
   );
 }

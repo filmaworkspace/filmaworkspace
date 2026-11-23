@@ -9,6 +9,9 @@ import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase-admin";
 import { sendEmail, SIGN_EMAIL_FROM } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { signRequestHtml, signRequestText, signCompletedHtml, signCompletedText } from "@/lib/emails/sign";
 import { buildSignedPdf, signedFileName } from "@/lib/sign/render";
 import { plain, stableJson } from "@/lib/sign/hash";
@@ -92,10 +95,11 @@ export async function createSignRequest(input: CreateInput, meta: { ip: string; 
   if (refPath) await db.doc(refPath).update({ signRequestId: ref.id, signStatus: "pending", updatedAt: FieldValue.serverTimestamp() });
 
   const url = `${APP_URL}/sign/${token}`;
+  const txReq = await emailTexts("sign-request");
   const { error } = await sendEmail({
     to: email,
-    subject: `Para firmar: ${title}`,
-    html: signRequestHtml({ title, signerName: parties[1].name, issuerName: input.issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
+    subject: fillText(textOf("sign-request", "subject", txReq), { firmante: parties[1].name, emisor: input.issuer.name, documento: title }),
+    html: signRequestHtml({ title, signerName: parties[1].name, issuerName: input.issuer.name, message: data.message, url, expiresAt: data.expiresAt }, txReq),
     text: signRequestText({ title, signerName: parties[1].name, issuerName: input.issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
     tags: [{ name: "type", value: "sign-request" }],
     from: SIGN_EMAIL_FROM, replyTo: input.issuer.email || undefined,
@@ -194,10 +198,11 @@ export async function sendSignedCopies(ref: FirebaseFirestore.DocumentReference,
     attachment = { filename: signedFileName(r), content: Buffer.from(pdf.output("arraybuffer")).toString("base64"), contentType: "application/pdf" };
   } catch (e) { console.error("[sign] pdf", (e as Error).message); }
   const to = [...new Set(r.parties.map((p) => p.email).filter(Boolean))];
+  const txDone = await emailTexts("sign-completed");
   const { error } = await sendEmail({
     to,
-    subject: `Firmado: ${r.title}`,
-    html: signCompletedHtml({ title: r.title, parties: r.parties.map((p) => ({ name: p.name, at: p.signature?.signedAt || null })), docHash: r.docHash, attached: !!attachment }),
+    subject: fillText(textOf("sign-completed", "subject", txDone), { documento: r.title }),
+    html: signCompletedHtml({ title: r.title, parties: r.parties.map((p) => ({ name: p.name, at: p.signature?.signedAt || null })), docHash: r.docHash, attached: !!attachment }, txDone),
     text: signCompletedText({ title: r.title, parties: r.parties.map((p) => ({ name: p.name, at: p.signature?.signedAt || null })), docHash: r.docHash, attached: !!attachment }),
     tags: [{ name: "type", value: "sign-completed" }],
     from: SIGN_EMAIL_FROM, replyTo: r.parties.find((p) => p.side === "issuer")?.email || undefined,
@@ -225,7 +230,7 @@ export async function adminAction(id: string, action: "cancel" | "remind" | "res
     const issuer = data.parties.find((p) => p.side === "issuer")!;
     const { error } = await sendEmail({
       to: signer.email, subject: `Recordatorio: ${data.title} pendiente de firma`,
-      html: signRequestHtml({ title: data.title, signerName: signer.name, issuerName: issuer.name, message: data.message, url, expiresAt: Math.max(data.expiresAt, Date.now() + 7 * DAY), reminder: true }),
+      html: signRequestHtml({ title: data.title, signerName: signer.name, issuerName: issuer.name, message: data.message, url, expiresAt: Math.max(data.expiresAt, Date.now() + 7 * DAY), reminder: true }, await emailTexts("sign-request")),
       text: signRequestText({ title: data.title, signerName: signer.name, issuerName: issuer.name, message: data.message, url, expiresAt: data.expiresAt }),
       tags: [{ name: "type", value: "sign-request" }],
       from: SIGN_EMAIL_FROM, replyTo: issuer.email || undefined,

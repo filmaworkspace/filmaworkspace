@@ -1,4 +1,5 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
 import { NextRequest, NextResponse } from "next/server";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 import { requireUser } from "@/lib/require-auth";
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await sendEmail({
     to: [to],
     subject: `${projectLabel} | Recordatorio: completa tu ficha`,
-    html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
+    html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }, await emailTexts("ficha-invite")),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
     tags: [{ name: "type", value: "form-reminder" }],
   });

@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { horarioReviewHtml, horarioReviewText } from "@/lib/emails/horario-review";
@@ -35,12 +38,13 @@ export async function POST(req: NextRequest) {
     }, { merge: true });
 
     const reviewUrl = `${base}/timesheet-review/${raw}`;
-    const subject   = `${projectName} | Resumen de control horario`;
+    const tx        = await emailTexts("horario-review");
+    const subject   = fillText(textOf("horario-review", "subject", tx), { nombre: recipientName, proyecto: projectName });
 
     const { error } = await sendEmail({
       to:      [recipientEmail],
       subject,
-      html:    horarioReviewHtml({ recipientName, projectName, reviewUrl }),
+      html:    horarioReviewHtml({ recipientName, projectName, reviewUrl }, tx),
       text:    horarioReviewText({ recipientName, projectName, reviewUrl }),
       tags:    [{ name: "type", value: "horario-review" }],
     });

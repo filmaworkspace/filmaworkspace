@@ -3,6 +3,9 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase-admin";
 import { requireAdmin } from "@/lib/require-admin";
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { billingDocumentHtml, billingDocumentText } from "@/lib/emails/billing-document";
 import { auditFromServer } from "@/lib/server/audit";
 
@@ -32,10 +35,12 @@ export async function POST(req: NextRequest) {
     : [["Fecha", day(d.issueDate)], ...(d.projectName ? [["Proyecto", d.projectName] as [string, string]] : []), ["Total", eur(d.totalAmount)], ...(kind === "invoice" ? [["Vencimiento", day(d.dueDate)] as [string, string]] : [])];
   const data = { kind, number: d.number, clientName: d.client?.name || "", issuerName: d.issuer?.name || "Filma Workspace", rows, message: typeof message === "string" ? message.slice(0, 2000) : "" } as const;
 
+  const tid = kind === "quote" ? "billing-quote" : "billing-invoice";
+  const tx = kind === "rectifying" ? {} : await emailTexts(tid);
   const { error } = await sendEmail({
     to: emails,
-    subject: `${kind === "quote" ? "Presupuesto" : kind === "rectifying" ? "Factura rectificativa" : "Factura"} ${d.number} · ${data.issuerName}`,
-    html: billingDocumentHtml(data),
+    subject: kind === "rectifying" ? `Factura rectificativa ${d.number} · ${data.issuerName}` : fillText(textOf(tid, "subject", tx), { cliente: data.clientName, numero: d.number, emisor: data.issuerName }),
+    html: billingDocumentHtml(data, tx),
     text: billingDocumentText(data),
     tags: [{ name: "type", value: type === "quote" ? "billing-quote" : "billing-invoice" }],
     attachments: [{ filename: `${d.number}.pdf`, content: pdfBase64, contentType: "application/pdf" }],

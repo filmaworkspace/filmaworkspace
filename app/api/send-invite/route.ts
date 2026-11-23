@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { fichaInviteHtml, fichaInviteText } from "@/lib/emails/ficha-invite";
 import { requireUser } from "@/lib/require-auth";
@@ -12,6 +15,7 @@ export async function POST(req: NextRequest) {
     await req.json();
 
   const projectLabel = workingTitle || projectName;
+  const tx = await emailTexts("ficha-invite");
 
   if (!to || !firstName || !projectName || !formUrl || !memberId) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -19,8 +23,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await sendEmail({
     to: [to],
-    subject: `${projectLabel} | Completa tu ficha`,
-    html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }),
+    subject: fillText(textOf("ficha-invite", "subject", tx), { nombre: firstName, invitador: senderName, proyecto: projectLabel, rol: role }),
+    html: fichaInviteHtml({ firstName, projectName, role, formUrl, pin, senderName }, tx),
     text: fichaInviteText({ firstName, projectName, role, formUrl, pin, senderName }),
     tags: [{ name: "type", value: "ficha-invite" }],
   }, { idempotencyKey: `ficha-invite/${memberId}/${Date.now()}` });

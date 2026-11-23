@@ -1,3 +1,4 @@
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, codeBox, emailLayout, esc, escMultiline, facts, linkFallback, p, safeUrl, strong } from "./layout";
 
 interface HorarioReviewProps {
@@ -6,18 +7,19 @@ interface HorarioReviewProps {
   reviewUrl:     string;
 }
 
-export function horarioReviewHtml({ recipientName, projectName, reviewUrl }: HorarioReviewProps): string {
+export function horarioReviewHtml({ recipientName, projectName, reviewUrl }: HorarioReviewProps, custom?: EmailTexts): string {
+  const v = { nombre: recipientName, proyecto: projectName };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("horario-review", f, custom);
   return emailLayout({
     title: "Resumen de control horario",
     preheader: "Revisa tus jornadas de control horario",
     eyebrow: projectName,
-    heading: "Resumen de control horario",
+    heading: fillText(T("heading"), v),
     body:
-      p(`Hola ${strong(esc(recipientName))},`) +
-      p("Desde este enlace puedes revisar todos tus días de control horario del proyecto: los que has rellenado y los que te quedan pendientes.") +
-      button(reviewUrl, "Ver mis jornadas") +
+      fillRich(T("intro"), v, (h) => p(h)) +
+      button(reviewUrl, fillText(T("button"), v)) +
       linkFallback(reviewUrl),
-    footer: "Este enlace es personal: no lo reenvíes.",
+    footer: fillInline(T("footer"), v),
   });
 }
 

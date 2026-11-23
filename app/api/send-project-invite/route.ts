@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { projectInviteHtml, projectInviteText } from "@/lib/emails/project-invite";
 import { requireUser } from "@/lib/require-auth";
@@ -20,6 +23,7 @@ export async function POST(req: NextRequest) {
   } = await req.json();
 
   const projectLabel = workingTitle || projectName;
+  const tx = await emailTexts("project-invite");
 
   if (!invitedEmail || !inviteeName || !projectName || !projectId) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -31,8 +35,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await sendEmail({
     to:             [invitedEmail],
-    subject:        `${projectLabel} | ${invitedByName} te ha invitado`,
-    html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
+    subject:        fillText(textOf("project-invite", "subject", tx), { nombre: inviteeName.split(" ")[0], invitador: invitedByName, proyecto: projectLabel, rol: role ?? "" }),
+    html:           projectInviteHtml({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }, tx),
     text:           projectInviteText({ inviteeName, invitedByName, projectName, role: role ?? "", isExistingUser, loginUrl, registerUrl }),
     tags:           [{ name: "type", value: "project-invite" }],
   }, { idempotencyKey: `project-invite/${projectId}/${invitedEmail}` });

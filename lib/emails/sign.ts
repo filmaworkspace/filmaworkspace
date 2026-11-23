@@ -1,5 +1,6 @@
 // Emails de Filma Sign: solicitud de firma (con el enlace personal) y copia
 // firmada por todas las partes.
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, emailLayout, esc, escMultiline, facts, linkFallback, p, strong } from "./layout";
 
 const day = (ms: number) => new Date(ms).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" });
@@ -7,19 +8,21 @@ const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString("es-ES", {
 
 interface RequestEmail { title: string; signerName: string; issuerName: string; message: string; url: string; expiresAt: number; reminder?: boolean }
 
-export function signRequestHtml(d: RequestEmail) {
+export function signRequestHtml(d: RequestEmail, custom?: EmailTexts) {
+  const v = { firmante: d.signerName, emisor: d.issuerName, documento: d.title };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("sign-request", f, custom);
   return emailLayout({
     title: d.title,
     preheader: `${d.issuerName} te ha enviado ${d.title} para firmar`,
     eyebrow: d.reminder ? "Filma Sign · Recordatorio" : "Filma Sign",
-    heading: d.title,
+    heading: fillText(T("heading"), v),
     body:
-      p(`Hola ${strong(esc(d.signerName))}, ${esc(d.issuerName)} te ha enviado este documento para que lo revises y lo firmes. Ya está firmado por su parte.`) +
+      fillRich(T("intro"), v, (h) => p(h)) +
       (d.message ? p(escMultiline(d.message)) : "") +
-      button(d.url, "Revisar y firmar") +
+      button(d.url, fillText(T("button"), v)) +
       p(`El enlace es personal y vale hasta el ${esc(day(d.expiresAt))}. Al firmar recibirás una copia en PDF firmada por las dos partes.`, { muted: true, small: true }) +
       linkFallback(d.url),
-    footer: "Filma Sign · Filma Workspace",
+    footer: fillInline(T("footer"), v),
   });
 }
 
@@ -29,17 +32,20 @@ export function signRequestText(d: RequestEmail) {
 
 interface CompletedEmail { title: string; parties: { name: string; at: number | null }[]; docHash: string; attached: boolean }
 
-export function signCompletedHtml(d: CompletedEmail) {
+export function signCompletedHtml(d: CompletedEmail, custom?: EmailTexts) {
+  const v = { documento: d.title };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("sign-completed", f, custom);
   return emailLayout({
     title: `Firmado: ${d.title}`,
     preheader: `${d.title} está firmado por todas las partes`,
     eyebrow: "Filma Sign · Firmado",
-    heading: d.title,
+    heading: fillText(T("heading"), v),
     body:
-      p(`El documento está firmado por todas las partes.${d.attached ? " Tienes adjunta la copia en PDF con las firmas y el certificado de auditoría." : ""}`) +
+      fillRich(T("intro"), v, (h) => p(h)) +
+      (d.attached ? p("Tienes adjunta la copia en PDF con las firmas y el certificado de auditoría.") : "") +
       facts([...d.parties.map((x) => [x.name, when(x.at)] as [string, string]), ["Huella SHA-256", `${d.docHash.slice(0, 16)}…`]]) +
       p("Guarda este correo: es tu copia del documento firmado.", { muted: true, small: true }),
-    footer: "Filma Sign · Filma Workspace",
+    footer: fillInline(T("footer"), v),
   });
 }
 

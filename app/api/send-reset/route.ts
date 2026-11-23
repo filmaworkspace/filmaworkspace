@@ -1,4 +1,7 @@
 import { sendEmail } from "@/lib/emails/send";
+import { emailTexts } from "@/lib/emails/textsServer";
+import { fillText, textOf } from "@/lib/emails/texts";
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { resetPasswordHtml, resetPasswordText } from "@/lib/emails/reset-password";
@@ -39,8 +42,8 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await sendEmail({
       to:             [email],
-      subject:        "Filma Workspace | Restablecer tu contraseña",
-      html:           resetPasswordHtml({ name, resetUrl }),
+      subject:        fillText(textOf("reset-password", "subject", await emailTexts("reset-password")), { nombre: (name || "").split(" ")[0] }),
+      html:           resetPasswordHtml({ name, resetUrl }, await emailTexts("reset-password")),
       text:           resetPasswordText({ name, resetUrl }),
       tags:           [{ name: "type", value: "reset-password" }],
     }, { idempotencyKey: `reset-password/${email}/${Date.now()}` });

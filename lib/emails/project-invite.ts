@@ -1,3 +1,4 @@
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, codeBox, emailLayout, esc, escMultiline, facts, linkFallback, p, safeUrl, strong } from "./layout";
 
 interface ProjectInviteProps {
@@ -18,22 +19,24 @@ export function projectInviteHtml({
   isExistingUser,
   loginUrl    = "https://filmaworkspace.com/login",
   registerUrl = "https://filmaworkspace.com/register",
-}: ProjectInviteProps): string {
+}: ProjectInviteProps, custom?: EmailTexts): string {
   const firstName = (inviteeName || "").split(" ")[0];
   const ctaUrl = isExistingUser ? loginUrl : registerUrl;
+  const v = { nombre: firstName, invitador: invitedByName, proyecto: projectName, rol: role };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("project-invite", f, custom);
   return emailLayout({
     title: `Invitación a ${projectName}`,
     preheader: `${invitedByName} te ha invitado a ${projectName}`,
     eyebrow: "Invitación",
-    heading: projectName,
+    heading: fillText(T("heading"), v),
     body:
-      p(`Hola${firstName ? ` ${strong(esc(firstName))}` : ""}, ${strong(esc(invitedByName))} te ha invitado a unirte al proyecto${role ? ` como ${strong(esc(role))}` : ""}.`) +
+      fillRich(T("intro"), v, (h) => p(h)) +
       p(isExistingUser
         ? "Ya tienes cuenta en Filma Workspace: entra para aceptar la invitación."
         : "Para unirte, crea tu cuenta en Filma Workspace. Es gratis y solo te llevará un momento.") +
       button(ctaUrl, isExistingUser ? "Ver mi invitación" : "Crear mi cuenta") +
       linkFallback(ctaUrl),
-    footer: `Enviado por ${esc(invitedByName)} a través de Filma Workspace. Si no esperabas esta invitación, ignora este correo.`,
+    footer: fillInline(T("footer"), v),
   });
 }
 

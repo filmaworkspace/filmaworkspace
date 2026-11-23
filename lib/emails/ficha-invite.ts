@@ -1,3 +1,4 @@
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, codeBox, emailLayout, esc, escMultiline, facts, linkFallback, p, safeUrl, strong } from "./layout";
 
 interface FichaInviteProps {
@@ -16,19 +17,20 @@ export function fichaInviteHtml({
   formUrl,
   pin,
   senderName,
-}: FichaInviteProps): string {
+}: FichaInviteProps, custom?: EmailTexts): string {
+  const v = { nombre: firstName, invitador: senderName, proyecto: projectName, rol: role };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("ficha-invite", f, custom);
   return emailLayout({
     title: `Tu ficha para ${projectName}`,
     preheader: `${senderName} te ha invitado al equipo de ${projectName}`,
     eyebrow: projectName,
-    heading: "Completa tu ficha de alta",
+    heading: fillText(T("heading"), v),
     body:
-      p(`Hola ${strong(esc(firstName))}, ${strong(esc(senderName))} te ha invitado a formar parte del equipo de ${strong(esc(projectName))}${role ? ` como ${strong(esc(role))}` : ""}.`) +
-      p("Abre el formulario, introduce este PIN cuando te lo pida, rellena tus datos y envíalo.") +
+      fillRich(T("intro"), v, (h) => p(h)) +
       codeBox(pin, "Tu PIN de acceso al formulario") +
-      button(formUrl, "Completar mi ficha") +
+      button(formUrl, fillText(T("button"), v)) +
       linkFallback(formUrl),
-    footer: `Enviado por ${esc(senderName)} a través de Filma Workspace. El enlace es personal: no lo reenvíes.`,
+    footer: fillInline(T("footer"), v),
   });
 }
 

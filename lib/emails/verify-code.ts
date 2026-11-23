@@ -1,3 +1,4 @@
+import { fillInline, fillRich, fillText, textOf, type EmailTexts } from "./texts";
 import { button, codeBox, emailLayout, esc, escMultiline, facts, linkFallback, p, safeUrl, strong } from "./layout";
 
 interface VerifyCodeProps {
@@ -5,16 +6,18 @@ interface VerifyCodeProps {
   code: string;
 }
 
-export function verifyCodeHtml({ name, code }: VerifyCodeProps): string {
+export function verifyCodeHtml({ name, code }: VerifyCodeProps, custom?: EmailTexts): string {
   const firstName = (name || "").split(" ")[0];
+  const v = { nombre: firstName, codigo: code };
+  const T = (f: Parameters<typeof textOf>[1]) => textOf("verify-code", f, custom);
   return emailLayout({
     title: "Código de verificación",
     preheader: `Tu código de verificación es ${code}`,
-    heading: "Tu código de verificación",
+    heading: fillText(T("heading"), v),
     body:
-      p(`Hola${firstName ? ` ${strong(esc(firstName))}` : ""}, introduce este código en la pantalla de verificación para completar el registro.`) +
+      fillRich(T("intro"), v, (h) => p(h)) +
       codeBox(code, "Caduca en 10 minutos"),
-    footer: "Si no has pedido este código, ignora este correo.",
+    footer: fillInline(T("footer"), v),
   });
 }
 
