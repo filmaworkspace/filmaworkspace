@@ -134,10 +134,14 @@ interface POComparison {
 
 interface SupplierStats {
   totalPOs: number;
+  openPOs: number;
   totalInvoices: number;
+  invoicedBase: number;
   pendingAmount: number;
-  avgApprovalTime: number;
   lastTransaction: Date | null;
+  taxId?: string;
+  iban?: string;
+  certState: "verified" | "unverified" | "expired" | "none" | "noiban";
 }
 
 interface BoxExpensePreview {
@@ -199,6 +203,12 @@ interface PendingApproval {
   expenseCount?: number;
   cardName?: string;
   paymentDate?: string;
+  supplierNumber?: string;
+  invoiceDate?: Date;
+  dueDate?: Date;
+  vatAmount?: number;
+  irpfAmount?: number;
+  documentType?: string;
 }
 
 interface UserStats {
@@ -210,6 +220,28 @@ interface UserStats {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Bloque de información del documento (mismo estilo en toda la página). */
+function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+        <h3 className="text-[13px] font-medium text-slate-900">{title}</h3>
+        {aside && <span className="text-xs text-slate-500">{aside}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Barra fina con tramos (realizado, comprometido, este documento). */
+function Bar({ parts, total }: { parts: { value: number; cls: string }[]; total: number }) {
+  return (
+    <span aria-hidden="true" className="flex h-[4px] w-full overflow-hidden rounded-full bg-[#F1F1F3]">
+      {parts.map((p, k) => <span key={k} className={p.cls} style={{ width: `${total > 0 ? Math.max(0, Math.min(100, (p.value / total) * 100)) : 0}%` }} />)}
+    </span>
+  );
+}
 
 export default function ApprovalsPage() {
   const params = useParams();
@@ -315,6 +347,7 @@ export default function ApprovalsPage() {
             currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
             attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
             items: d.items || [], department: d.department, poType: d.poType, currency: d.currency || "EUR",
+            vatAmount: d.vatAmount || 0, irpfAmount: d.irpfAmount || 0,
             timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "po", subAccountsMap),
             budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "po", false),
             supplierStats: await loadSupplierStats(d.supplierId), daysWaiting, isUrgent: daysWaiting >= 3,
@@ -342,7 +375,9 @@ export default function ApprovalsPage() {
               createdByName: d.createdByName || membersMap[d.createdBy] || "Usuario",
               currentApprovalStep: d.currentApprovalStep || 0, approvalSteps: (withNames(d as any, memberList).approvalSteps || []) as any,
               attachmentUrl: d.attachmentUrl, attachmentFileName: d.attachmentFileName,
-              items: d.items || [], poId: d.poId, poNumber: d.poNumber,
+              items: d.items || [], poId: d.poId, poNumber: d.poNumber, department: d.department,
+              supplierNumber: d.supplierNumber || "", invoiceDate: d.invoiceDate?.toDate?.(), dueDate: d.dueDate?.toDate?.(),
+              vatAmount: d.vatAmount || 0, irpfAmount: d.irpfAmount || 0, documentType: d.documentType || "invoice",
               timeline: buildTimeline(d, membersMap), autoChecks: buildAutoChecks(d, "invoice", subAccountsMap),
               budgetImpact: calculateBudgetImpact(d.items || [], subAccountsMap, "invoice", !!d.poId),
               supplierStats: await loadSupplierStats(d.supplierId), poComparison, daysWaiting, isUrgent: daysWaiting >= 3,
@@ -437,6 +472,31 @@ export default function ApprovalsPage() {
         }
       } catch (e) {}
 
+      // Comprobaciones con datos de otros documentos y del proveedor.
+      for (const a of approvals) {
+        if (a.type === "box") continue;
+        const st = a.supplierStats;
+        if (st) {
+          a.autoChecks.push(
+            st.certState === "verified" ? { id: "iban", label: "Cuenta bancaria", status: "pass", message: "Certificado de titularidad verificado" }
+            : st.certState === "noiban" ? { id: "iban", label: "Cuenta bancaria", status: "warning", message: "El proveedor no tiene IBAN" }
+            : { id: "iban", label: "Cuenta bancaria", status: "warning", message: st.certState === "unverified" ? "Certificado sin verificar" : st.certState === "expired" ? "Certificado caducado" : "Sin certificado de titularidad" },
+          );
+        }
+        if (a.poComparison && a.poComparison.remaining < -0.005) {
+          a.autoChecks.push({ id: "po-over", label: `PO-${a.poComparison.poNumber}`, status: "fail", message: `La supera en ${formatCurrency(-a.poComparison.remaining)}` });
+        }
+        if (a.type === "invoice" && a.supplierNumber && a.supplierId) {
+          const dup = (await scopedDocs("invoices", "supplierId", "==", a.supplierId)).docs.find((x) => x.id !== a.documentId && (x.data().supplierNumber || "").trim().toUpperCase() === a.supplierNumber!.trim().toUpperCase() && !["cancelled", "void"].includes(x.data().status));
+          if (dup) a.autoChecks.push({ id: "dup", label: "Posible duplicado", status: "fail", message: `${dup.data().displayNumber} tiene el mismo número de proveedor` });
+        }
+        if (a.type === "invoice" && a.dueDate) {
+          const days = Math.round((a.dueDate.getTime() - Date.now()) / 86400000);
+          if (days < 0) a.autoChecks.push({ id: "due", label: "Vencimiento", status: "warning", message: `Vencida hace ${-days} ${-days === 1 ? "día" : "días"}` });
+          else if (days <= 7) a.autoChecks.push({ id: "due", label: "Vencimiento", status: "info", message: days === 0 ? "Vence hoy" : `Vence en ${days} ${days === 1 ? "día" : "días"}` });
+        }
+      }
+
       approvals.sort((a, b) => { if (a.isUrgent && !b.isUrgent) return -1; if (!a.isUrgent && b.isUrgent) return 1; return b.createdAt.getTime() - a.createdAt.getTime(); });
       setPendingApprovals(approvals);
       setFilteredApprovals(approvals);
@@ -487,13 +547,27 @@ export default function ApprovalsPage() {
   const loadSupplierStats = async (supplierId?: string): Promise<SupplierStats | undefined> => {
     if (!supplierId) return undefined;
     try {
-      let totalPOs = 0, totalInvoices = 0, pendingAmount = 0;
+      const [posSnap, invSnap, supSnap] = await Promise.all([
+        scopedDocs("pos", "supplierId", "==", supplierId),
+        scopedDocs("invoices", "supplierId", "==", supplierId).catch(() => ({ docs: [] as any[], size: 0, empty: true })),
+        getDoc(doc(db, `projects/${id}/suppliers`, supplierId)).catch(() => null),
+      ]);
+      let openPOs = 0, invoicedBase = 0, pendingAmount = 0;
       let lastTransaction: Date | null = null;
-      const posSnap = await scopedDocs("pos", "supplierId", "==", supplierId);
-      totalPOs = posSnap.size;
-      for (const poDoc of posSnap.docs) { const d = poDoc.data(); if (d.status === "pending") pendingAmount += d.totalAmount || 0; const created = d.createdAt?.toDate(); if (created && (!lastTransaction || created > lastTransaction)) lastTransaction = created; }
-      try { const invSnap = await scopedDocs("invoices", "supplierId", "==", supplierId); totalInvoices = invSnap.size; for (const invDoc of invSnap.docs) { const d = invDoc.data(); if (d.status === "pending" || d.status === "pending_approval") pendingAmount += d.totalAmount || 0; } } catch (e) {}
-      return { totalPOs, totalInvoices, pendingAmount, avgApprovalTime: 0, lastTransaction };
+      const seen = (dt?: Date) => { if (dt && (!lastTransaction || dt > lastTransaction)) lastTransaction = dt; };
+      for (const d of posSnap.docs.map((x) => x.data())) { if (d.status === "approved") openPOs++; seen(d.createdAt?.toDate()); }
+      for (const d of invSnap.docs.map((x: any) => x.data())) {
+        if (["cancelled", "void", "rejected"].includes(d.status)) continue;
+        invoicedBase += d.baseAmount || 0;
+        if (!d.paidAt && d.status !== "paid") pendingAmount += d.totalAmount || 0;
+        seen(d.invoiceDate?.toDate?.() || d.createdAt?.toDate?.());
+      }
+      const sup = supSnap?.data();
+      const iban = (sup?.bankAccount || sup?.iban || "").replace(/\s+/g, "");
+      const cert = sup?.certificates?.bankOwnership;
+      const exp = cert?.expiryDate?.toDate?.();
+      const certState: SupplierStats["certState"] = !iban ? "noiban" : cert?.verified ? (exp && exp < new Date() ? "expired" : "verified") : cert?.uploaded ? "unverified" : "none";
+      return { totalPOs: posSnap.size, openPOs, totalInvoices: invSnap.size, invoicedBase, pendingAmount, lastTransaction, taxId: sup?.taxId, iban, certState };
     } catch (e) { return undefined; }
   };
 
@@ -515,7 +589,7 @@ export default function ApprovalsPage() {
           if (poItemIndex >= 0 && poItemIndex < poItems.length) {
             const poItem = poItems[poItemIndex];
             const diff = (invItem.baseAmount || 0) - (poItem.baseAmount || 0);
-            if (Math.abs(diff) > 0.01) itemDiscrepancies.push({ description: invItem.description || poItem.description, poAmount: poItem.baseAmount || 0, invoiceAmount: invItem.baseAmount || 0, difference: diff });
+            if (diff > 0.01) itemDiscrepancies.push({ description: invItem.description || poItem.description, poAmount: poItem.baseAmount || 0, invoiceAmount: invItem.baseAmount || 0, difference: diff });
           }
         }
       }
@@ -540,16 +614,24 @@ export default function ApprovalsPage() {
   const buildAutoChecks = (docData: any, type: "po" | "invoice", subAccountsMap: Record<string, any>): AutoCheck[] => {
     const checks: AutoCheck[] = [];
     const items = docData.items || [];
-    const totalAmount = docData.totalAmount || 0;
-    checks.push({ id: "attachment", label: "Documento adjunto", status: docData.attachmentUrl ? "pass" : "warning", message: docData.attachmentUrl ? "Archivo adjunto disponible" : "Sin documento adjunto" });
-    let hasBudgetIssue = false, budgetMessage = "Todas las cuentas tienen presupuesto";
-    let budgetChecked = false;
-    for (const item of items) { if (item.subAccountId && subAccountsMap[item.subAccountId]?.hasFigure) { budgetChecked = true; const sub = subAccountsMap[item.subAccountId]; if (sub.available < (item.baseAmount || item.totalAmount || 0)) { hasBudgetIssue = true; budgetMessage = `${sub.code} supera el presupuesto`; break; } } }
-    // Sin acceso a las cifras de presupuesto no se puede comprobar: no se muestra.
-    if (budgetChecked) checks.push({ id: "budget", label: "Presupuesto disponible", status: hasBudgetIssue ? "fail" : "pass", message: budgetMessage });
-    checks.push({ id: "supplier", label: "Proveedor", status: docData.supplierId ? "pass" : "info", message: docData.supplierId ? "Proveedor registrado" : "Proveedor no vinculado" });
-    if (totalAmount > 25000) checks.push({ id: "amount-high", label: "Importe elevado", status: "warning", message: `Superior a 25.000 €`, details: "Puede requerir aprobaciones adicionales" });
-    if (type === "invoice") { if (docData.poId) checks.push({ id: "po-link", label: "Vinculación a PO", status: "pass", message: `Vinculada a PO-${docData.poNumber}` }); else checks.push({ id: "po-link", label: "Vinculación a PO", status: "info", message: "Sin PO asociada" }); }
+    // La factura tiene que traer su documento; en una PO es opcional.
+    if (type === "invoice") checks.push({ id: "attachment", label: "Documento", status: docData.attachmentUrl ? "pass" : "warning", message: docData.attachmentUrl ? "Adjunto" : "Sin documento adjunto" });
+    else if (docData.attachmentUrl) checks.push({ id: "attachment", label: "Documento", status: "pass", message: "Presupuesto del proveedor adjunto" });
+    const noAccount = items.filter((it: any) => !it.subAccountId).length;
+    if (noAccount) checks.push({ id: "accounts", label: "Cuentas", status: "fail", message: `${noAccount} ${noAccount === 1 ? "línea sin cuenta" : "líneas sin cuenta"}` });
+    // Presupuesto por subcuenta (solo con acceso a las cifras).
+    const bySub: Record<string, number> = {};
+    for (const it of items) if (it.subAccountId) bySub[it.subAccountId] = (bySub[it.subAccountId] || 0) + (it.baseAmount || 0);
+    const over = Object.entries(bySub).filter(([sid, amt]) => subAccountsMap[sid]?.hasFigure && subAccountsMap[sid].available < amt - 0.005 && !(type === "invoice" && docData.poId));
+    if (Object.keys(bySub).some((sid) => subAccountsMap[sid]?.hasFigure)) {
+      checks.push(over.length
+        ? { id: "budget", label: "Presupuesto", status: "fail", message: `${over.map(([sid]) => subAccountsMap[sid].code).join(", ")} sin disponible suficiente` }
+        : { id: "budget", label: "Presupuesto", status: "pass", message: "Hay disponible en todas las cuentas" });
+    }
+    if (!docData.supplierId) checks.push({ id: "supplier", label: "Proveedor", status: "warning", message: "No está dado de alta" });
+    if (type === "invoice") checks.push(docData.poId
+      ? { id: "po-link", label: "PO", status: "pass", message: `Vinculada a PO-${docData.poNumber}` }
+      : { id: "po-link", label: "PO", status: "info", message: "Sin PO: el gasto se realiza directamente" });
     return checks;
   };
 
@@ -666,14 +748,21 @@ export default function ApprovalsPage() {
   const formatDate = (date: Date) => new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(date);
   const formatDateTime = (date: Date) => new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
   const formatCurrency = (amount: number, currency: string = "EUR") => { const s: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" }; return `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(amount || 0)} ${s[currency] || currency}`; };
-  const getCheckIcon = (status: AutoCheck["status"]) => { switch (status) { case "pass": return <CheckCircle size={14} className="text-emerald-500" />; case "warning": return <AlertTriangle size={14} className="text-amber-500" />; case "fail": return <XCircle size={14} className="text-red-500" />; case "info": return <Info size={14} className="text-blue-500" />; } };
-  const getCheckBg = (status: AutoCheck["status"]) => { switch (status) { case "pass": return "bg-emerald-50 border-emerald-200"; case "warning": return "bg-amber-50 border-amber-200"; case "fail": return "bg-red-50 border-red-200"; case "info": return "bg-blue-50 border-blue-200"; } };
-
   if (loading) return <PageLoading />;
 
   const urgentCount = pendingApprovals.filter((a) => a.isUrgent).length;
   const typeLabel = (t: "all" | "po" | "invoice" | "box") => (t === "all" ? "Todos" : t === "po" ? "POs" : t === "invoice" ? "Facturas" : "Cajas");
-  const checkTone = (s: AutoCheck["status"]) => (s === "pass" ? "bg-emerald-500" : s === "warning" ? "bg-amber-500" : s === "fail" ? "bg-red-500" : "bg-slate-400");
+  const typeCode = (a: PendingApproval) => (a.type === "po" ? "PO" : a.type === "box" ? (a.boxType === "card" ? "TAR" : "TRF") : a.documentType === "proforma" ? "PRF" : a.documentType === "guarantee" ? "FNZ" : "FRA");
+  const typeName = (a: PendingApproval) => (a.type === "po" ? "Orden de compra" : a.type === "box" ? (a.boxType === "card" ? "Sobre de tarjeta" : "Sobre de transferencias") : a.documentType === "proforma" ? "Proforma" : a.documentType === "guarantee" ? "Fianza" : "Factura");
+  const DOT: Record<AutoCheck["status"], string> = { pass: "bg-emerald-500", warning: "bg-amber-500", fail: "bg-red-500", info: "bg-slate-400" };
+  const worstOf = (a: PendingApproval) => (a.autoChecks.some((c) => c.status === "fail") ? "fail" : a.autoChecks.some((c) => c.status === "warning") ? "warning" : null);
+  const days = (n: number) => (n === 0 ? "hoy" : `${n} ${n === 1 ? "día" : "días"}`);
+  const levelOf = (a: PendingApproval) => {
+    const steps = (a.approvalSteps || []).filter((x) => (x as any).status !== "skipped");
+    const i = Math.max(0, steps.findIndex((x) => x === a.approvalSteps[a.currentApprovalStep]));
+    return steps.length ? `Nivel ${i + 1} de ${steps.length}` : "";
+  };
+  const a = currentApproval;
 
   return (
     <Page>
@@ -681,17 +770,15 @@ export default function ApprovalsPage() {
         title={
           <>
             Aprobaciones <span className="text-[15px] font-normal text-slate-400">{pendingApprovals.length}</span>
-            {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 text-xs font-normal text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{urgentCount} {urgentCount === 1 ? "urgente" : "urgentes"}</span>}
+            {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 text-xs font-normal text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{urgentCount} {urgentCount === 1 ? "esperando más de 3 días" : "esperan más de 3 días"}</span>}
           </>
         }
         actions={
-          filteredApprovals.length > 0 ? (
-            <span className="hidden items-center gap-3 text-[11px] text-slate-500 lg:flex">
-              {[["J", "siguiente"], ["K", "anterior"], ["A", "aprobar"], ["R", "rechazar"]].map(([k, l]) => (
-                <span key={k} className="inline-flex items-center gap-1"><kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 tabular-nums text-[10px] text-slate-600">{k}</kbd>{l}</span>
-              ))}
-            </span>
-          ) : undefined
+          <span className="hidden items-center gap-4 text-xs text-slate-500 md:flex">
+            <span><span className="tabular-nums text-slate-900">{userStats.approvedToday}</span> hoy</span>
+            <span><span className="tabular-nums text-slate-900">{userStats.approvedThisWeek}</span> esta semana</span>
+            <span><span className="tabular-nums text-slate-900">{userStats.approvedThisMonth}</span> este mes</span>
+          </span>
         }
       />
 
@@ -699,15 +786,10 @@ export default function ApprovalsPage() {
         <SearchBar fields={APPROVAL_FIELDS} field={apprField} onField={setApprField} value={apprSearch} onChange={setApprSearch} count={filteredApprovals.length} />
         <div className="flex gap-0.5 rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="tablist" aria-label="Tipo">
           {(["all", "po", "invoice", "box"] as const).map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={typeFilter === t}
-              onClick={() => setTypeFilter(t)}
-              className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${typeFilter === t ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}
-            >
+            <button key={t} role="tab" aria-selected={typeFilter === t} onClick={() => setTypeFilter(t)}
+              className={`flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors ${typeFilter === t ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"}`}>
               {typeLabel(t)}
-              <span className="tabular-nums text-slate-400">{t === "all" ? pendingApprovals.length : pendingApprovals.filter((a) => a.type === t).length}</span>
+              <span className="tabular-nums text-slate-400">{t === "all" ? pendingApprovals.length : pendingApprovals.filter((x) => x.type === t).length}</span>
             </button>
           ))}
         </div>
@@ -717,304 +799,320 @@ export default function ApprovalsPage() {
         {filteredApprovals.length === 0 ? (
           <EmptyState title={apprSearch || typeFilter !== "all" ? "Sin resultados" : userStats.approvedThisWeek > 0 ? `Todo al día · ${userStats.approvedThisWeek} aprobados esta semana` : "Todo al día"} />
         ) : (
-          <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
             {/* Cola */}
-            <div className="overflow-hidden rounded-lg border border-slate-200 lg:sticky lg:top-[85px] lg:max-h-[calc(100vh-110px)] lg:overflow-y-auto">
-              {filteredApprovals.map((approval, index) => {
-                const worst = approval.autoChecks.some((c) => c.status === "fail") ? "fail" : approval.autoChecks.some((c) => c.status === "warning") ? "warning" : null;
-                const on = index === currentIndex;
-                return (
-                  <button
-                    key={approval.id}
-                    onClick={() => setCurrentIndex(index)}
-                    className={`relative flex w-full flex-col gap-0.5 border-b border-slate-100 px-3.5 py-2.5 text-left last:border-0 ${on ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}
-                  >
-                    {on && <span className="absolute inset-y-0 left-0 w-[2px] bg-slate-900" />}
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 font-mono text-xs font-medium">
-                        {approval.displayNumber}
-                        {approval.isUrgent && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Urgente" />}
+            <div className="lg:sticky lg:top-[85px]">
+              <div className="overflow-hidden rounded-lg border border-slate-200 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto">
+                {filteredApprovals.map((x, index) => {
+                  const worst = worstOf(x);
+                  const on = index === currentIndex;
+                  return (
+                    <button key={x.id} onClick={() => setCurrentIndex(index)} aria-current={on}
+                      className={`relative flex w-full flex-col gap-1 border-b border-slate-100 px-3.5 py-2.5 text-left last:border-0 ${on ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
+                      {on && <span className="absolute inset-y-0 left-0 w-[2px] bg-slate-900" />}
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="w-7 font-mono text-[10px] text-slate-500">{typeCode(x)}</span>
+                          <span className="font-mono text-xs font-medium text-slate-900">{x.displayNumber}</span>
+                        </span>
+                        <span className="text-[13px] font-medium tabular-nums text-slate-900">{formatCurrency(x.baseAmount, x.currency)}</span>
                       </span>
-                      <span className="tabular-nums text-xs">{formatCurrency(approval.baseAmount, approval.currency)}</span>
-                    </span>
-                    <span className="flex items-center justify-between gap-2 text-xs text-slate-500">
-                      <span className="truncate">{approval.supplier}</span>
-                      <span className="flex flex-shrink-0 items-center gap-1.5">
-                        {worst && <span className={`h-1.5 w-1.5 rounded-full ${worst === "fail" ? "bg-red-500" : "bg-amber-500"}`} title={worst === "fail" ? "Hay comprobaciones fallidas" : "Hay avisos"} />}
-                        {approval.daysWaiting > 0 ? `${approval.daysWaiting} d` : "hoy"}
+                      <span className="flex items-center justify-between gap-2 pl-9 text-xs text-slate-500">
+                        <span className="truncate">{x.supplier || "Sin proveedor"}</span>
+                        <span className="flex flex-shrink-0 items-center gap-1.5">
+                          {worst && <span className={`h-1.5 w-1.5 rounded-full ${DOT[worst]}`} title={worst === "fail" ? "Hay comprobaciones que fallan" : "Hay avisos"} />}
+                          <span className={x.isUrgent ? "text-red-700" : ""}>{x.daysWaiting > 0 ? `${x.daysWaiting} d` : "hoy"}</span>
+                        </span>
                       </span>
-                    </span>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 hidden items-center gap-3 text-[11px] text-slate-500 lg:flex">
+                {[["J", "siguiente"], ["K", "anterior"], ["A", "aprobar"], ["R", "rechazar"]].map(([k, l]) => (
+                  <span key={k} className="inline-flex items-center gap-1"><kbd className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 text-[10px] text-slate-600">{k}</kbd>{l}</span>
+                ))}
+              </p>
             </div>
 
             {/* Documento */}
-            <div className="flex min-w-0 flex-col gap-4">
-              {currentApproval && (
-                <>
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="flex items-center gap-2">
-                          <span className="font-mono text-[13px] font-semibold">{currentApproval.displayNumber}</span>
-                          <span className="text-xs text-slate-500">{currentApproval.type === "po" ? "Orden de compra" : currentApproval.type === "invoice" ? "Factura" : "Caja"}</span>
-                          {currentApproval.isUrgent && <span className="text-xs text-red-700">· urgente</span>}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {[currentApproval.department, currentApproval.poType].filter(Boolean).join(" · ")}
-                          {currentApproval.poNumber && currentApproval.type === "invoice" && <> · PO-{currentApproval.poNumber}</>}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="block text-xl font-semibold tabular-nums tracking-tight">{formatCurrency(currentApproval.baseAmount, currentApproval.currency)}</span>
-                        <span className="text-xs text-slate-500">base</span>
-                      </div>
+            {a && (
+              <div className="flex min-w-0 flex-col gap-4">
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  {/* Cabecera */}
+                  <div className="flex flex-wrap items-start justify-between gap-4 px-5 pb-4 pt-5">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span>{typeName(a)}</span>
+                        {levelOf(a) && <><span aria-hidden="true">·</span><span>{levelOf(a)}</span></>}
+                        <span aria-hidden="true">·</span>
+                        <span className={a.isUrgent ? "text-red-700" : ""}>esperando {days(a.daysWaiting)}</span>
+                      </p>
+                      <h2 className="mt-1 flex items-center gap-3">
+                        <span className="font-mono text-[15px] font-semibold text-slate-900">{a.displayNumber}</span>
+                        <span className="truncate text-[17px] font-semibold text-slate-900">{a.supplier || "Sin proveedor"}</span>
+                      </h2>
+                      {a.description && <p className="mt-1 text-[13px] text-slate-600">{a.description}</p>}
                     </div>
-
-                    <div className="flex flex-col gap-5 px-5 py-4 text-[13px]">
-                      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4">
-                        {[
-                          ["Proveedor", currentApproval.supplier],
-                          ["Fecha", formatDate(currentApproval.createdAt)],
-                          ["Creado por", currentApproval.createdByName],
-                          ["Esperando", `${currentApproval.daysWaiting} ${currentApproval.daysWaiting === 1 ? "día" : "días"}`],
-                        ].map(([k, v]) => (
-                          <div key={k} className="flex flex-col">
-                            <dt className="text-xs text-slate-500">{k}</dt>
-                            <dd className={k === "Esperando" && currentApproval.isUrgent ? "text-red-700" : ""}>{v || "—"}</dd>
-                          </div>
-                        ))}
-                      </dl>
-
-                      {currentApproval.description && <p className="text-slate-700">{currentApproval.description}</p>}
-
-                      {currentApproval.attachmentUrl && (
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-500">Documento adjunto</span>
-                            <span className="flex gap-3 text-xs">
-                              <button onClick={() => setShowPreview(!showPreview)} className="font-medium text-slate-900 hover:underline">{showPreview ? "Ocultar" : "Vista previa"}</button>
-                              <a href={currentApproval.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-900">Abrir ↗</a>
-                            </span>
-                          </div>
-                          {showPreview && (
-                            <div className="overflow-hidden rounded-md border border-slate-200 bg-[#F7F7F8]">
-                              {currentApproval.attachmentUrl.toLowerCase().includes(".pdf")
-                                ? <iframe src={currentApproval.attachmentUrl} className="h-[480px] w-full" title="Vista previa del documento" />
-                                // eslint-disable-next-line @next/next/no-img-element
-                                : <img src={currentApproval.attachmentUrl} alt="Vista previa del documento" className="max-h-[480px] w-full object-contain" />}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {currentApproval.items && currentApproval.items.length > 0 && (
-                        <div className="overflow-hidden rounded-md border border-slate-200">
-                          <table className="tbl w-full border-collapse">
-                            <thead>
-                              <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
-                                <th scope="col" className="px-3 py-1.5 text-left font-medium">Concepto</th>
-                                <th scope="col" className="px-3 py-1.5 text-left font-medium">Cuenta</th>
-                                <th scope="col" className="px-3 py-1.5 text-right font-medium">Cant. × precio</th>
-                                <th scope="col" className="px-3 py-1.5 text-right font-medium">Base</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentApproval.items.map((item: any, index: number) => (
-                                <tr key={index} className="border-b border-slate-100 last:border-0">
-                                  <td className="px-3 py-1.5">{item.description}{item.episodeAssignment === "specific" && item.episodes?.length ? <span className="ml-1.5 text-xs text-slate-500">cap. {item.episodes.map((e: any) => e.episode).join(", ")}</span> : null}</td>
-                                  <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{item.subAccountCode || "—"}</td>
-                                  <td className="px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</td>
-                                  <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(item.baseAmount ?? ((item.quantity || 0) * (item.unitPrice || 0)))}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {currentApproval.type === "box" && currentApproval.boxExpenses && currentApproval.boxExpenses.length > 0 && (
-                        <div className="overflow-hidden rounded-md border border-slate-200">
-                          <div className="flex items-center justify-between border-b border-slate-200 bg-[#FAFAFA] px-3 py-1.5 text-xs text-slate-600">
-                            <span>{currentApproval.boxType === "card" ? `Tarjeta ${currentApproval.cardName}` : "Sobre de transferencias"} · {currentApproval.expenseCount || currentApproval.boxExpenses.length} gastos</span>
-                            {currentApproval.boxType === "transfer" && currentApproval.paymentDate && <span>Pago {currentApproval.paymentDate}</span>}
-                          </div>
-                          <div className="max-h-56 overflow-y-auto">
-                            <table className="tbl w-full border-collapse">
-                              <tbody>
-                                {currentApproval.boxExpenses.map((exp, idx) => (
-                                  <tr key={exp.id || idx} className="border-b border-slate-100 last:border-0">
-                                    {currentApproval.boxType === "transfer" && <td className="px-3 py-1.5">{exp.personName || "—"}</td>}
-                                    <td className="max-w-[180px] truncate px-3 py-1.5">{exp.supplier}</td>
-                                    <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{exp.subAccountCode}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums text-xs text-slate-600">{formatCurrency(exp.baseAmount)}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(exp.totalAmount)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-slate-500">Circuito de aprobación</span>
-                        <ApprovalSteps steps={currentApproval.approvalSteps as any} current={currentApproval.currentApprovalStep} department={currentApproval.department} />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3 border-t border-slate-200 bg-[#FAFAFA] px-5 py-3">
-                      {showCommentInput ? (
-                        <div className="flex flex-col gap-2">
-                          <Textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Comentario" rows={2} autoFocus />
-                          <div className="flex justify-end gap-2">
-                            <Button variant="secondary" onClick={() => { setShowCommentInput(false); setApprovalComment(""); }}>Cancelar</Button>
-                            <Button variant="primary" onClick={() => handleApprove(currentApproval, true)} disabled={processing}><Check size={14} /> Aprobar con comentario</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <IconButton label="Anterior (K)" onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))} disabled={currentIndex === 0}><ChevronLeft size={15} /></IconButton>
-                            <span className="tabular-nums">{currentIndex + 1} / {filteredApprovals.length}</span>
-                            <IconButton label="Siguiente (J)" onClick={() => setCurrentIndex(Math.min(filteredApprovals.length - 1, currentIndex + 1))} disabled={currentIndex === filteredApprovals.length - 1}><ChevronRight size={15} /></IconButton>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="ghost" onClick={() => { setSelectedApproval(currentApproval); setShowInfoRequestModal(true); }}>Pedir información</Button>
-                            <Button variant="ghost" onClick={() => setShowCommentInput(true)}>Aprobar con comentario</Button>
-                            <Button variant="secondary" onClick={() => { setSelectedApproval(currentApproval); setShowRejectionModal(true); }} disabled={processing}><span className="text-red-700">Rechazar</span></Button>
-                            <Button variant="primary" onClick={() => { setSelectedApproval(currentApproval); setShowApprovalModal(true); }} disabled={processing}><Check size={14} /> Aprobar</Button>
-                          </div>
-                        </div>
-                      )}
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">Base imponible</p>
+                      <p className="text-[22px] font-semibold tabular-nums tracking-tight text-slate-900">{formatCurrency(a.baseAmount, a.currency)}</p>
+                      {a.amount !== a.baseAmount && <p className="text-xs tabular-nums text-slate-500">{formatCurrency(a.amount, a.currency)} con impuestos</p>}
                     </div>
                   </div>
 
-                  {/* Comprobaciones */}
-                  <section className="overflow-hidden rounded-lg border border-slate-200">
-                    <h3 className="border-b border-slate-200 bg-[#FAFAFA] px-4 py-2 text-xs font-medium text-slate-500">Comprobaciones automáticas</h3>
-                    {currentApproval.autoChecks.map((check) => (
-                      <div key={check.id} className="flex items-start gap-2.5 border-b border-slate-100 px-4 py-2 text-[13px] last:border-0">
-                        <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${checkTone(check.status)}`} />
-                        <span className="flex-1">
-                          <span className="text-slate-900">{check.label}</span>
-                          <span className="text-slate-500"> · {check.message}</span>
-                          {check.details && <span className="block text-xs text-slate-500">{check.details}</span>}
-                        </span>
+                  {/* Datos */}
+                  <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-slate-100 px-5 py-4 text-[13px] md:grid-cols-4">
+                    {([
+                      a.type === "invoice" ? ["Nº proveedor", a.supplierNumber ? <span className="font-mono text-xs">{a.supplierNumber}</span> : null] : ["Departamento", a.department],
+                      a.type === "invoice" ? ["Fecha factura", a.invoiceDate ? formatDate(a.invoiceDate) : null] : ["Fecha", formatDate(a.createdAt)],
+                      a.type === "invoice" ? ["Vencimiento", a.dueDate ? formatDate(a.dueDate) : null] : a.type === "box" ? ["Gastos", String(a.expenseCount || a.boxExpenses?.length || 0)] : ["Líneas", String(a.items?.length || 0)],
+                      ["Solicita", a.createdByName],
+                      ...(a.type === "invoice" ? [["Departamento", a.department], ["PO", a.poNumber ? <span className="font-mono text-xs">PO-{a.poNumber}</span> : "Sin PO"]] : []),
+                    ] as [string, React.ReactNode][]).map(([k, v]) => (
+                      <div key={k} className="min-w-0">
+                        <dt className="text-xs text-slate-500">{k}</dt>
+                        <dd className="mt-0.5 truncate text-slate-900">{v || <span className="text-slate-400">—</span>}</dd>
                       </div>
                     ))}
-                  </section>
+                  </dl>
 
-                  {/* Budget Impact */}
-                  {canSeeBudgetFigures && currentApproval.budgetImpact && currentApproval.budgetImpact.length > 0 && (
-                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                      <button onClick={() => toggleSection("budget")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <PieChart size={18} className="text-slate-500" />
-                          <span className="text-[13px] font-medium text-slate-900">Impacto en presupuesto</span>
-                          {currentApproval.budgetImpact.some(i => i.afterApproval < 0) && (
-                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Sin presupuesto</span>
-                          )}
-                        </div>
-                        {expandedSections.has("budget") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-                      </button>
-                      {expandedSections.has("budget") && (
-                        <div className="px-6 pb-6 space-y-4">
-                          {currentApproval.budgetImpact.map((impact, idx) => {
-                            const isOverBudget = impact.afterApproval < 0;
-                            const isLow = impact.afterApproval >= 0 && impact.afterApproval < impact.budgeted * 0.1;
-                            const execBefore = impact.budgeted > 0 ? ((impact.committed + impact.actual) / impact.budgeted) * 100 : 0;
-                            const execAfter = impact.budgeted > 0 ? (((impact.committedAfter ?? impact.committed) + (impact.actualAfter ?? impact.actual)) / impact.budgeted) * 100 : 0;
-                            const thisDoc = impact.available - impact.afterApproval;
-                            return (
-                              <div key={idx} className={`rounded-md border ${isOverBudget ? "border-red-200 bg-red-50/40" : isLow ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-slate-50/60"}`}>
-                                {/* Header subcuenta */}
-                                <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200/60">
-                                  <div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{impact.accountCode}</span>
-                                    <p className="text-[13px] font-semibold text-slate-900 mt-0.5">{impact.accountName}</p>
-                                  </div>
-                                  {isOverBudget && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg font-medium">Sin presupuesto</span>}
-                                  {isLow && !isOverBudget && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Presupuesto bajo</span>}
-                                </div>
-                                {/* Stats */}
-                                <div className="grid grid-cols-4 gap-0 px-4 py-4">
-                                  <div className="pr-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Presupuestado</p>
-                                    <p className="text-[13px] font-bold text-slate-900 tabular-nums">{formatCurrency(impact.budgeted)}</p>
-                                  </div>
-                                  <div className="px-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Comprometido</p>
-                                    <p className="text-[13px] font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.committed)}</p>
-                                    {impact.committedAfter !== undefined && impact.committedAfter !== impact.committed && (
-                                      <p className={`text-xs font-semibold tabular-nums mt-0.5 ${impact.committedAfter > impact.committed ? "text-amber-600" : "text-emerald-600"}`}>
-                                        → {formatCurrency(impact.committedAfter)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="px-4 border-r border-slate-200">
-                                    <p className="text-xs text-slate-500 mb-1">Realizado</p>
-                                    <p className="text-[13px] font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.actual)}</p>
-                                    {impact.actualAfter !== undefined && impact.actualAfter !== impact.actual && (
-                                      <p className="text-xs font-semibold text-amber-600 tabular-nums mt-0.5">
-                                        → {formatCurrency(impact.actualAfter)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="pl-4">
-                                    <p className="text-xs text-slate-500 mb-1">Disponible</p>
-                                    <p className="text-[13px] font-semibold text-slate-700 tabular-nums">{formatCurrency(impact.available)}</p>
-                                    <p className={`text-xs font-bold tabular-nums mt-0.5 ${isOverBudget ? "text-red-600" : thisDoc === 0 ? "text-slate-500" : "text-amber-600"}`}>
-                                      → {formatCurrency(impact.afterApproval)}
-                                    </p>
-                                  </div>
-                                </div>
-                                {/* Barra de ejecución */}
-                                {impact.budgeted > 0 && (
-                                  <div className="px-4 pb-4">
-                                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-                                      <span>Ejecución tras aprobar</span>
-                                      <span className={`font-semibold ${execAfter > 100 ? "text-red-600" : execAfter > 90 ? "text-amber-600" : "text-slate-700"}`}>{execAfter.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
-                                      <div className="h-full bg-slate-300 rounded-full" style={{ width: `${Math.min(execBefore, 100)}%` }} />
-                                      <div className={`absolute top-0 left-0 h-full rounded-full opacity-70 ${isOverBudget ? "bg-red-500" : execAfter > 90 ? "bg-amber-500" : "bg-[#2F52E0]"}`} style={{ width: `${Math.min(execAfter, 100)}%` }} />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                  {/* Líneas */}
+                  {a.items && a.items.length > 0 && (
+                    <div className="border-t border-slate-100">
+                      <table className="w-full border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-[11px] text-slate-500">
+                            <th scope="col" className="px-5 py-2 text-left font-medium">Concepto</th>
+                            <th scope="col" className="w-40 px-3 py-2 text-left font-medium">Cuenta</th>
+                            <th scope="col" className="w-36 px-3 py-2 text-right font-medium">Cant. × precio</th>
+                            <th scope="col" className="w-32 px-5 py-2 text-right font-medium">Base</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {a.items.map((item: any, k: number) => (
+                            <tr key={k} className="border-b border-slate-100 last:border-0">
+                              <td className="px-5 py-2 text-slate-900">
+                                {item.description || <span className="text-slate-400">Sin concepto</span>}
+                                {item.episodeAssignment === "specific" && item.episodes?.length ? <span className="ml-1.5 text-xs text-slate-500">cap. {item.episodes.map((e: any) => e.episode).join(", ")}</span> : null}
+                              </td>
+                              <td className="px-3 py-2">
+                                {item.subAccountCode ? <><span className="font-mono text-xs text-slate-700">{item.subAccountCode}</span> <span className="text-xs text-slate-500">{item.subAccountDescription || ""}</span></> : <span className="text-xs text-red-700">Sin cuenta</span>}
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-600">{item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}</td>
+                              <td className="px-5 py-2 text-right tabular-nums text-slate-900">{formatCurrency(item.baseAmount ?? ((item.quantity || 0) * (item.unitPrice || 0)))}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="text-xs text-slate-600">
+                          {!!a.vatAmount && <tr><td colSpan={3} className="px-5 pt-2 text-right">IVA</td><td className="px-5 pt-2 text-right tabular-nums">{formatCurrency(a.vatAmount)}</td></tr>}
+                          {!!a.irpfAmount && <tr><td colSpan={3} className="px-5 pt-1 text-right">IRPF</td><td className="px-5 pt-1 text-right tabular-nums">−{formatCurrency(a.irpfAmount)}</td></tr>}
+                          <tr><td colSpan={3} className="px-5 pb-2.5 pt-1 text-right font-medium text-slate-900">Total</td><td className="px-5 pb-2.5 pt-1 text-right font-medium tabular-nums text-slate-900">{formatCurrency(a.amount, a.currency)}</td></tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Gastos del sobre */}
+                  {a.type === "box" && a.boxExpenses && a.boxExpenses.length > 0 && (
+                    <div className="max-h-72 overflow-y-auto border-t border-slate-100">
+                      <table className="w-full border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-[11px] text-slate-500">
+                            {a.boxType === "transfer" && <th scope="col" className="px-5 py-2 text-left font-medium">Persona</th>}
+                            <th scope="col" className={`${a.boxType === "transfer" ? "px-3" : "px-5"} py-2 text-left font-medium`}>Proveedor</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium">Cuenta</th>
+                            <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
+                            <th scope="col" className="px-5 py-2 text-right font-medium">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {a.boxExpenses.map((e, k) => (
+                            <tr key={e.id || k} className="border-b border-slate-100 last:border-0">
+                              {a.boxType === "transfer" && <td className="px-5 py-1.5">{e.personName || "—"}</td>}
+                              <td className={`${a.boxType === "transfer" ? "px-3" : "px-5"} max-w-[220px] truncate py-1.5`}>{e.supplier}</td>
+                              <td className="px-3 py-1.5 font-mono text-xs text-slate-600">{e.subAccountCode}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-slate-600">{formatCurrency(e.baseAmount)}</td>
+                              <td className="px-5 py-1.5 text-right tabular-nums">{formatCurrency(e.totalAmount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Documento adjunto */}
+                  {a.attachmentUrl && (
+                    <div className="border-t border-slate-100 px-5 py-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-2 text-slate-600"><FileText size={14} className="text-slate-400" />{a.attachmentFileName || "Documento"}</span>
+                        <span className="flex gap-3">
+                          <button onClick={() => setShowPreview(!showPreview)} className="font-medium text-slate-900 hover:underline">{showPreview ? "Ocultar" : "Ver aquí"}</button>
+                          <a href={a.attachmentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900">Abrir <ExternalLink size={11} /></a>
+                        </span>
+                      </div>
+                      {showPreview && (
+                        <div className="mt-3 overflow-hidden rounded-md border border-slate-200 bg-[#F7F7F8]">
+                          {a.attachmentUrl.toLowerCase().includes(".pdf")
+                            ? <iframe src={a.attachmentUrl} className="h-[520px] w-full" title="Documento" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            : <img src={a.attachmentUrl} alt={`Documento de ${a.displayNumber}`} className="max-h-[520px] w-full object-contain" />}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* PO Comparison */}
-                  {currentApproval.poComparison && (
-                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                      <button onClick={() => toggleSection("po-comparison")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Target size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Comparativa con PO-{currentApproval.poComparison.poNumber}</span>{currentApproval.poComparison.percentageUsed > 100 && (<span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">Excede PO</span>)}</div>{expandedSections.has("po-comparison") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
-                      {expandedSections.has("po-comparison") && (<div className="px-6 pb-6"><div className="grid grid-cols-4 gap-4 mb-4"><div className="text-center p-3 bg-slate-50 rounded-md"><p className="text-xs text-slate-500">Base PO</p><p className="text-[13px] font-bold text-slate-900">{formatCurrency(currentApproval.poComparison.poBaseAmount)}</p></div><div className="text-center p-3 bg-emerald-50 rounded-md"><p className="text-xs text-emerald-600">Facturado antes</p><p className="text-[13px] font-bold text-emerald-700">{formatCurrency(currentApproval.poComparison.invoicedBefore)}</p></div><div className="text-center p-3 bg-amber-50 rounded-md"><p className="text-xs text-amber-600">Esta factura</p><p className="text-[13px] font-bold text-amber-700">{formatCurrency(currentApproval.poComparison.thisInvoice)}</p></div><div className={`text-center p-3 rounded-md ${currentApproval.poComparison.remaining < 0 ? "bg-red-50" : "bg-slate-50"}`}><p className={`text-xs ${currentApproval.poComparison.remaining < 0 ? "text-red-600" : "text-slate-500"}`}>Restante</p><p className={`text-[13px] font-bold ${currentApproval.poComparison.remaining < 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(currentApproval.poComparison.remaining)}</p></div></div><div className="mb-4"><div className="flex items-center justify-between text-xs text-slate-500 mb-1"><span>Uso de la PO</span><span className={currentApproval.poComparison.percentageUsed > 100 ? "text-red-600 font-medium" : ""}>{currentApproval.poComparison.percentageUsed.toFixed(1)}%</span></div><div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${currentApproval.poComparison.percentageUsed > 100 ? "bg-red-500" : currentApproval.poComparison.percentageUsed > 90 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(currentApproval.poComparison.percentageUsed, 100)}%` }} /></div></div>{currentApproval.poComparison.itemDiscrepancies.length > 0 && (<div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md"><p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2"><AlertTriangle size={12} />Discrepancias en items</p><div className="space-y-2">{currentApproval.poComparison.itemDiscrepancies.map((disc, idx) => (<div key={idx} className="flex items-center justify-between text-xs"><span className="text-slate-700">{disc.description}</span><div className="flex items-center gap-3"><span className="text-slate-500">PO: {formatCurrency(disc.poAmount)}</span><span className="text-slate-900">FRA: {formatCurrency(disc.invoiceAmount)}</span><span className={disc.difference > 0 ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}>{disc.difference > 0 ? "+" : ""}{formatCurrency(disc.difference)}</span></div></div>))}</div></div>)}</div>)}
-                    </div>
-                  )}
-
-                  {/* Supplier Stats */}
-                  {currentApproval.supplierStats && (
-                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                      <button onClick={() => toggleSection("supplier")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><Building2 size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Historial del proveedor</span></div>{expandedSections.has("supplier") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
-                      {expandedSections.has("supplier") && (<div className="px-6 pb-6"><div className="grid grid-cols-3 gap-4"><div className="text-center p-4 bg-slate-50 rounded-md"><p className="text-2xl font-bold text-slate-900">{currentApproval.supplierStats.totalPOs}</p><p className="text-xs text-slate-500">POs totales</p></div><div className="text-center p-4 bg-slate-50 rounded-md"><p className="text-2xl font-bold text-slate-900">{currentApproval.supplierStats.totalInvoices}</p><p className="text-xs text-slate-500">Facturas totales</p></div><div className="text-center p-4 bg-amber-50 rounded-md"><p className="text-2xl font-bold text-amber-700">{formatCurrency(currentApproval.supplierStats.pendingAmount)}</p><p className="text-xs text-amber-600">Pendiente</p></div></div>{currentApproval.supplierStats.lastTransaction && (<p className="text-xs text-slate-500 mt-3 text-center">Última transacción: {formatDate(currentApproval.supplierStats.lastTransaction)}</p>)}</div>)}
-                    </div>
-                  )}
-
-                  {/* Timeline */}
-                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    <button onClick={() => toggleSection("timeline")} className="w-full px-3.5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><History size={18} className="text-slate-500" /><span className="text-[13px] font-medium text-slate-900">Historial de actividad</span><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{currentApproval.timeline.length}</span></div>{expandedSections.has("timeline") ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}</button>
-                    {expandedSections.has("timeline") && (<div className="px-6 pb-6"><div className="space-y-3">{currentApproval.timeline.map((event, idx) => (<div key={event.id} className="flex items-start gap-3"><div className="relative"><div className={`w-8 h-8 rounded-full flex items-center justify-center ${event.type === "created" ? "bg-blue-100" : event.type === "approved" ? "bg-emerald-100" : event.type === "rejected" ? "bg-red-100" : event.type === "comment" ? "bg-slate-100" : "bg-amber-100"}`}>{event.type === "created" && <FileText size={14} className="text-blue-600" />}{event.type === "approved" && <Check size={14} className="text-emerald-600" />}{event.type === "rejected" && <X size={14} className="text-red-600" />}{event.type === "comment" && <MessageSquare size={14} className="text-slate-600" />}{event.type === "info_requested" && <HelpCircle size={14} className="text-amber-600" />}</div>{idx < currentApproval.timeline.length - 1 && (<div className="absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-8 bg-slate-200" />)}</div><div className="flex-1 pt-1"><p className="text-[13px] text-slate-900"><span className="font-medium">{event.userName}</span>{event.type === "created" && " creó el documento"}{event.type === "approved" && ` aprobó (Nivel ${event.stepOrder})`}{event.type === "rejected" && " rechazó el documento"}{event.type === "comment" && " añadió un comentario"}{event.type === "info_requested" && " solicitó información"}</p>{event.comment && (<p className="text-[13px] text-slate-600 bg-slate-50 p-2 rounded-lg mt-1 italic">&quot;{event.comment}&quot;</p>)}<p className="text-xs text-slate-400 mt-0.5">{formatDateTime(event.date)}</p></div></div>))}</div></div>)}
+                  {/* Circuito */}
+                  <div className="border-t border-slate-100 px-5 py-4">
+                    <p className="mb-2 text-xs text-slate-500">Circuito de aprobación</p>
+                    <ApprovalSteps steps={a.approvalSteps as any} current={a.currentApprovalStep} department={a.department} />
                   </div>
-                </>
-              )}
-            </div>
+
+                  {/* Acciones */}
+                  <div className="border-t border-slate-200 bg-[#FAFAFA] px-5 py-3">
+                    {showCommentInput ? (
+                      <div className="flex flex-col gap-2">
+                        <Textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Comentario para el circuito" rows={2} autoFocus />
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" onClick={() => { setShowCommentInput(false); setApprovalComment(""); }}>Cancelar</Button>
+                          <Button variant="primary" onClick={() => handleApprove(a, true)} disabled={processing || !approvalComment.trim()}><Check size={14} /> Aprobar con comentario</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <IconButton label="Anterior (K)" onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))} disabled={currentIndex === 0}><ChevronLeft size={15} /></IconButton>
+                          <span className="tabular-nums">{currentIndex + 1} de {filteredApprovals.length}</span>
+                          <IconButton label="Siguiente (J)" onClick={() => setCurrentIndex(Math.min(filteredApprovals.length - 1, currentIndex + 1))} disabled={currentIndex === filteredApprovals.length - 1}><ChevronRight size={15} /></IconButton>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="ghost" onClick={() => { setSelectedApproval(a); setShowInfoRequestModal(true); }}><HelpCircle size={14} /> Pedir información</Button>
+                          <Button variant="ghost" onClick={() => setShowCommentInput(true)}><MessageSquare size={14} /> Con comentario</Button>
+                          <Button variant="danger" onClick={() => { setSelectedApproval(a); setShowRejectionModal(true); }} disabled={processing}><X size={14} /> Rechazar</Button>
+                          <Button variant="primary" onClick={() => { setSelectedApproval(a); setShowApprovalModal(true); }} disabled={processing}><Check size={14} /> Aprobar</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {/* Comprobaciones */}
+                  {a.autoChecks.length > 0 && (
+                    <Section title="Comprobaciones" aside={(() => { const n = a.autoChecks.filter((c) => c.status === "fail" || c.status === "warning").length; return n ? `${n} ${n === 1 ? "aviso" : "avisos"}` : "Todo correcto"; })()}>
+                      {[...a.autoChecks].sort((x, y) => ["fail", "warning", "info", "pass"].indexOf(x.status) - ["fail", "warning", "info", "pass"].indexOf(y.status)).map((c) => (
+                        <div key={c.id} className="flex items-start gap-2.5 border-b border-slate-100 px-4 py-2 text-[13px] last:border-0">
+                          <span className={`mt-[7px] h-1.5 w-1.5 flex-shrink-0 rounded-full ${DOT[c.status]}`} />
+                          <span className="min-w-0 flex-1">
+                            <span className="text-slate-900">{c.label}</span>
+                            <span className="text-slate-500"> · {c.message}</span>
+                            {c.details && <span className="block text-xs text-slate-500">{c.details}</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </Section>
+                  )}
+
+                  {/* Presupuesto */}
+                  {canSeeBudgetFigures && a.budgetImpact && a.budgetImpact.length > 0 && (
+                    <Section title="Presupuesto" aside={a.type === "po" ? "Al aprobar se compromete" : a.poNumber ? "Pasa de comprometido a realizado" : "Al aprobar se realiza"}>
+                      {a.budgetImpact.map((im) => {
+                        const over = im.afterApproval < 0;
+                        const used = (im.committedAfter ?? im.committed) + (im.actualAfter ?? im.actual);
+                        const thisDoc = Math.max(0, used - im.committed - im.actual);
+                        return (
+                          <div key={im.accountCode} className="border-b border-slate-100 px-4 py-3 last:border-0">
+                            <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                              <span className="min-w-0 truncate"><span className="font-mono text-xs text-slate-700">{im.accountCode}</span> <span className="text-slate-900">{im.accountName}</span></span>
+                              <span className={`flex-shrink-0 tabular-nums ${over ? "font-medium text-red-700" : "text-slate-900"}`}>{formatCurrency(im.afterApproval)} <span className="text-xs font-normal text-slate-500">disponible</span></span>
+                            </div>
+                            <div className="mt-2">
+                              <Bar total={im.budgeted} parts={[
+                                { value: im.actual, cls: "bg-slate-700" },
+                                { value: im.committed, cls: "bg-slate-400" },
+                                { value: thisDoc, cls: over ? "bg-red-500" : "bg-[#2F52E0]" },
+                              ]} />
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-4 text-[11.5px] tabular-nums text-slate-500">
+                              <span>Presupuesto {formatCurrency(im.budgeted)}</span>
+                              <span>Realizado {formatCurrency(im.actualAfter ?? im.actual)}</span>
+                              <span>Comprometido {formatCurrency(im.committedAfter ?? im.committed)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </Section>
+                  )}
+
+                  {/* PO */}
+                  {a.poComparison && (
+                    <Section title={`PO-${a.poComparison.poNumber}`} aside={`${a.poComparison.percentageUsed.toFixed(0)} % con esta factura`}>
+                      <div className="px-4 py-3">
+                        <Bar total={Math.max(a.poComparison.poBaseAmount, a.poComparison.invoicedBefore + a.poComparison.thisInvoice)} parts={[
+                          { value: a.poComparison.invoicedBefore, cls: "bg-slate-700" },
+                          { value: a.poComparison.thisInvoice, cls: a.poComparison.remaining < 0 ? "bg-red-500" : "bg-[#2F52E0]" },
+                        ]} />
+                        <dl className="mt-3 grid grid-cols-4 gap-3 text-[13px]">
+                          {[["Base PO", a.poComparison.poBaseAmount], ["Ya facturado", a.poComparison.invoicedBefore], ["Esta factura", a.poComparison.thisInvoice], ["Queda", a.poComparison.remaining]].map(([k, v]) => (
+                            <div key={k as string}>
+                              <dt className="text-xs text-slate-500">{k}</dt>
+                              <dd className={`mt-0.5 tabular-nums ${k === "Queda" && (v as number) < 0 ? "font-medium text-red-700" : "text-slate-900"}`}>{formatCurrency(v as number)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        {a.poComparison.itemDiscrepancies.length > 0 && (
+                          <div className="mt-3 border-t border-slate-100 pt-2.5">
+                            <p className="text-xs text-slate-500">Líneas que superan su línea de la PO</p>
+                            {a.poComparison.itemDiscrepancies.map((d, k) => (
+                              <div key={k} className="mt-1 flex items-center justify-between gap-3 text-xs">
+                                <span className="truncate text-slate-700">{d.description}</span>
+                                <span className="flex-shrink-0 tabular-nums text-slate-500">{formatCurrency(d.poAmount)} en PO · <span className={d.difference > 0 ? "text-red-700" : "text-slate-900"}>{d.difference > 0 ? "+" : ""}{formatCurrency(d.difference)}</span></span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </Section>
+                  )}
+
+                  {/* Proveedor */}
+                  {a.supplierStats && (
+                    <Section title={a.supplier} aside={a.supplierId ? <Link href={`/project/${id}/accounting/suppliers/${a.supplierId}`} className="inline-flex items-center gap-1 hover:text-slate-900">Ficha <ExternalLink size={11} /></Link> : undefined}>
+                      <dl className="grid grid-cols-3 gap-3 px-4 py-3 text-[13px]">
+                        <div><dt className="text-xs text-slate-500">Facturado</dt><dd className="mt-0.5 tabular-nums text-slate-900">{formatCurrency(a.supplierStats.invoicedBase)}</dd></div>
+                        <div><dt className="text-xs text-slate-500">Pendiente de pago</dt><dd className="mt-0.5 tabular-nums text-slate-900">{formatCurrency(a.supplierStats.pendingAmount)}</dd></div>
+                        <div><dt className="text-xs text-slate-500">POs abiertas</dt><dd className="mt-0.5 tabular-nums text-slate-900">{a.supplierStats.openPOs} <span className="text-xs text-slate-500">de {a.supplierStats.totalPOs}</span></dd></div>
+                      </dl>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
+                        {a.supplierStats.taxId && <span>NIF <span className="font-mono text-slate-700">{a.supplierStats.taxId}</span></span>}
+                        <span className="inline-flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${a.supplierStats.certState === "verified" ? "bg-emerald-500" : "bg-amber-500"}`} />{a.supplierStats.certState === "verified" ? "IBAN verificado" : a.supplierStats.certState === "noiban" ? "Sin IBAN" : "IBAN sin certificado verificado"}</span>
+                        {a.supplierStats.lastTransaction && <span>Último movimiento {formatDate(a.supplierStats.lastTransaction)}</span>}
+                      </div>
+                    </Section>
+                  )}
+                </div>
+
+                {/* Actividad */}
+                <Section title="Actividad" aside={`${a.timeline.length}`}>
+                  <ol className="px-4 py-3">
+                    {a.timeline.map((ev, k) => (
+                      <li key={ev.id} className="relative flex gap-3 pb-3 last:pb-0">
+                        {k < a.timeline.length - 1 && <span aria-hidden="true" className="absolute left-[3px] top-3 h-full w-px bg-slate-200" />}
+                        <span className={`relative mt-[6px] h-[7px] w-[7px] flex-shrink-0 rounded-full ${ev.type === "approved" ? "bg-emerald-500" : ev.type === "rejected" ? "bg-red-500" : ev.type === "info_requested" ? "bg-amber-500" : "bg-slate-400"}`} />
+                        <div className="min-w-0 flex-1 text-[13px]">
+                          <p className="text-slate-900">
+                            <span className="font-medium">{ev.userName}</span>
+                            <span className="text-slate-600">{ev.type === "created" ? " lo envió" : ev.type === "approved" ? ` aprobó${ev.stepOrder ? ` el nivel ${ev.stepOrder}` : ""}` : ev.type === "rejected" ? " lo rechazó" : ev.type === "info_requested" ? " pidió información" : " comentó"}</span>
+                            <span className="ml-2 text-xs text-slate-500">{formatDateTime(ev.date)}</span>
+                          </p>
+                          {ev.comment && <p className="mt-1 rounded-md bg-[#F7F7F8] px-2.5 py-1.5 text-slate-700">{ev.comment}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </Section>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1022,18 +1120,24 @@ export default function ApprovalsPage() {
       <Modal
         open={showApprovalModal && !!selectedApproval}
         onClose={() => { setShowApprovalModal(false); setSelectedApproval(null); }}
-        title="Aprobar"
+        title={`Aprobar ${selectedApproval?.displayNumber || ""}`}
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setShowApprovalModal(false); setSelectedApproval(null); }}>Cancelar</Button>
             <Button variant="primary" onClick={() => selectedApproval && handleApprove(selectedApproval)} disabled={processing} autoFocus><Check size={14} /> Aprobar</Button>
           </>
         }
       >
         {selectedApproval && (
-          <p className="text-[13px] text-slate-700">
-            <span className="font-mono">{selectedApproval.displayNumber}</span> · {selectedApproval.supplier} · <span className="tabular-nums">{formatCurrency(selectedApproval.baseAmount, selectedApproval.currency)}</span>
-          </p>
+          <div className="text-[13px]">
+            <p className="text-slate-900">{selectedApproval.supplier} · <span className="tabular-nums">{formatCurrency(selectedApproval.baseAmount, selectedApproval.currency)}</span> <span className="text-slate-500">base</span></p>
+            <p className="mt-1 text-slate-500">{(() => {
+              const steps = selectedApproval.approvalSteps.filter((x) => (x as any).status !== "skipped");
+              const last = steps.length && selectedApproval.approvalSteps[selectedApproval.currentApprovalStep] === steps[steps.length - 1];
+              return last ? (selectedApproval.type === "po" ? "Es el último nivel: la PO queda aprobada y compromete presupuesto." : "Es el último nivel: queda aprobado.") : "Pasa al siguiente nivel del circuito.";
+            })()}</p>
+            {worstOf(selectedApproval) && <p className="mt-2 text-amber-800">Hay {worstOf(selectedApproval) === "fail" ? "comprobaciones que fallan" : "avisos"}: revísalos antes de aprobar.</p>}
+          </div>
         )}
       </Modal>
 
@@ -1043,14 +1147,12 @@ export default function ApprovalsPage() {
         title={`Rechazar ${selectedApproval?.displayNumber || ""}`}
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setShowRejectionModal(false); setRejectionReason(""); setSelectedApproval(null); }}>Cancelar</Button>
             <Button variant="danger" onClick={handleReject} disabled={processing || !rejectionReason.trim()}>Rechazar</Button>
           </>
         }
       >
-        <Field label="Motivo">
-          <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} rows={4} autoFocus />
-        </Field>
+        <Field label="Motivo"><Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} rows={4} autoFocus placeholder="Lo verá quien lo envió" /></Field>
       </Modal>
 
       <Modal
@@ -1059,16 +1161,13 @@ export default function ApprovalsPage() {
         title={`Pedir información · ${selectedApproval?.displayNumber || ""}`}
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setShowInfoRequestModal(false); setInfoRequestMessage(""); setSelectedApproval(null); }}>Cancelar</Button>
             <Button variant="primary" onClick={handleRequestInfo} disabled={processing || !infoRequestMessage.trim()}><Send size={14} /> Enviar</Button>
           </>
         }
       >
-        <Field label="¿Qué necesitas saber?">
-          <Textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} rows={4} autoFocus />
-        </Field>
+        <Field label="¿Qué necesitas saber?"><Textarea value={infoRequestMessage} onChange={(e) => setInfoRequestMessage(e.target.value)} rows={4} autoFocus /></Field>
       </Modal>
-
     </Page>
   );
 }
