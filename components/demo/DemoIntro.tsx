@@ -33,7 +33,7 @@ const STEP_MS = 1100; // entre elementos de una lista
 const CLOUD: [number, number, number][] = [[6, 14, .55], [70, 8, .4], [80, 40, .6], [2, 52, .35], [62, 80, .5], [14, 84, .45], [40, 4, .3], [36, 92, .35]];
 
 const slidesFor = (first: string): Slide[] => [
-  { kind: "brand", text: "Toda la producción en un solo lugar" },
+  { kind: "hero", title: "Filma Workspace", text: "Toda la producción en un solo lugar" },
   { kind: "hero", title: first ? `Hola, ${first}` : "Hola" },
   { kind: "hero", icon: Layers, title: "Un proyecto.\nDos entornos de trabajo.", tones: [{ theme: "both", at: 600 }] },
   { kind: "hero", icon: Calculator, title: "Contabilidad", text: "Cada euro de la producción, con su historia. Del presupuesto al pago, en tiempo real.", tones: [{ theme: "accounting" }] },
