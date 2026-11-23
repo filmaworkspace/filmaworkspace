@@ -264,7 +264,7 @@ export default function ChartOfAccountsPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200">
               <h3 className="font-semibold text-slate-900 text-sm">{editingCode ? `Editar cuenta — ${editingCode}` : "Nueva cuenta contable"}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+              <button aria-label="Cerrar" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
             <div className="px-5 py-4 grid grid-cols-2 gap-3">
               <div>
@@ -320,7 +320,7 @@ export default function ChartOfAccountsPage() {
             <p className="tabular-nums text-xs text-slate-500 mt-0.5">PGC 2007 · {plan.length} cuentas · Editable</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
+            <button aria-label="Recargar" onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input placeholder="Filtrar código o nombre" value={search} onChange={e => setSearch(e.target.value)}
@@ -394,7 +394,7 @@ export default function ChartOfAccountsPage() {
                             className="text-xs text-slate-500 hover:text-slate-900 border border-slate-200 rounded px-2 py-0.5 bg-white">
                             Editar
                           </button>
-                          <button onClick={() => handleDelete(c.code)}
+                          <button aria-label="Eliminar" onClick={() => handleDelete(c.code)}
                             className="text-slate-400 hover:text-red-500 p-0.5">
                             <Trash2 size={12} />
                           </button>

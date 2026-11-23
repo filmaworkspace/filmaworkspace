@@ -311,7 +311,7 @@ function ReceivedSourcesModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
           <h3 className="text-sm font-semibold text-slate-900">Cuentas que suman aquí</h3>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+          <button aria-label="Cerrar" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
             <X size={15} />
           </button>
         </div>
@@ -407,7 +407,7 @@ function DetailSidebar({
       <div className="fixed right-0 top-0 h-full w-[340px] bg-white border-l border-slate-200 shadow-xl z-50 flex flex-col">
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-b border-slate-100 flex-shrink-0">
           <p className="text-sm font-semibold text-slate-900">Ajustes del detalle</p>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+          <button aria-label="Cerrar" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
             <X size={15} />
           </button>
         </div>

@@ -262,7 +262,7 @@ export default function BudgetingFringesPanel({ draftId }: { draftId: string }) 
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">{modalItem ? "Editar carga social" : "Nueva carga social"}</h3>
-              <button onClick={() => setModalItem(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setModalItem(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -349,7 +349,7 @@ export default function BudgetingFringesPanel({ draftId }: { draftId: string }) 
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">Editar carpeta</h3>
-              <button onClick={() => setFolderEditTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setFolderEditTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>

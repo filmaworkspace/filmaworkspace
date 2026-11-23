@@ -174,7 +174,7 @@ export default function BudgetingCategoriesPanel({ draftId }: { draftId: string 
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">{modalCat ? "Editar categoría" : "Nueva categoría"}</h3>
-              <button onClick={() => setModalCat(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setModalCat(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>

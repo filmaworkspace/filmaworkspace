@@ -691,7 +691,7 @@ export default function ControlHorarioPage() {
         <div className="border border-slate-200 rounded-lg px-4 pt-3 pb-3.5 mb-8">
           {/* Month nav */}
           <div className="flex items-center gap-0.5 mb-1.5">
-            <button
+            <button aria-label="Anterior"
               onClick={() => navMonth(-1)}
               className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
             >
@@ -700,7 +700,7 @@ export default function ControlHorarioPage() {
             <h2 className="text-[14px] font-semibold text-slate-900 min-w-[180px] text-center px-1">
               {MONTH_NAMES[currentMonth]} {currentYear}
             </h2>
-            <button
+            <button aria-label="Siguiente"
               onClick={() => navMonth(1)}
               className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
             >
@@ -767,10 +767,10 @@ export default function ControlHorarioPage() {
                         className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-[13px]"
                         autoFocus
                       />
-                      <button onClick={handleUpdateJornada} className="p-1.5 rounded-lg border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-xs">
+                      <button aria-label="Confirmar" onClick={handleUpdateJornada} className="p-1.5 rounded-lg border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] text-xs">
                         <Check size={13} />
                       </button>
-                      <button onClick={() => setEditingJornada(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+                      <button aria-label="Cerrar" onClick={() => setEditingJornada(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
                         <X size={13} />
                       </button>
                     </div>
@@ -874,7 +874,7 @@ export default function ControlHorarioPage() {
                             <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ background: "#eaf3de", color: "#3b6d11" }}>
                               {formatTime(form.submittedAt)}
                             </span>
-                            <button onClick={() => setShowFormDetail(form)}
+                            <button aria-label="Ver" onClick={() => setShowFormDetail(form)}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                               <Eye size={14} />
                             </button>
@@ -1005,7 +1005,7 @@ export default function ControlHorarioPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Configuración</h3>
-              <button onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
+              <button aria-label="Cerrar" onClick={() => setShowConfig(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
                 <X size={16} />
               </button>
             </div>
@@ -1096,7 +1096,7 @@ export default function ControlHorarioPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <h3 className="text-base font-semibold text-slate-900">Jornadas</h3>
-              <button onClick={() => setShowSchedules(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
+              <button aria-label="Cerrar" onClick={() => setShowSchedules(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md">
                 <X size={16} />
               </button>
             </div>
@@ -1195,7 +1195,7 @@ export default function ControlHorarioPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-[13px] font-semibold text-slate-900">Añadir persona</h3>
-              <button onClick={() => setShowAddMember(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowAddMember(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -1240,7 +1240,7 @@ export default function ControlHorarioPage() {
               ) : (
                 <h3 className="text-[13px] font-semibold text-slate-900">Grupos</h3>
               )}
-              <button onClick={() => setShowGroups(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowGroups(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -1268,11 +1268,11 @@ export default function ControlHorarioPage() {
                           className="px-3 py-1.5 text-xs font-medium rounded-md border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]">
                           Añadir al día
                         </button>
-                        <button onClick={() => openEditGroup(g)}
+                        <button aria-label="Editar" onClick={() => openEditGroup(g)}
                           className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => handleDeleteGroup(g.id)}
+                        <button aria-label="Eliminar" onClick={() => handleDeleteGroup(g.id)}
                           className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                           <Trash2 size={13} />
                         </button>
@@ -1384,7 +1384,7 @@ export default function ControlHorarioPage() {
                 <p className="text-[13px] font-semibold text-slate-900">{showFormDetail.recipientName}</p>
                 <p className="text-xs text-slate-400">{showFormDetail.recipientRole}</p>
               </div>
-              <button onClick={() => setShowFormDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowFormDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -1417,7 +1417,7 @@ export default function ControlHorarioPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-semibold text-slate-900">Descargar datos</h3>
-              <button onClick={() => setShowDownload(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowDownload(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={16} />
               </button>
             </div>

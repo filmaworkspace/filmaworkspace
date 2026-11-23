@@ -50,7 +50,7 @@ export function Page({ children, width = "" }: { children: React.ReactNode; widt
   const top = useContext(PageTopContext);
   return (
     <div className={cx("min-h-screen bg-white", inter.className)}>
-      <main className={cx("mx-auto px-6 pb-24 sm:px-10", top, width)}>{children}</main>
+      <main id="contenido" className={cx("mx-auto px-6 pb-24 sm:px-10", top, width)}>{children}</main>
     </div>
   );
 }

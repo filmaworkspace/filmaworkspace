@@ -358,7 +358,7 @@ export default function GuideEditorPage() {
               <div className="relative rounded-xl overflow-hidden border border-slate-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={coverImageUrl} alt="Portada" className="w-full h-32 object-cover" />
-                <button
+                <button aria-label="Cerrar"
                   onClick={() => setCoverImageUrl("")}
                   className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-lg hover:bg-black/80"
                 >
@@ -424,7 +424,7 @@ function BlockEditor({
         <button onClick={() => onMove(-1)} disabled={index === 0} className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-30">▲</button>
         <button onClick={() => onMove(1)} disabled={index === total - 1} className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-30">▼</button>
       </div>
-      <button
+      <button aria-label="Eliminar"
         onClick={onRemove}
         className="absolute right-1 top-1 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
       >
@@ -434,13 +434,13 @@ function BlockEditor({
       {block.type === "heading" && (
         <div className="flex items-start gap-2">
           <div className="flex flex-col gap-1 pt-1.5">
-            <button
+            <button aria-label="Título"
               onClick={() => onChange({ level: 2 } as Partial<GuideBlock>)}
               className={`p-1 rounded ${block.level === 2 ? "text-slate-900" : "text-slate-300 hover:text-slate-500"}`}
             >
               <Heading2 size={14} />
             </button>
-            <button
+            <button aria-label="Subtítulo"
               onClick={() => onChange({ level: 3 } as Partial<GuideBlock>)}
               className={`p-1 rounded ${block.level === 3 ? "text-slate-900" : "text-slate-300 hover:text-slate-500"}`}
             >
@@ -459,10 +459,10 @@ function BlockEditor({
       {block.type === "paragraph" && (
         <div>
           <div className="flex items-center gap-1 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><Bold size={12} /></button>
-            <button onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><Italic size={12} /></button>
-            <button onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><UnderlineIcon size={12} /></button>
-            <button
+            <button aria-label="Negrita" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><Bold size={12} /></button>
+            <button aria-label="Cursiva" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><Italic size={12} /></button>
+            <button aria-label="Subrayado" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><UnderlineIcon size={12} /></button>
+            <button aria-label="Copiar enlace"
               onMouseDown={(e) => {
                 e.preventDefault();
                 const url = window.prompt("URL del enlace");

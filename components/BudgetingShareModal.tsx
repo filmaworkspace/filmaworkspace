@@ -91,7 +91,7 @@ export default function BudgetingShareModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
           <h3 className="text-sm font-semibold text-slate-900">Compartir presupuesto</h3>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+          <button aria-label="Cerrar" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
             <X size={15} />
           </button>
         </div>

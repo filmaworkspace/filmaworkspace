@@ -369,7 +369,7 @@ function FileUploadField({ docKey, label, required, formId, existing, onUploaded
         <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
           <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
           <span className="text-sm text-emerald-800 flex-1 truncate">{existing.name}</span>
-          <button type="button" onClick={() => onUploaded(docKey, null)} className="p-1 text-emerald-600 hover:text-red-500 transition-colors"><X size={13} /></button>
+          <button aria-label="Cerrar" type="button" onClick={() => onUploaded(docKey, null)} className="p-1 text-emerald-600 hover:text-red-500 transition-colors"><X size={13} /></button>
         </div>
       ) : (
         <div onClick={() => inputRef.current?.click()}
@@ -441,7 +441,7 @@ function ExpenseUploadRow({ expense, formId, onChange, onRemove }: {
           className="flex-1 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none resize-none bg-white"
           style={{ borderColor: expense.description ? "#d1c7bc" : "" }}
         />
-        <button type="button" onClick={() => onRemove(expense.localId)}
+        <button aria-label="Eliminar" type="button" onClick={() => onRemove(expense.localId)}
           className="mt-0.5 p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
           <Trash2 size={14} />
         </button>
@@ -463,7 +463,7 @@ function ExpenseUploadRow({ expense, formId, onChange, onRemove }: {
           <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
             <span className="text-xs text-emerald-700 truncate flex-1">{expense.fileName}</span>
-            <button type="button" onClick={() => onChange(expense.localId, { fileUrl: undefined, fileName: undefined })}
+            <button aria-label="Cerrar" type="button" onClick={() => onChange(expense.localId, { fileUrl: undefined, fileName: undefined })}
               className="text-emerald-500 hover:text-red-500 transition-colors"><X size={12} /></button>
           </div>
         ) : expense.uploading ? (

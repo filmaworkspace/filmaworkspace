@@ -1344,7 +1344,7 @@ export default function BudgetingTopPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">Guardar versión</h3>
-              <button onClick={() => setShowSnapshotModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowSnapshotModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -1386,7 +1386,7 @@ export default function BudgetingTopPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">Guardar como plantilla</h3>
-              <button onClick={() => setShowTemplateModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowTemplateModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>
@@ -1448,7 +1448,7 @@ export default function BudgetingTopPage() {
                 {sendStep === "confirm" && "Confirmar envío"}
                 {sendStep === "done" && "Enviado"}
               </h3>
-              <button onClick={() => setShowSendModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowSendModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>

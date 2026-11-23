@@ -697,9 +697,9 @@ export default function PayrollPage() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             {/* Month nav */}
             <div className="flex items-center gap-0.5">
-              <button onClick={prevM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={16} /></button>
+              <button aria-label="Anterior" onClick={prevM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={16} /></button>
               <h2 className="text-[14px] font-semibold text-slate-900 min-w-[180px] text-center px-1">{MONTH_NAMES[month]} {year}</h2>
-              <button onClick={nextM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronRight size={16} /></button>
+              <button aria-label="Siguiente" onClick={nextM} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"><ChevronRight size={16} /></button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -752,7 +752,7 @@ export default function PayrollPage() {
                   <p className="text-xs text-slate-400 mt-0.5">El salario siempre cubre el mes completo</p>
                 </div>
               </div>
-              <button onClick={() => setShowPeriodCfg(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
+              <button aria-label="Cerrar" onClick={() => setShowPeriodCfg(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
             </div>
             <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
               {ALLOWANCES.map(a => {
@@ -828,7 +828,7 @@ export default function PayrollPage() {
                   <Zap size={15} className="text-amber-500" />
                   <p className="text-[13px] font-semibold text-slate-900">{rfMember.firstName} {rfMember.lastName1}</p>
                 </div>
-                <button onClick={() => setRfTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
+                <button aria-label="Cerrar" onClick={() => setRfTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={15} /></button>
               </div>
               <div className="p-6 space-y-5">
                 {/* Day range */}
@@ -964,7 +964,7 @@ export default function PayrollPage() {
                     className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Imprimir">
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => { setDetailId(null); setEditingSalary(false); setNoteDraft(null); }} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button aria-label="Cerrar" onClick={() => { setDetailId(null); setEditingSalary(false); setNoteDraft(null); }} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                     <X size={15} />
                   </button>
                 </div>
@@ -1040,7 +1040,7 @@ export default function PayrollPage() {
                             <span className={`font-medium ${hasOverride ? "text-amber-700" : "text-slate-700"}`}>
                               {new Intl.NumberFormat("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2}).format(currentRate)} {rateLabel}
                               {hasOverride && (
-                                <button onClick={() => { setSalaryDraft(String(currentRate)); setEditingSalary(true); }}
+                                <button aria-label="Bloquear" onClick={() => { setSalaryDraft(String(currentRate)); setEditingSalary(true); }}
                                   className="ml-1.5 text-amber-500 hover:text-amber-700">
                                   <Lock size={9} style={{display:"inline"}} />
                                 </button>
@@ -1234,7 +1234,7 @@ export default function PayrollPage() {
             <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-base font-semibold text-slate-900">Solicitar complementos</p>
-                <button onClick={() => setShowSolicitar(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={16} /></button>
+                <button aria-label="Cerrar" onClick={() => setShowSolicitar(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><X size={16} /></button>
               </div>
               <div className="flex items-center gap-1.5">
                 {[1,2,3,4].map(s => (
@@ -1456,7 +1456,7 @@ export default function PayrollPage() {
                   {editMember.role ? ` · ${editMember.role}` : ""}
                 </p>
               </div>
-              <button onClick={() => setEditTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <button aria-label="Cerrar" onClick={() => setEditTarget(null)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
               </button>
             </div>

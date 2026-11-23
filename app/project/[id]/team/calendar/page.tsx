@@ -496,7 +496,7 @@ export default function CalendarPage() {
           <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
             {/* Date nav — pill contenedor que desaparece al imprimir, dejando solo el nombre del mes/semana */}
             <div className="flex items-center gap-0.5 border border-slate-200 rounded-md pl-1 pr-1 py-0.5 print:border-0 print:p-0">
-              <button
+              <button aria-label="Anterior"
                 onClick={() => viewMode === "month" ? navMonth(-1) : navWeek(-1)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors print:hidden"
               >
@@ -513,7 +513,7 @@ export default function CalendarPage() {
                     })()
                 }
               </h2>
-              <button
+              <button aria-label="Siguiente"
                 onClick={() => viewMode === "month" ? navMonth(1) : navWeek(1)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors print:hidden"
               >
@@ -621,7 +621,7 @@ export default function CalendarPage() {
                           }`}>
                             {new Date(ymd + "T12:00:00").getDate()}
                           </span>
-                          <button
+                          <button aria-label="Añadir"
                             onClick={(e) => { e.stopPropagation(); openCreate(ymd); }}
                             className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-slate-600 rounded transition-all"
                           >
@@ -699,7 +699,7 @@ export default function CalendarPage() {
                     `}
                   >
                     <div className="flex justify-end mb-3">
-                      <button
+                      <button aria-label="Añadir"
                         onClick={(e) => { e.stopPropagation(); openCreate(ymd); }}
                         className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-all"
                       >
@@ -756,7 +756,7 @@ export default function CalendarPage() {
                 >
                   <Plus size={12} /> Añadir
                 </button>
-                <button onClick={() => setSelectedDate(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                <button aria-label="Cerrar" onClick={() => setSelectedDate(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
                   <X size={14} />
                 </button>
               </div>
@@ -808,13 +808,13 @@ export default function CalendarPage() {
                       </div>
                       {!isAuto && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
+                          <button aria-label="Editar"
                             onClick={() => openEdit(ev)}
                             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
                           >
                             <Edit2 size={13} />
                           </button>
-                          <button
+                          <button aria-label="Eliminar"
                             onClick={() => handleDelete(ev)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
@@ -858,7 +858,7 @@ export default function CalendarPage() {
                         <p className={`text-xs ${cfg.text} font-medium`}>{cfg.label}{isAuto ? " · Auto" : ""}</p>
                       </div>
                     </div>
-                    <button onClick={() => setSidebarEvent(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white/50 transition-colors">
+                    <button aria-label="Cerrar" onClick={() => setSidebarEvent(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white/50 transition-colors">
                       <X size={14} />
                     </button>
                   </div>
@@ -952,7 +952,7 @@ export default function CalendarPage() {
               <h2 className="text-base font-semibold text-slate-900">
                 {editingEvent ? "Editar evento" : "Nuevo evento"}
               </h2>
-              <button
+              <button aria-label="Cerrar"
                 onClick={() => setShowEventModal(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
               >

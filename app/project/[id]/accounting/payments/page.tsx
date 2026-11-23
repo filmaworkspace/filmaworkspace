@@ -831,7 +831,7 @@ export default function PaymentsPage() {
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-1">
                                         <p className="text-[11px] font-medium text-slate-900 truncate font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p>
-                                        {forecast.status === "draft" && (<button onClick={() => handleRemovePaymentItem(forecast.id, item.id)} className="p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={10} /></button>)}
+                                        {forecast.status === "draft" && (<button aria-label="Cerrar" onClick={() => handleRemovePaymentItem(forecast.id, item.id)} className="p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={10} /></button>)}
                                       </div>
                                       <div className="flex items-center justify-between mt-0.5">
                                         <span className="text-[10px] text-slate-500 truncate">{item.supplier}</span>
@@ -897,7 +897,7 @@ export default function PaymentsPage() {
                             <td className="px-4 py-3"><span className={cx("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium", statusConfig.bg, statusConfig.text)}><StatusIcon size={12} />{statusConfig.label}</span></td>
                             <td className="px-4 py-3">{forecast.items.length > 0 ? (<div className="flex items-center gap-2 justify-center"><div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: progress.percent + "%" }} /></div><span className="text-xs text-slate-500">{progress.completed}/{progress.total}</span></div>) : (<span className="text-xs text-slate-400">-</span>)}</td>
                             <td className="px-4 py-3 text-right"><span className="text-[13px] font-bold text-slate-900">{formatCurrency(forecast.totalAmount)} €</span></td>
-                            <td className="px-4 py-3"><button onClick={() => setShowForecastDetail(forecast)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><Eye size={16} /></button></td>
+                            <td className="px-4 py-3"><button aria-label="Ver" onClick={() => setShowForecastDetail(forecast)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><Eye size={16} /></button></td>
                           </tr>
                           {isExpanded && forecast.items.length > 0 && (
                             <tr><td colSpan={7} className="bg-slate-50 px-4 py-3">

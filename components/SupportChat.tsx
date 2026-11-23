@@ -286,7 +286,7 @@ export default function SupportChat() {
                 )}
               </div>
             </div>
-            <button onClick={() => setOpen(false)}
+            <button aria-label="Cerrar" onClick={() => setOpen(false)}
               className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors">
               <X size={14} />
             </button>

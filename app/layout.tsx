@@ -34,6 +34,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${inter.variable} font-sans antialiased`}
       >
+        <a href="#contenido" className="skip-link">Saltar al contenido</a>
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

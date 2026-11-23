@@ -697,11 +697,11 @@ export default function PODetailPage() {
             <div className="absolute right-0 flex items-center gap-2">
               {/* Navegación entre POs */}
               <div className="flex items-center gap-1 mr-2">
-                <button onClick={() => navigatePO("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+                <button aria-label="Anterior" onClick={() => navigatePO("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30">
                   <ChevronLeft size={18} />
                 </button>
                 <span className="text-xs text-slate-500 px-2">{currentIndex + 1} / {allPOIds.length}</span>
-                <button onClick={() => navigatePO("next")} disabled={currentIndex >= allPOIds.length - 1} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+                <button aria-label="Siguiente" onClick={() => navigatePO("next")} disabled={currentIndex >= allPOIds.length - 1} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30">
                   <ChevronRight size={18} />
                 </button>
               </div>
@@ -728,7 +728,7 @@ export default function PODetailPage() {
 
               {/* Menú de acciones */}
               <div className="relative">
-                <button 
+                <button aria-label="Más acciones" 
                   onClick={() => setShowActionsMenu(!showActionsMenu)} 
                   className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-md hover:bg-slate-50 text-[13px] font-medium"
                 >

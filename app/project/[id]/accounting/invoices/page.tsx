@@ -693,7 +693,7 @@ export default function InvoicesPage() {
       footer: (rs) => formatCurrency(rs.filter((r) => !["cancelled", "void", "rejected"].includes(r.status)).reduce((a, r) => a + (r.totalAmount || 0), 0)),
     },
     {
-      key: "due", label: "Vencimiento", width: "w-44", className: "whitespace-nowrap tabular-nums text-slate-600",
+      key: "due", label: "Vencimiento", width: "w-52", className: "whitespace-nowrap tabular-nums text-slate-600",
       sortValue: (i) => i.dueDate?.getTime() ?? null,
       render: (i) => {
         const due = dueLabel(i, getInvoiceDisplayState(i));

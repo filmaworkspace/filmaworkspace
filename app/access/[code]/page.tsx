@@ -372,13 +372,13 @@ const allowances = access
 
           {/* Month nav */}
           <div className="flex items-center gap-0.5">
-            <button onClick={prevM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
+            <button aria-label="Anterior" onClick={prevM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
               <ChevronLeft size={16}/>
             </button>
             <span className="text-sm font-semibold min-w-[118px] text-center" style={{ color:BD }}>
               {MONTH_NAMES[month]} {year}
             </span>
-            <button onClick={nextM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
+            <button aria-label="Siguiente" onClick={nextM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
               <ChevronRight size={16}/>
             </button>
           </div>
@@ -507,7 +507,7 @@ const allowances = access
                   )}
                 </div>
               </div>
-              <button onClick={() => setSheetId(null)}
+              <button aria-label="Cerrar" onClick={() => setSheetId(null)}
                 className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors">
                 <X size={18}/>
               </button>
@@ -515,13 +515,13 @@ const allowances = access
 
             {/* Month navigation inside sheet */}
             <div className="px-5 py-3 flex items-center justify-between border-b border-stone-50">
-              <button onClick={sheetPrevM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
+              <button aria-label="Anterior" onClick={sheetPrevM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
                 <ChevronLeft size={16}/>
               </button>
               <span className="text-sm font-bold" style={{ color:BD }}>
                 {MONTH_NAMES[sheetMonth]} {sheetYear}
               </span>
-              <button onClick={sheetNextM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
+              <button aria-label="Siguiente" onClick={sheetNextM} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors text-stone-400">
                 <ChevronRight size={16}/>
               </button>
             </div>

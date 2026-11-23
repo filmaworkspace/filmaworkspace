@@ -556,7 +556,7 @@ export default function LedgerPage() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto flex-wrap">
-              <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg">
+              <button aria-label="Recargar" onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-lg">
                 <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               </button>
 
@@ -770,7 +770,7 @@ export default function LedgerPage() {
                   </div>
                   <p className="text-slate-400 text-sm mt-0.5">{selected.name}</p>
                 </div>
-                <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-white transition-colors mt-1"><X size={16} /></button>
+                <button aria-label="Cerrar" onClick={() => setSelected(null)} className="text-slate-500 hover:text-white transition-colors mt-1"><X size={16} /></button>
               </div>
               {/* KPIs */}
               <div className="grid grid-cols-3 gap-3 mt-4">

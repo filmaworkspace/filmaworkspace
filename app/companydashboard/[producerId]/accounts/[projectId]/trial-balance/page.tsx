@@ -186,7 +186,7 @@ export default function TrialBalancePage() {
             <p className="tabular-nums text-xs text-slate-500 mt-0.5">{filtered.length} cuentas · PGC 2007</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
+            <button aria-label="Recargar" onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input placeholder="Filtrar cuenta" value={search} onChange={e => setSearch(e.target.value)}

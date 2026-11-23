@@ -81,7 +81,7 @@ export default function BudgetingLibraryModal({
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
             <h2 className="text-sm font-semibold text-slate-900">{TABS.find((t) => t.id === tab)?.label}</h2>
-            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+            <button aria-label="Cerrar" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
               <X size={16} />
             </button>
           </div>

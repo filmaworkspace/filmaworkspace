@@ -1058,7 +1058,7 @@ export default function EditInvoicePage() {
                           {!item.isNewItem && <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">De PO</span>}
                         </div>
                         {items.length > 1 && (
-                          <button onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <button aria-label="Eliminar" onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -1218,7 +1218,7 @@ export default function EditInvoicePage() {
                       </div>
                       <span className="text-[13px] text-slate-600 w-24 text-right">{formatCurrency(dd.amount)} €</span>
                       {dueDates.length > 2 && (
-                        <button onClick={() => removeDueDate(i)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                        <button aria-label="Eliminar" onClick={() => removeDueDate(i)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
                       )}
                     </div>
                   ))}

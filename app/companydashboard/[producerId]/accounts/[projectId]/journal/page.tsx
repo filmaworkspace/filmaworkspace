@@ -614,7 +614,7 @@ export default function JournalPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 sticky top-0 bg-white z-10">
               <h3 className="font-semibold text-slate-900 text-sm">Nuevo asiento manual</h3>
-              <button onClick={() => { setActiveModal(null); resetManualForm(); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+              <button aria-label="Cerrar" onClick={() => { setActiveModal(null); resetManualForm(); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
             <div className="px-5 py-4 space-y-4">
               {/* Template picker */}
@@ -674,7 +674,7 @@ export default function JournalPage() {
                           <td className="px-2 py-1"><input value={line.name} onChange={e => updateMLine(line.id, "name", e.target.value)} placeholder={planCuentas.find(a => a.code === line.code)?.name || ""} className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full focus:border-slate-400 outline-none" /></td>
                           <td className="px-2 py-1"><input type="number" value={line.debe || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "debe", parseFloat(e.target.value) || 0)} className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
                           <td className="px-2 py-1"><input type="number" value={line.haber || ""} min={0} step={0.01} onChange={e => updateMLine(line.id, "haber", parseFloat(e.target.value) || 0)} className="tabular-nums text-[11px] border border-slate-200 rounded px-1.5 py-0.5 w-full text-right focus:border-slate-400 outline-none" /></td>
-                          <td className="px-1"><button onClick={() => setMLines(p => p.filter(l => l.id !== line.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
+                          <td className="px-1"><button aria-label="Eliminar" onClick={() => setMLines(p => p.filter(l => l.id !== line.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -701,7 +701,7 @@ export default function JournalPage() {
                 <h3 className="font-semibold text-slate-900 text-sm">Contabilizar nóminas</h3>
                 <span className="text-[10px] tabular-nums text-slate-400">— genera 3 asientos: devengo · SS patronal · pago neto</span>
               </div>
-              <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+              <button aria-label="Cerrar" onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
 
             <div className="px-5 py-4 space-y-5">
@@ -804,7 +804,7 @@ export default function JournalPage() {
                           <td className="px-2 py-1.5 text-right bg-blue-50"><span className="tabular-nums text-xs font-semibold text-blue-800">{fmt(w.irpfEur)}</span></td>
                           <td className="px-2 py-1.5 text-right bg-emerald-50"><span className={`tabular-nums text-xs font-bold ${w.netoAPagar >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmt(w.netoAPagar)}</span></td>
                           <td className="px-2 py-1.5 text-right bg-amber-50"><span className="tabular-nums text-xs font-semibold text-amber-800">{fmt(w.costeTotalEmpresa)}</span></td>
-                          <td className="px-1"><button onClick={() => removeWorker(w.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
+                          <td className="px-1"><button aria-label="Eliminar" onClick={() => removeWorker(w.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={10} /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -898,7 +898,7 @@ export default function JournalPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
+            <button aria-label="Recargar" onClick={loadData} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white border border-slate-200 rounded-lg"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
 
             {/* Search */}
             <div className="relative">
@@ -1012,7 +1012,7 @@ export default function JournalPage() {
                     {entry.isManual && (
                       <>
                         <button onClick={() => duplicateEntry(entry)} title="Duplicar" className="text-slate-400 hover:text-slate-700 p-0.5"><Copy size={12} /></button>
-                        <button onClick={() => deleteManual(entry.id)} className="text-slate-400 hover:text-red-500 p-0.5"><Trash2 size={12} /></button>
+                        <button aria-label="Eliminar" onClick={() => deleteManual(entry.id)} className="text-slate-400 hover:text-red-500 p-0.5"><Trash2 size={12} /></button>
                       </>
                     )}
                     {!entry.isManual && (

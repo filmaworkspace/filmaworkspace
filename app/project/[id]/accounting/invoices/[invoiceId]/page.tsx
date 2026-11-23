@@ -948,9 +948,9 @@ export default function InvoiceDetailPage() {
 
             <div className="absolute right-0 flex items-center gap-2">
               <div className="flex items-center gap-1 mr-2">
-                <button onClick={() => navigateInvoice("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30"><ChevronLeft size={18} /></button>
+                <button aria-label="Anterior" onClick={() => navigateInvoice("prev")} disabled={currentIndex <= 0} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30"><ChevronLeft size={18} /></button>
                 <span className="text-xs text-slate-500 px-2">{currentIndex + 1} / {allInvoiceIds.length}</span>
-                <button onClick={() => navigateInvoice("next")} disabled={currentIndex >= allInvoiceIds.length - 1} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30"><ChevronRight size={18} /></button>
+                <button aria-label="Siguiente" onClick={() => navigateInvoice("next")} disabled={currentIndex >= allInvoiceIds.length - 1} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30"><ChevronRight size={18} /></button>
               </div>
 
               {canCode() && invoice.status !== "cancelled" && (
@@ -975,7 +975,7 @@ export default function InvoiceDetailPage() {
               )}
 
               <div className="relative">
-                <button onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-md hover:bg-slate-50"><MoreHorizontal size={18} /></button>
+                <button aria-label="Más acciones" onClick={() => setShowActionsMenu(!showActionsMenu)} className="p-2.5 border border-slate-200 rounded-md hover:bg-slate-50"><MoreHorizontal size={18} /></button>
                 {showActionsMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} /><AnchoredPanel className="w-56 bg-white border border-slate-200 rounded-md shadow-xl py-1" align="right" gap={8}>
                   <Link href={`/project/${projectId}/accounting/document-center?doc=inv:${invoiceId}`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileText size={16} className="text-slate-400" />Ver en documentación</Link>
                   {canReplaceDocument() && (

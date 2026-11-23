@@ -57,7 +57,7 @@ export function SignRequestPanel({ r, busy, onClose, onAction, admin = false }: 
                   </p>
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {p.signature && <img src={p.signature.image} alt="" className="h-9 w-24 object-contain" />}
+                {p.signature && <img src={p.signature.image} alt={`Firma de ${p.name || "firmante"}`} className="h-9 w-24 object-contain" />}
               </div>
             ))}
           </div>

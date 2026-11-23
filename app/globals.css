@@ -138,3 +138,53 @@ table.tbl thead th.text-right:not([class*="w-"]) {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ─── Accesibilidad ───────────────────────────────────────────────────────────
+   Contraste: los grises claros de texto llegan al mínimo AA (4,5:1 sobre
+   blanco) y los decorativos a 3:1. El color de fondos y bordes no cambia. */
+.text-slate-400,
+.placeholder\:text-slate-400::placeholder,
+.hover\:text-slate-400:hover {
+  color: #68758a;
+}
+.text-slate-300 {
+  color: #8592a6;
+}
+
+/* Foco visible con teclado en todo lo que se puede accionar, aunque el
+   elemento quite el contorno (outline-none). Con ratón no aparece. */
+:where(a, button, summary, tr[tabindex], [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]:not([tabindex="-1"]), input[type="checkbox"], input[type="radio"]):focus-visible {
+  outline: 2px solid #2f52e0 !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  outline: 2px solid #2f52e0 !important;
+  outline-offset: 0;
+}
+
+/* Menos movimiento para quien lo pide en el sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Saltar al contenido (enlace visible solo con teclado). */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 100;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 13px;
+}
+.skip-link:focus {
+  top: 8px;
+}

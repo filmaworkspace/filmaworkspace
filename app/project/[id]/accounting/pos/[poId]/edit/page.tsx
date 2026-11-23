@@ -1095,7 +1095,7 @@ export default function EditPOPage() {
                           {itemHasAllFields && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
                         </div>
                         {items.length > 1 && canEdit() && (
-                          <button onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <button aria-label="Eliminar" onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -1333,7 +1333,7 @@ export default function EditPOPage() {
                       </div>
                     </div>
                     {canEdit() && (
-                      <button onClick={() => { setExistingFileUrl(""); setExistingFileName(""); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <button aria-label="Cerrar" onClick={() => { setExistingFileUrl(""); setExistingFileName(""); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <X size={16} />
                       </button>
                     )}
@@ -1353,7 +1353,7 @@ export default function EditPOPage() {
                             <span className="text-xs text-slate-500">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
                           </div>
                         </div>
-                        <button onClick={() => setUploadedFile(null)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <button aria-label="Cerrar" onClick={() => setUploadedFile(null)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                           <X size={16} />
                         </button>
                       </div>

@@ -256,7 +256,7 @@ function AccountCombobox({
                 className="flex-1 text-[11px] bg-transparent outline-none text-slate-700 placeholder-slate-400"
               />
               {query && (
-                <button onClick={() => setQuery("")} className="text-slate-400 hover:text-slate-600">
+                <button aria-label="Cerrar" onClick={() => setQuery("")} className="text-slate-400 hover:text-slate-600">
                   <X size={9} />
                 </button>
               )}
@@ -589,7 +589,7 @@ export default function CompanyAccountsPage() {
               <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /><span className="text-slate-500">Contabilizadas:</span><span className="font-semibold text-emerald-600">{accountedCnt}</span></div>
               {notCodedCnt > 0 && <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" /><span className="text-slate-500">Sin codificar:</span><span className="font-semibold text-slate-500">{notCodedCnt}</span></div>}
               <div className="flex items-center gap-1.5 ml-auto"><Euro size={12} className="text-slate-400" /><span className="text-slate-500">Base total:</span><span className="font-semibold text-slate-900">{fmt(totalBase)} €</span></div>
-              <button onClick={loadData} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
+              <button aria-label="Recargar" onClick={loadData} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /></button>
             </div>
           </div>
 
@@ -690,15 +690,15 @@ export default function CompanyAccountsPage() {
             {/* Panel nav */}
             <div className="flex-shrink-0 bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <button onClick={goToPrev} disabled={currentIdx <= 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronLeft size={16} /></button>
+                <button aria-label="Anterior" onClick={goToPrev} disabled={currentIdx <= 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronLeft size={16} /></button>
                 <span className="tabular-nums text-xs text-slate-500">{currentIdx + 1} / {filtered.length}</span>
-                <button onClick={goToNext} disabled={currentIdx >= filtered.length - 1} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronRight size={16} /></button>
+                <button aria-label="Siguiente" onClick={goToNext} disabled={currentIdx >= filtered.length - 1} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg disabled:opacity-30"><ChevronRight size={16} /></button>
               </div>
               <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
                 <button onClick={() => setShowDocument(false)} className={`px-3 py-1 text-xs font-medium rounded-md ${!showDocument ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}>Datos</button>
                 <button onClick={() => setShowDocument(true)} disabled={!selectedInvoice.attachmentUrl} className={`px-3 py-1 text-xs font-medium rounded-md ${showDocument ? "bg-slate-100 text-slate-900" : "text-slate-500"} disabled:opacity-40`}>Documento</button>
               </div>
-              <button onClick={() => setSelectedInvoice(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg"><X size={16} /></button>
+              <button aria-label="Cerrar" onClick={() => setSelectedInvoice(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg"><X size={16} /></button>
             </div>
 
             {showDocument && selectedInvoice.attachmentUrl ? (
@@ -884,7 +884,7 @@ export default function CompanyAccountsPage() {
                               </td>
                               {editingLines && (
                                 <td className="px-2">
-                                  <button onClick={() => removeDraftLine(line.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
+                                  <button aria-label="Eliminar" onClick={() => removeDraftLine(line.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
                                 </td>
                               )}
                             </tr>

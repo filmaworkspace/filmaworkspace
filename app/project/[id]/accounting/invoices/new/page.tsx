@@ -1573,7 +1573,7 @@ export default function NewInvoicePage() {
                     <AnchoredPanel className="w-72 bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden" align="right" offsetTop={48}>
                       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-semibold text-slate-900 text-[13px]">Borradores</h3>
-                        <button onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
+                        <button aria-label="Cerrar" onClick={() => setShowDraftsPanel(false)} className="text-slate-400 hover:text-slate-600">
                           <X size={16} />
                         </button>
                       </div>
@@ -1589,7 +1589,7 @@ export default function NewInvoicePage() {
                                     {new Date(draft.savedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                                   </p>
                                 </div>
-                                <button
+                                <button aria-label="Eliminar"
                                   onClick={() => deleteDraft(draft.id)}
                                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100"
                                 >
@@ -1990,7 +1990,7 @@ export default function NewInvoicePage() {
                           <p className="text-xs text-slate-500">{(uploadedFile.size / 1024).toFixed(0)} KB</p>
                         </div>
                       </div>
-                      <button onClick={() => setUploadedFile(null)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                      <button aria-label="Cerrar" onClick={() => setUploadedFile(null)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                         <X size={16} />
                       </button>
                     </div>
@@ -2108,7 +2108,7 @@ export default function NewInvoicePage() {
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-xs font-medium text-slate-500">Vencimiento {idx + 1}</span>
                               {dueDates.length > 2 && (
-                                <button
+                                <button aria-label="Eliminar"
                                   type="button"
                                   onClick={() => removeDueDate(idx)}
                                   className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -2372,7 +2372,7 @@ export default function NewInvoicePage() {
                               )}
                               {itemComplete && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
                             </div>
-                            <button onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                            <button aria-label="Eliminar" onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                               <Trash2 size={14} />
                             </button>
                           </div>

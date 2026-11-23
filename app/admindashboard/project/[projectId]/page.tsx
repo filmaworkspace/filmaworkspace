@@ -1671,7 +1671,7 @@ export default function AdminProjectPage() {
           <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Enviar mensaje al equipo</h3>
-              <button onClick={() => setShowMessageModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowMessageModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -1748,7 +1748,7 @@ export default function AdminProjectPage() {
           <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Editar proyecto</h3>
-              <button onClick={() => setShowEditModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowEditModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -1792,7 +1792,7 @@ export default function AdminProjectPage() {
                         <span key={pid} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm">
                           <Building2 size={12} />
                           {prod.name}
-                          <button
+                          <button aria-label="Cerrar"
                             onClick={() => setEditForm({ ...editForm, producers: editForm.producers.filter((id) => id !== pid) })}
                             className="ml-1 text-amber-400 hover:text-amber-700"
                           >
@@ -1882,7 +1882,7 @@ export default function AdminProjectPage() {
           <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Programar cierre</h3>
-              <button onClick={() => setShowCloseModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowCloseModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -1999,7 +1999,7 @@ export default function AdminProjectPage() {
                       <p className="text-sm font-medium text-slate-900 truncate">{selectedUser.name}</p>
                       <p className="text-xs text-slate-500 truncate">{selectedUser.email}</p>
                     </div>
-                    <button onClick={() => setAddMemberForm({ ...addMemberForm, odId: "", searchQuery: "", inviteName: "" })} className="text-slate-400 hover:text-slate-600">
+                    <button aria-label="Cerrar" onClick={() => setAddMemberForm({ ...addMemberForm, odId: "", searchQuery: "", inviteName: "" })} className="text-slate-400 hover:text-slate-600">
                       <X size={14} />
                     </button>
                   </div>
@@ -2066,7 +2066,7 @@ export default function AdminProjectPage() {
                 <h3 className="text-lg font-semibold text-slate-900">Editar permisos</h3>
                 <p className="text-sm text-slate-500">{showEditMemberModal.name}</p>
               </div>
-              <button onClick={() => setShowEditMemberModal(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowEditMemberModal(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -2143,7 +2143,7 @@ export default function AdminProjectPage() {
           <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Clonar proyecto</h3>
-              <button onClick={() => setShowCloneModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowCloneModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -2213,7 +2213,7 @@ export default function AdminProjectPage() {
                 <h3 className="text-lg font-semibold text-slate-900">Copiar proveedores</h3>
                 <p className="text-sm text-slate-500">Desde: {project.name}</p>
               </div>
-              <button onClick={() => setShowCopySuppliersModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowCopySuppliersModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -2275,7 +2275,7 @@ export default function AdminProjectPage() {
                 <h3 className="text-lg font-semibold text-slate-900">Copiar presupuesto</h3>
                 <p className="text-sm text-slate-500">Desde: {project.name}</p>
               </div>
-              <button onClick={() => setShowCopyBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowCopyBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>
@@ -2341,7 +2341,7 @@ export default function AdminProjectPage() {
           <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Eliminar presupuesto</h3>
-              <button onClick={() => setShowDeleteBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
+              <button aria-label="Cerrar" onClick={() => setShowDeleteBudgetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl">
                 <X size={20} />
               </button>
             </div>

@@ -1060,7 +1060,7 @@ export default function CrewMemberPage() {
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">Formulario para que el miembro complete sus datos</p>
               </div>
-              <button onClick={() => setShowFormModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setShowFormModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
                 <X size={16} />
               </button>
             </div>

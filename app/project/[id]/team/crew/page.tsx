@@ -1092,7 +1092,7 @@ export default function CrewPage() {
                   {editingMember ? `Editar · ${editingMember.crewNumber}` : "Nuevo miembro"}
                 </h2>
               </div>
-              <button onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <button aria-label="Cerrar" onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -1333,7 +1333,7 @@ export default function CrewPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={closeSendForm} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <button aria-label="Cerrar" onClick={closeSendForm} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -1485,7 +1485,7 @@ export default function CrewPage() {
                   <p className="text-xs text-slate-400 mt-0.5">Orden según configuración de equipo</p>
                 </div>
               </div>
-              <button onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+              <button aria-label="Cerrar" onClick={() => setShowCrewListModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={16} />
               </button>
             </div>

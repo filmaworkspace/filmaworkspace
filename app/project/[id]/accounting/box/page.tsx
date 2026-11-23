@@ -2581,7 +2581,7 @@ export default function BoxesPage() {
                         <Eye size={16} />
                       </button>
                     )}
-                    <button onClick={closeDrawer} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
+                    <button aria-label="Cerrar" onClick={closeDrawer} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X size={18} /></button>
                   </div>
                 </div>
 
@@ -2718,7 +2718,7 @@ export default function BoxesPage() {
                             <div className="flex items-center justify-between">
                               <span className="text-xs text-slate-400 font-medium">Línea {idx + 1}</span>
                               {drawerItems.length > 1 && (
-                                <button type="button"
+                                <button aria-label="Eliminar" type="button"
                                   onClick={() => setDrawerItems(prev => prev.filter((_, i) => i !== idx))}
                                   className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
                                   <Trash2 size={12} />
@@ -2887,7 +2887,7 @@ export default function BoxesPage() {
                                   <span className="text-xs text-slate-400">€</span>
                                 </div>
                               </div>
-                              <button type="button"
+                              <button aria-label="Cerrar" type="button"
                                 onClick={() => setDrawerLinkedCharges(prev => prev.filter((_, i) => i !== ci))}
                                 className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
                                 <X size={11} />
@@ -2956,7 +2956,7 @@ export default function BoxesPage() {
                         className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
                         <Maximize2 size={12} /> Abrir
                       </a>
-                      <button onClick={() => setDrawerShowPreview(false)}
+                      <button aria-label="Cerrar" onClick={() => setDrawerShowPreview(false)}
                         className="p-1 text-slate-400 hover:bg-slate-100 rounded">
                         <X size={14} />
                       </button>
@@ -3213,7 +3213,7 @@ export default function BoxesPage() {
                             </span>
                           )}
                           {cardExpensesList.length > 1 && (
-                            <button onClick={() => removeCardExpense(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
+                            <button aria-label="Eliminar" onClick={() => removeCardExpense(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
                           )}
                         </div>
                       </div>
@@ -3315,7 +3315,7 @@ export default function BoxesPage() {
                               </div>
                               <div className="col-span-1 flex justify-center">
                                 {exp.items.length > 1 && (
-                                  <button onClick={() => removeCardItem(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
+                                  <button aria-label="Eliminar" onClick={() => removeCardItem(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
                                 )}
                               </div>
                             </div>
@@ -3391,7 +3391,7 @@ export default function BoxesPage() {
                       <p className="text-[13px] font-medium text-slate-900">{importFile.name}</p>
                       <p className="text-xs text-slate-500">{importPreview.length} gastos detectados</p>
                     </div>
-                    <button onClick={() => { setImportFile(null); setImportPreview([]); }} className="p-1.5 text-slate-400 hover:bg-slate-200 rounded"><X size={16} /></button>
+                    <button aria-label="Cerrar" onClick={() => { setImportFile(null); setImportPreview([]); }} className="p-1.5 text-slate-400 hover:bg-slate-200 rounded"><X size={16} /></button>
                   </div>
                   {importPreview.length > 0 && (
                     <div className="border border-slate-200 rounded-md overflow-hidden">
@@ -3656,7 +3656,7 @@ export default function BoxesPage() {
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Gasto {idx + 1}</span>
                         <div className="flex items-center gap-2">
                           {exp.file && <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg"><Paperclip size={12} /> {exp.file.name.substring(0, 20)}...</span>}
-                          {expensesList.length > 1 && <button onClick={() => removeExpenseFromList(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
+                          {expensesList.length > 1 && <button aria-label="Eliminar" onClick={() => removeExpenseFromList(idx)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
                         </div>
                       </div>
                       <div className="grid grid-cols-12 gap-3">
@@ -3776,7 +3776,7 @@ export default function BoxesPage() {
                                   className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 tabular-nums" />
                               </div>
                               <div className="col-span-1 flex justify-center">
-                                {exp.items.length > 1 && <button onClick={() => removeItemFromExpense(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>}
+                                {exp.items.length > 1 && <button aria-label="Eliminar" onClick={() => removeItemFromExpense(idx, itemIdx)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>}
                               </div>
                             </div>
                           ))}
@@ -4309,7 +4309,7 @@ export default function BoxesPage() {
                                     </select>
                                   </div>
                                   {ed.items.length > 1 && (
-                                    <button type="button" onClick={() => removeVolcarItem(i, j)}
+                                    <button aria-label="Eliminar" type="button" onClick={() => removeVolcarItem(i, j)}
                                       className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0">
                                       <Trash2 size={14} />
                                     </button>

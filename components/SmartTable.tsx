@@ -285,6 +285,8 @@ export function SmartTable<T>({
         <tbody>
           {rows.map((r) => (
             <tr key={rowKey(r)} onClick={onRowClick ? () => onRowClick(r) : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? (e) => { if (e.key === "Enter" && e.target === e.currentTarget) onRowClick(r); } : undefined}
               className={`border-b border-slate-100 last:border-0 hover:bg-[#FAFAFA] ${onRowClick ? "cursor-pointer" : ""} ${rowClassName?.(r) || ""}`}>
               {cols.map((c, i) => (
                 <td key={c.key} className={`${i === 0 ? "relative pl-4 pr-3" : "px-3"} py-1.5 ${c.align === "right" ? "text-right" : ""} ${c.className || ""}`}>

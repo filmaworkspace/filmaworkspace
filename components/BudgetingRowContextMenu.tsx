@@ -102,7 +102,7 @@ export default function BudgetingRowContextMenu({
           <div className="border-t border-slate-100 my-1.5" />
           <div className="flex items-center justify-between px-3 py-1">
             <span className="text-xs text-slate-700">Negrita</span>
-            <button
+            <button aria-label="Negrita"
               onClick={() => state.style!.onChangeBold(!state.style!.bold)}
               className={`p-1 rounded transition-colors ${state.style!.bold ? "text-[#E86F4A] bg-[#E86F4A]/[0.1]" : "text-slate-300 hover:text-slate-500"}`}
             >

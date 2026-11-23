@@ -50,7 +50,7 @@ function ScenariosBar({ scenarios, onAdd, onRename, onDelete }: {
           ) : (
             <span key={sc.id} className="inline-flex items-center gap-1 text-xs pl-2.5 pr-1.5 py-1 rounded-full border border-slate-200 text-slate-600">
               <button onClick={() => { setEditingId(sc.id); setEditLabel(sc.label); }} className="hover:text-[#E86F4A]">{sc.label}</button>
-              <button onClick={() => onDelete(sc.id)} className="text-slate-300 hover:text-red-500"><X size={10} /></button>
+              <button aria-label="Cerrar" onClick={() => onDelete(sc.id)} className="text-slate-300 hover:text-red-500"><X size={10} /></button>
             </span>
           )
         ))}
@@ -258,7 +258,7 @@ export default function BudgetingGlobalsPanel({ draftId }: { draftId: string }) 
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-900">{modalItem ? "Editar global" : "Nuevo global"}</h3>
-              <button onClick={() => setModalItem(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+              <button aria-label="Cerrar" onClick={() => setModalItem(undefined)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                 <X size={15} />
               </button>
             </div>

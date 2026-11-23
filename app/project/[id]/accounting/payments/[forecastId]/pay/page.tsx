@@ -734,7 +734,7 @@ export default function PaymentPayPage() {
                                     <p className="text-xs text-slate-500">{(itemReceipts[item.id].file.size / 1024).toFixed(1)} KB</p>
                                   </div>
                                   <a href={itemReceipts[item.id].url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-emerald-100 rounded-lg"><ExternalLink size={14} className="text-emerald-600" /></a>
-                                  <button onClick={() => handleRemoveReceipt(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 size={14} /></button>
+                                  <button aria-label="Eliminar" onClick={() => handleRemoveReceipt(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 size={14} /></button>
                                 </div>
                               ) : (
                                 <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
