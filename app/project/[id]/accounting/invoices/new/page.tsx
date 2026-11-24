@@ -104,9 +104,9 @@ const DOCUMENT_TYPES = {
     label: "Factura",
     article: "de la",
     icon: Receipt,
-    bgColor: "bg-emerald-50",
-    textColor: "text-emerald-700",
-    borderColor: "border-emerald-200",
+    bgColor: "bg-[#F7F7F8]",
+    textColor: "text-slate-900",
+    borderColor: "border-slate-300",
     requiresReplacement: false,
   },
   proforma: {
@@ -1678,199 +1678,80 @@ export default function NewInvoicePage() {
         <div className="grid grid-cols-3 gap-8">
           {/* Left Column */}
           <div className="col-span-2 space-y-6">
-            {/* Document Type Section */}
+            {/* Documento: tipo, PO o proveedor, en un solo bloque */}
             {!replaceMode && (
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Tipo de documento</h2>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-4 gap-3">
-                    {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([key, config]) => {
-                      const Icon = config.icon;
-                      const isSelected = documentType === key;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            setDocumentType(key);
-                            setLinkedDocumentId("");
-                          }}
-                          className={cx(
-                            "p-4 rounded-md border-2 transition-all text-left",
-                            isSelected ? config.borderColor + " " + config.bgColor : "border-slate-200 hover:border-slate-300"
-                          )}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <Icon size={20} className={isSelected ? config.textColor : "text-slate-400"} />
-                            {isSelected && <CheckCircle2 size={16} className={config.textColor} />}
-                          </div>
-                          <p className="font-semibold text-slate-900 text-[13px]">{config.label}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{config.code}</p>
+              <div className="rounded-lg border border-slate-200 bg-white">
+                <div className="grid gap-x-6 gap-y-4 px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)]">
+                  <span className="pt-1.5 text-xs font-medium text-slate-500">Tipo</span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="inline-flex rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="radiogroup" aria-label="Tipo de documento">
+                      {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([key, config]) => {
+                        const on = documentType === key;
+                        return (
+                          <button key={key} type="button" role="radio" aria-checked={on}
+                            onClick={() => { setDocumentType(key); setLinkedDocumentId(""); }}
+                            className={cx("flex h-8 items-center gap-2 rounded-[5px] px-3 text-[13px] transition-colors", on ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900")}>
+                            {config.label}<span className="font-mono text-[10.5px] text-slate-400">{config.code}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {currentDocType.requiresReplacement && <span className="text-xs text-amber-800">Cuando se pague, habrá que subir la factura definitiva.</span>}
+                  </div>
+
+                  <span className="pt-1.5 text-xs font-medium text-slate-500">Origen</span>
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="inline-flex rounded-md border border-slate-200 bg-[#F7F7F8] p-0.5" role="radiogroup" aria-label="Orden de compra">
+                      {([["with-po", "Con PO"], ["without-po", "Sin PO"]] as const).map(([v, l]) => {
+                        const on = formData.invoiceType === v;
+                        return (
+                          <button key={v} type="button" role="radio" aria-checked={on}
+                            onClick={() => { if (on) return; setFormData({ ...formData, invoiceType: v, supplier: "", supplierName: "" }); setItems([]); setSelectedPO(null); }}
+                            className={cx("flex h-8 items-center rounded-[5px] px-3 text-[13px] transition-colors", on ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900")}>{l}</button>
+                        );
+                      })}
+                    </div>
+
+                    {formData.invoiceType === "with-po" ? (
+                      <div className="min-w-[260px] flex-1">
+                        <button type="button" onClick={() => setShowPOModal(true)} onBlur={() => handleBlur("po")}
+                          className={cx("flex h-9 w-full items-center justify-between gap-3 rounded-md border px-3 text-left text-[13px] transition-colors hover:border-slate-300", hasError("po") ? "border-red-300" : "border-slate-200")}>
+                          {selectedPO
+                            ? <span className="flex min-w-0 items-center gap-2"><span className="font-mono text-xs font-medium text-slate-900">PO-{selectedPO.number}</span><span className="truncate text-slate-600">{selectedPO.supplier}</span></span>
+                            : <span className="text-slate-400">Elegir orden de compra</span>}
+                          <Search size={14} className="flex-shrink-0 text-slate-400" />
                         </button>
-                      );
-                    })}
-                  </div>
-                  {currentDocType.requiresReplacement && (
-                    <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle size={18} className="text-amber-600 mt-0.5" />
-                        <div>
-                          <p className="text-[13px] font-semibold text-amber-800">Requiere factura definitiva</p>
-                          <p className="text-[13px] text-amber-700 mt-1">Una vez pagado, deberás subir la factura definitiva.</p>
-                        </div>
+                        {hasError("po") && <p className="mt-1 text-xs text-red-600">{errors.po}</p>}
+                        {selectedPO && (
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className={poStats.isOverInvoiced ? "text-red-700" : "text-slate-500"}>{poStats.isOverInvoiced ? "Supera la base de la PO" : "Facturado con esta"}</span>
+                              <span className="tabular-nums text-slate-700">{formatCurrency(poStats.invoicedAmount)} € de {formatCurrency(poStats.totalAmount)} €</span>
+                            </div>
+                            <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]">
+                              <div className={cx("h-full", poStats.percentageInvoiced > 100 ? "bg-red-500" : poStats.percentageInvoiced > 90 ? "bg-amber-500" : "bg-[#2F52E0]")} style={{ width: Math.min(poStats.percentageInvoiced, 100) + "%" }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Pending Documents Button */}
-            {!replaceMode && pendingDocuments.length > 0 && documentType === "invoice" && (
-              <button
-                onClick={() => setShowReplaceModal(true)}
-                className="w-full p-4 border border-dashed border-slate-200 rounded-lg bg-[#F7F7F8] hover:bg-[#F4F4F5] hover:border-slate-400 transition-all text-left group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#F1F1F3] rounded-md flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                      <RefreshCw size={18} className="text-slate-700" />
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-medium text-slate-900">¿Tienes la factura definitiva?</p>
-                      <p className="text-xs text-slate-700">
-                        {pendingDocuments.length} documento{pendingDocuments.length !== 1 ? "s" : ""} pendiente{pendingDocuments.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight size={18} className="text-slate-400 group-hover:text-slate-700" />
-                </div>
-              </button>
-            )}
-
-            {/* PO Association Section */}
-            {!replaceMode && (
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Asociación a PO</h2>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => {
-                        setFormData({ ...formData, invoiceType: "with-po", supplier: "", supplierName: "" });
-                        setItems([]);
-                        setSelectedPO(null);
-                      }}
-                      className={cx(
-                        "p-5 rounded-md border-2 transition-all text-left",
-                        formData.invoiceType === "with-po" ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)" }}>
-                          <FileText size={20} style={{ color: formData.invoiceType === "with-po" ? "#2F52E0" : "#94a3b8" }} />
-                        </div>
-                        {formData.invoiceType === "with-po" && <CheckCircle2 size={20} className="text-slate-900" />}
+                    ) : !linkedDocumentId ? (
+                      <div className="min-w-[260px] flex-1">
+                        <button type="button" onClick={() => setShowSupplierModal(true)} onBlur={() => handleBlur("supplier")}
+                          className={cx("flex h-9 w-full items-center justify-between gap-3 rounded-md border px-3 text-left text-[13px] transition-colors hover:border-slate-300", hasError("supplier") ? "border-red-300" : "border-slate-200")}>
+                          {formData.supplierName ? <span className="truncate font-medium text-slate-900">{formData.supplierName}</span> : <span className="text-slate-400">Elegir proveedor</span>}
+                          <Search size={14} className="flex-shrink-0 text-slate-400" />
+                        </button>
+                        {hasError("supplier") && <p className="mt-1 text-xs text-red-600">{errors.supplier}</p>}
                       </div>
-                      <h3 className="font-semibold text-slate-900 mb-1">Con PO asociada</h3>
-                      <p className="text-[13px] text-slate-500">Vinculada a una orden de compra</p>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFormData({ ...formData, invoiceType: "without-po", supplier: "", supplierName: "" });
-                        setItems([]);
-                        setSelectedPO(null);
-                      }}
-                      className={cx(
-                        "p-5 rounded-md border-2 transition-all text-left",
-                        formData.invoiceType === "without-po" ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:border-slate-300"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <Receipt size={20} className={formData.invoiceType === "without-po" ? "text-emerald-600" : "text-emerald-400"} />
-                        </div>
-                        {formData.invoiceType === "without-po" && <CheckCircle2 size={20} className="text-slate-900" />}
-                      </div>
-                      <h3 className="font-semibold text-slate-900 mb-1">Sin PO</h3>
-                      <p className="text-[13px] text-slate-500">Documento independiente</p>
-                    </button>
+                    ) : null}
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* PO Selection Section */}
-            {formData.invoiceType === "with-po" && !replaceMode && (
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Orden de compra *</h2>
-                </div>
-                <div className="p-6">
-                  <button
-                    onClick={() => setShowPOModal(true)}
-                    onBlur={() => handleBlur("po")}
-                    className={cx(
-                      "w-full px-4 py-1.5 border rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between",
-                      hasError("po") ? "border-red-300 bg-red-50" : selectedPO ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
-                    )}
-                  >
-                    {selectedPO ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <CheckCircle2 size={18} className="text-emerald-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">PO-{selectedPO.number}</p>
-                          <p className="text-[13px] text-slate-500">{selectedPO.supplier}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">Seleccionar PO</span>
-                    )}
-                    <Search size={16} className="text-slate-400" />
+                {pendingDocuments.length > 0 && documentType === "invoice" && (
+                  <button type="button" onClick={() => setShowReplaceModal(true)} className="flex w-full items-center justify-between border-t border-slate-100 px-5 py-2.5 text-left text-[13px] hover:bg-[#FAFAFA]">
+                    <span className="flex items-center gap-2 text-slate-700"><RefreshCw size={13} className="text-slate-400" />¿Es la factura definitiva de una proforma? <span className="text-slate-500">{pendingDocuments.length} pendiente{pendingDocuments.length !== 1 ? "s" : ""}</span></span>
+                    <ArrowRight size={14} className="text-slate-400" />
                   </button>
-                  {hasError("po") && (
-                    <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.po}
-                    </p>
-                  )}
-                  {selectedPO && (
-                    <div className={cx("mt-4 p-4 rounded-md border", poStats.isOverInvoiced ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200")}>
-                      <div className="flex items-start gap-3">
-                        <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", poStats.isOverInvoiced ? "bg-red-100" : "bg-slate-200")}>
-                          {poStats.isOverInvoiced ? <AlertTriangle size={16} className="text-red-600" /> : <Info size={16} className="text-slate-500" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className={cx("text-[13px] font-semibold mb-2", poStats.isOverInvoiced ? "text-red-800" : "text-slate-700")}>
-                            {poStats.isOverInvoiced ? "Excede la base de la PO" : "Facturación de la PO"}
-                          </p>
-                          <div className="grid grid-cols-2 gap-4 text-[13px]">
-                            <div>
-                              <p className="text-slate-500">Base PO</p>
-                              <p className="font-semibold text-slate-900">{formatCurrency(poStats.totalAmount)} €</p>
-                            </div>
-                            <div>
-                              <p className="text-slate-500">Facturado (con esta)</p>
-                              <p className={cx("font-semibold", poStats.isOverInvoiced ? "text-red-600" : "text-emerald-600")}>
-                                {formatCurrency(poStats.invoicedAmount)} €
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-3 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                            <div
-                              className={cx("h-full", poStats.percentageInvoiced > 100 ? "bg-red-500" : poStats.percentageInvoiced > 90 ? "bg-amber-500" : "bg-emerald-500")}
-                              style={{ width: Math.min(poStats.percentageInvoiced, 100) + "%" }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             )}
 
@@ -1879,9 +1760,9 @@ export default function NewInvoicePage() {
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
                   <Lock size={14} className="text-slate-400" />
-                  <h2 className="font-semibold text-slate-900">Orden de compra vinculada</h2>
+                  <h2 className="text-[13px] font-semibold text-slate-900">Orden de compra vinculada</h2>
                 </div>
-                <div className="p-6">
+                <div className="px-5 py-4">
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(47, 82, 224, 0.1)" }}>
                       <FileText size={18} style={{ color: "#2F52E0" }} />
@@ -1895,51 +1776,14 @@ export default function NewInvoicePage() {
               </div>
             )}
 
-            {/* Supplier Selection (without PO) */}
-            {formData.invoiceType === "without-po" && !linkedDocumentId && !replaceMode && (
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Proveedor *</h2>
-                </div>
-                <div className="p-6">
-                  <button
-                    onClick={() => setShowSupplierModal(true)}
-                    onBlur={() => handleBlur("supplier")}
-                    className={cx(
-                      "w-full px-4 py-1.5 border rounded-md hover:border-slate-300 transition-colors text-left flex items-center justify-between",
-                      hasError("supplier") ? "border-red-300 bg-red-50" : formData.supplier ? "border-emerald-300 bg-emerald-50" : "border-slate-200"
-                    )}
-                  >
-                    {formData.supplierName ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <CheckCircle2 size={18} className="text-emerald-600" />
-                        </div>
-                        <span className="font-medium text-slate-900">{formData.supplierName}</span>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">Seleccionar proveedor</span>
-                    )}
-                    <Search size={16} className="text-slate-400" />
-                  </button>
-                  {hasError("supplier") && (
-                    <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.supplier}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Replace Mode Supplier (locked) */}
             {replaceMode && formData.supplierName && (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
                   <Lock size={14} className="text-slate-400" />
-                  <h2 className="font-semibold text-slate-900">Proveedor</h2>
+                  <h2 className="text-[13px] font-semibold text-slate-900">Proveedor</h2>
                 </div>
-                <div className="p-6">
+                <div className="px-5 py-4">
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md">
                     <div className="w-10 h-10 bg-slate-200 rounded-lg flex items-center justify-center">
                       <Building2 size={18} className="text-slate-600" />
@@ -1953,10 +1797,9 @@ export default function NewInvoicePage() {
             {/* File Upload Section */}
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">Archivo del documento *</h2>
-                <p className="text-xs text-slate-500 mt-0.5">PDF, JPG o PNG hasta 10MB</p>
+                <h2 className="text-[13px] font-semibold text-slate-900">Documento</h2>
               </div>
-              <div className="p-6">
+              <div className="px-5 py-4">
                 <div
                   onDrop={handleDrop}
                   onDragOver={(e) => {
@@ -1968,11 +1811,11 @@ export default function NewInvoicePage() {
                     setIsDragging(false);
                   }}
                   className={cx(
-                    "border-2 border-dashed rounded-md p-8 text-center transition-all",
+                    "border border-dashed rounded-md px-4 py-3 transition-all",
                     isDragging
                       ? "border-slate-400 bg-[#F7F7F8]"
                       : uploadedFile
-                      ? "border-emerald-300 bg-emerald-50"
+                      ? "border-slate-300 bg-[#F7F7F8]"
                       : hasError("file")
                       ? "border-red-300 bg-red-50"
                       : "border-slate-200 hover:border-slate-300"
@@ -1980,10 +1823,10 @@ export default function NewInvoicePage() {
                   style={isDragging ? { borderColor: "#2F52E0", backgroundColor: "rgba(47, 82, 224, 0.05)" } : {}}
                 >
                   {uploadedFile ? (
-                    <div className="flex items-center justify-between bg-white border border-slate-200 rounded-md p-4">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <CheckCircle2 size={18} className="text-emerald-600" />
+                        <div className="w-10 h-10 bg-[#F1F1F3] rounded-lg flex items-center justify-center">
+                          <CheckCircle2 size={18} className="text-[#2F52E0]" />
                         </div>
                         <div className="text-left">
                           <p className="text-[13px] font-medium text-slate-900">{uploadedFile.name}</p>
@@ -1995,14 +1838,15 @@ export default function NewInvoicePage() {
                       </button>
                     </div>
                   ) : (
-                    <label className="cursor-pointer block">
-                      <div className={cx("w-12 h-12 rounded-md flex items-center justify-center mx-auto mb-3", hasError("file") ? "bg-red-100" : "bg-slate-100")}>
-                        <Upload size={20} className={hasError("file") ? "text-red-400" : "text-slate-400"} />
-                      </div>
-                      <p className={cx("text-[13px] font-medium mb-1", hasError("file") ? "text-red-700" : "text-slate-700")}>
-                        Arrastra o haz clic para subir
-                      </p>
-                      <p className="text-xs text-slate-500">PDF, JPG, PNG (máx. 10MB)</p>
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <span className={cx("flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md", hasError("file") ? "bg-red-100" : "bg-[#F1F1F3]")}>
+                        <Upload size={16} className={hasError("file") ? "text-red-500" : "text-slate-600"} />
+                      </span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className={cx("block text-[13px] font-medium", hasError("file") ? "text-red-700" : "text-slate-900")}>Suelta aquí el documento o elígelo</span>
+                        <span className="block text-xs text-slate-500">PDF, JPG o PNG, hasta 10 MB</span>
+                      </span>
+                      <span className="text-xs font-medium text-slate-700">Elegir archivo</span>
                       <input
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
@@ -2027,7 +1871,7 @@ export default function NewInvoicePage() {
             {/* Basic Info Section */}
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">Información básica</h2>
+                <h2 className="text-[13px] font-semibold text-slate-900">Datos</h2>
               </div>
               <div className="p-6 space-y-5">
                 <div>
@@ -2044,11 +1888,11 @@ export default function NewInvoicePage() {
                         hasError("description")
                           ? "border-red-300 bg-red-50"
                           : formData.description.trim()
-                          ? "border-emerald-300 bg-emerald-50"
+                          ? "border-slate-300 bg-[#F7F7F8]"
                           : "border-slate-200"
                       )}
                     />
-                    {formData.description.trim() && <CheckCircle2 size={16} className="absolute right-4 top-4 text-emerald-600" />}
+                    {formData.description.trim() && <CheckCircle2 size={16} className="absolute right-4 top-4 text-[#2F52E0]" />}
                   </div>
                   {hasError("description") && (
                     <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
@@ -2102,7 +1946,7 @@ export default function NewInvoicePage() {
                             key={dueDate.id}
                             className={cx(
                               "p-4 border rounded-md",
-                              isDueDatesValid() && dueDate.date ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50"
+                              isDueDatesValid() && dueDate.date ? "border-slate-300 bg-[#F7F7F8]/30" : "border-slate-200 bg-slate-50/50"
                             )}
                           >
                             <div className="flex items-center justify-between mb-3">
@@ -2171,7 +2015,7 @@ export default function NewInvoicePage() {
                           </button>
                           <div className={cx(
                             "text-xs font-medium px-3 py-1.5 rounded-lg",
-                            isDueDatesValid() ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                            isDueDatesValid() ? "bg-[#F1F1F3] text-slate-900" : "bg-red-100 text-red-700"
                           )}>
                             Total: {Math.round(getDueDatesPercentage() * 100) / 100}% = {formatCurrency(getDueDatesTotal())} €
                           </div>
@@ -2203,19 +2047,19 @@ export default function NewInvoicePage() {
             {replaceMode && selectedPendingDoc && (
               <div className={cx("bg-white border rounded-lg overflow-hidden", !sameAmount ? "border-amber-300" : "border-slate-200")}>
                 <div className="px-5 py-3 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-900">Verificación de importe</h2>
+                  <h2 className="text-[13px] font-semibold text-slate-900">Verificación de importe</h2>
                 </div>
-                <div className="p-6">
+                <div className="px-5 py-4">
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div className="p-4 bg-slate-50 rounded-md">
                       <p className="text-xs text-slate-500 mb-1">Importe original</p>
                       <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedPendingDoc.totalAmount)} €</p>
                       <p className="text-xs text-slate-400 mt-1">{selectedPendingDoc.displayNumber}</p>
                     </div>
-                    <div className="p-4 bg-emerald-50 rounded-md">
-                      <p className="text-xs text-emerald-600 mb-1">Importe factura</p>
-                      <p className="text-lg font-bold text-emerald-700">{formatCurrency(totals.totalAmount)} €</p>
-                      <p className="text-xs text-emerald-500 mt-1">Este documento</p>
+                    <div className="p-4 bg-[#F7F7F8] rounded-md">
+                      <p className="text-xs text-[#2F52E0] mb-1">Importe factura</p>
+                      <p className="text-lg font-bold text-slate-900">{formatCurrency(totals.totalAmount)} €</p>
+                      <p className="text-xs text-[#2F52E0] mt-1">Este documento</p>
                     </div>
                     <div className={cx("p-4 rounded-md", Math.abs(amountDifference) < 0.01 ? "bg-slate-50" : amountDifference > 0 ? "bg-amber-50" : "bg-[#F7F7F8]")}>
                       <p className={cx("text-xs mb-1", Math.abs(amountDifference) < 0.01 ? "text-slate-500" : amountDifference > 0 ? "text-amber-600" : "text-slate-700")}>
@@ -2255,7 +2099,7 @@ export default function NewInvoicePage() {
                             hasError("differenceReason")
                               ? "border-red-300 bg-red-50"
                               : differenceReason.trim()
-                              ? "border-emerald-300 bg-emerald-50"
+                              ? "border-slate-300 bg-[#F7F7F8]"
                               : "border-slate-200"
                           )}
                         />
@@ -2276,8 +2120,8 @@ export default function NewInvoicePage() {
             <div className="bg-white border border-slate-200 rounded-lg overflow-visible">
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="font-semibold text-slate-900">Items</h2>
-                  <span className={cx("px-2.5 py-1 rounded-lg text-xs font-medium", items.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+                  <h2 className="text-[13px] font-semibold text-slate-900">Líneas</h2>
+                  <span className={cx("px-2.5 py-1 rounded-lg text-xs font-medium", items.length > 0 ? "bg-[#F1F1F3] text-slate-900" : "bg-slate-100 text-slate-600")}>
                     {items.length}
                   </span>
                 </div>
@@ -2336,14 +2180,11 @@ export default function NewInvoicePage() {
                 </div>
               )}
               
-              <div className="p-6">
+              <div className="px-5 py-4">
                 {items.length === 0 ? (
-                  <div className={cx("text-center py-12 border-2 border-dashed rounded-md", hasError("items") ? "border-red-300 bg-red-50" : "border-slate-200")}>
-                    <div className={cx("w-12 h-12 rounded-md flex items-center justify-center mx-auto mb-3", hasError("items") ? "bg-red-100" : "bg-slate-100")}>
-                      <ShoppingCart size={20} className={hasError("items") ? "text-red-400" : "text-slate-400"} />
-                    </div>
-                    <p className={cx("text-[13px] font-medium", hasError("items") ? "text-red-700" : "text-slate-700")}>No hay ítems</p>
-                  </div>
+                  <p className={cx("rounded-md border border-dashed px-4 py-5 text-center text-[13px]", hasError("items") ? "border-red-300 text-red-700" : "border-slate-200 text-slate-500")}>
+                    {delegateToAccounting ? "Contabilidad añadirá las líneas al codificar." : selectedPO ? `Sin líneas: tráelas de PO-${selectedPO.number} o crea una nueva.` : "Sin líneas: crea una nueva."}
+                  </p>
                 ) : (
                   <div className="space-y-4">
                     {items.map((item, index) => {
@@ -2351,11 +2192,11 @@ export default function NewInvoicePage() {
                         ? item.description.trim() && item.quantity > 0 && item.unitPrice > 0
                         : item.description.trim() && item.subAccountId && item.quantity > 0 && item.unitPrice > 0;
                       return (
-                        <div key={item.id} className={cx("border rounded-md p-5", itemComplete ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/50")}>
+                        <div key={item.id} className={cx("border rounded-md p-5", itemComplete ? "border-slate-300 bg-[#F7F7F8]/30" : "border-slate-200 bg-slate-50/50")}>
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                {itemComplete ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Hash size={12} />}
+                                {itemComplete ? <CheckCircle2 size={12} className="text-[#2F52E0]" /> : <Hash size={12} />}
                                 Item {index + 1}
                               </span>
                               {formData.invoiceType === "with-po" ? (
@@ -2370,7 +2211,7 @@ export default function NewInvoicePage() {
                               ) : (
                                 <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">Nuevo</span>
                               )}
-                              {itemComplete && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
+                              {itemComplete && <span className="text-xs bg-[#F1F1F3] text-slate-900 px-2 py-0.5 rounded-lg font-medium">Completo</span>}
                             </div>
                             <button aria-label="Eliminar" onClick={() => removeItem(index)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                               <Trash2 size={14} />
@@ -2385,7 +2226,7 @@ export default function NewInvoicePage() {
                               placeholder="Descripción"
                               className={cx(
                                 "w-full px-2.5 py-1.5 border rounded-md text-[13px] focus:outline-none focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 bg-white",
-                                hasError("item_" + index + "_description") ? "border-red-300 bg-red-50" : item.description.trim() ? "border-emerald-200" : "border-slate-200"
+                                hasError("item_" + index + "_description") ? "border-red-300 bg-red-50" : item.description.trim() ? "border-slate-300" : "border-slate-200"
                               )}
                             />
                             {/* Selector de cuenta - se oculta si se delega a contabilidad */}
@@ -2401,13 +2242,13 @@ export default function NewInvoicePage() {
                                     hasError("item_" + index + "_account")
                                       ? "border-red-300 bg-red-50"
                                       : item.subAccountCode
-                                      ? "border-emerald-200 bg-emerald-50"
+                                      ? "border-slate-300 bg-[#F7F7F8]"
                                       : "border-slate-200"
                                   )}
                                 >
                                   {item.subAccountCode ? (
                                     <div className="flex items-center gap-2">
-                                      <CheckCircle2 size={14} className="text-emerald-600" />
+                                      <CheckCircle2 size={14} className="text-[#2F52E0]" />
                                       <span className="font-mono text-slate-900">
                                         {item.subAccountCode} - {item.subAccountDescription}
                                       </span>
@@ -2419,7 +2260,7 @@ export default function NewInvoicePage() {
                                 </button>
                               ) : (
                                 <div className="px-4 py-2.5 bg-slate-100 rounded-md text-[13px] flex items-center gap-2">
-                                  <CheckCircle2 size={14} className="text-emerald-600" />
+                                  <CheckCircle2 size={14} className="text-[#2F52E0]" />
                                   <span className="font-mono text-slate-700">
                                     {item.subAccountCode} - {item.subAccountDescription}
                                   </span>
@@ -2484,7 +2325,7 @@ export default function NewInvoicePage() {
                                   step="0.01"
                                   value={item.quantity}
                                   onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
-                                  className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.quantity > 0 ? "border-emerald-200" : "border-slate-200")}
+                                  className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.quantity > 0 ? "border-slate-300" : "border-slate-200")}
                                 />
                               </div>
                               <div>
@@ -2495,7 +2336,7 @@ export default function NewInvoicePage() {
                                   step="0.01"
                                   value={item.unitPrice}
                                   onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.unitPrice > 0 ? "border-emerald-200" : "border-slate-200")}
+                                  className={cx("w-full px-2.5 py-1.5 border rounded-md text-[13px] bg-white", item.unitPrice > 0 ? "border-slate-300" : "border-slate-200")}
                                 />
                               </div>
                               <div>
@@ -2568,131 +2409,51 @@ export default function NewInvoicePage() {
 
           {/* Right Column - Sidebar */}
           <div className="col-span-1">
-            <div className="space-y-4">
-              {/* Progress Card */}
-              <div className="bg-white border border-slate-200 rounded-lg p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[13px] font-medium text-slate-700">Progreso</span>
-                  <span className={cx("text-[13px] font-bold", completionPercentage === 100 ? "text-emerald-600" : "text-slate-900")}>{completionPercentage}%</span>
-                </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={cx("h-full transition-all duration-300", completionPercentage === 100 ? "bg-emerald-500" : "")}
-                    style={{ width: completionPercentage + "%", backgroundColor: completionPercentage < 100 ? "#2F52E0" : undefined }}
-                  />
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    {uploadedFile ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Circle size={12} className="text-slate-300" />}
-                    <span className={uploadedFile ? "text-slate-700" : "text-slate-400"}>Archivo</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {(formData.invoiceType === "with-po" ? selectedPO : formData.supplier || linkedDocumentId) ? (
-                      <CheckCircle2 size={12} className="text-emerald-600" />
-                    ) : (
-                      <Circle size={12} className="text-slate-300" />
-                    )}
-                    <span className={(formData.invoiceType === "with-po" ? selectedPO : formData.supplier || linkedDocumentId) ? "text-slate-700" : "text-slate-400"}>
-                      {formData.invoiceType === "with-po" ? "PO" : "Proveedor"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {formData.description.trim() ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Circle size={12} className="text-slate-300" />}
-                    <span className={formData.description.trim() ? "text-slate-700" : "text-slate-400"}>Descripción</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {(multipleDueDates ? isDueDatesValid() && dueDates.every(d => d.date) : formData.dueDate) ? (
-                      <CheckCircle2 size={12} className="text-emerald-600" />
-                    ) : (
-                      <Circle size={12} className="text-slate-300" />
-                    )}
-                    <span className={(multipleDueDates ? isDueDatesValid() && dueDates.every(d => d.date) : formData.dueDate) ? "text-slate-700" : "text-slate-400"}>
-                      Vencimiento{multipleDueDates ? ` (${dueDates.length})` : ""}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {items.some((i) => i.description.trim() && i.subAccountId && i.quantity > 0 && i.unitPrice > 0) ? (
-                      <CheckCircle2 size={12} className="text-emerald-600" />
-                    ) : (
-                      <Circle size={12} className="text-slate-300" />
-                    )}
-                    <span className={items.some((i) => i.description.trim() && i.subAccountId && i.quantity > 0 && i.unitPrice > 0) ? "text-slate-700" : "text-slate-400"}>
-                      Items válidos
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Document Type Card */}
-              <div className={cx(currentDocType.bgColor, "border", currentDocType.borderColor, "rounded-lg p-5")}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center">
-                    <DocIcon size={20} className={currentDocType.textColor} />
-                  </div>
-                  <div>
-                    <p className={cx("font-semibold", currentDocType.textColor)}>{currentDocType.label}</p>
-                    <p className="text-[13px] text-slate-600">{getDocumentNumber()}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Totals Card */}
+            <div className="space-y-4 lg:sticky lg:top-[85px]">
+              {/* Totales */}
               <AmountSummary base={totals.baseAmount} vat={totals.vatAmount} irpf={totals.irpfAmount} total={totals.totalAmount} />
 
-              {/* Approval Preview Card */}
-              <div className={cx("border rounded-lg overflow-hidden", approvalPreview.autoApprove ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200")}>
-                <div className="px-5 py-4 border-b" style={{ borderColor: approvalPreview.autoApprove ? "#a7f3d0" : "#fcd34d" }}>
-                  <div className="flex items-center gap-3">
-                    {approvalPreview.autoApprove ? (
-                      <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-                        <CheckCircle size={20} className="text-emerald-600" />
-                      </div>
-                    ) : (
-                      <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
-                        <Clock size={20} className="text-amber-600" />
-                      </div>
-                    )}
-                    <div>
-                      <p className={cx("font-semibold", approvalPreview.autoApprove ? "text-emerald-800" : "text-amber-800")}>
-                        {approvalPreview.autoApprove ? "Aprobación automática" : "Requiere aprobación"}
-                      </p>
-                      <p className={cx("text-[13px]", approvalPreview.autoApprove ? "text-emerald-700" : "text-amber-700")}>{approvalPreview.message}</p>
+              {/* Lo que falta */}
+              {(() => {
+                const checks = [
+                  { ok: !!uploadedFile, label: "Documento" },
+                  { ok: !!(formData.invoiceType === "with-po" ? selectedPO : formData.supplier || linkedDocumentId), label: formData.invoiceType === "with-po" ? "Orden de compra" : "Proveedor" },
+                  { ok: !!formData.description.trim(), label: "Concepto" },
+                  { ok: !!(multipleDueDates ? isDueDatesValid() && dueDates.every((d) => d.date) : formData.dueDate), label: multipleDueDates ? `Vencimientos (${dueDates.length})` : "Vencimiento" },
+                  { ok: items.some((i) => i.description.trim() && i.subAccountId && i.quantity > 0 && i.unitPrice > 0) || delegateToAccounting, label: delegateToAccounting ? "Codificación delegada" : "Líneas con cuenta" },
+                ];
+                const left = checks.filter((c) => !c.ok).length;
+                return (
+                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="font-medium text-slate-900">{left ? `Faltan ${left}` : "Listo para enviar"}</span>
+                      <span className="text-xs tabular-nums text-slate-500">{checks.length - left} de {checks.length}</span>
                     </div>
+                    <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]"><div className="h-full bg-[#2F52E0] transition-all" style={{ width: `${((checks.length - left) / checks.length) * 100}%` }} /></div>
+                    <ul className="mt-3 space-y-1.5">
+                      {checks.map((c) => (
+                        <li key={c.label} className="flex items-center gap-2 text-xs">
+                          {c.ok ? <CheckCircle2 size={13} className="text-[#2F52E0]" /> : <Circle size={13} className="text-slate-300" />}
+                          <span className={c.ok ? "text-slate-700" : "text-slate-500"}>{c.label}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+                );
+              })()}
+
+              {/* Circuito de aprobación */}
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                  {approvalPreview.autoApprove ? <CheckCircle size={14} className="text-[#2F52E0]" /> : <Clock size={14} className="text-amber-600" />}
+                  <span className="text-[13px] font-medium text-slate-900">{approvalPreview.autoApprove ? "Sin aprobación" : "Aprobación"}</span>
+                  <span className="ml-auto text-xs text-slate-500">{approvalPreview.message}</span>
                 </div>
                 {approvalPreview.steps.length > 0 && (
-                  <div className="bg-white/60 px-5 py-4">
+                  <div className="px-4 py-3">
                     <ApprovalSteps steps={approvalPreview.steps} department={formData.department || selectedPO?.department || permissions.fixedDepartment} preview />
                   </div>
                 )}
-              </div>
-
-              {/* Info Card */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Info size={14} className="text-slate-500" />
-                  </div>
-                  <div className="text-[13px] text-slate-600">
-                    <p className="font-medium text-slate-700 mb-2">Importante</p>
-                    <ul className="space-y-1.5 text-slate-500">
-                      <li className="flex items-start gap-2">
-                        <ChevronRight size={12} className="mt-0.5 flex-shrink-0" />
-                        <span>Archivo obligatorio</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <ChevronRight size={12} className="mt-0.5 flex-shrink-0" />
-                        <span>Fecha vencimiento obligatoria</span>
-                      </li>
-                      {currentDocType.requiresReplacement && (
-                        <li className="flex items-start gap-2 text-amber-600">
-                          <ChevronRight size={12} className="mt-0.5 flex-shrink-0" />
-                          <span>Requiere factura definitiva tras pago</span>
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
