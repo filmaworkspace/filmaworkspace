@@ -1,84 +1,33 @@
 "use client";
-import { toast as appToast } from "@/lib/toast";
 
-// ─── Framework ────────────────────────────────────────────────────────────────
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { syncBudget } from "@/lib/ledgerClient";
-import { useParams, useRouter } from "next/navigation";
+// ─── Pagos › Pagar una previsión ─────────────────────────────────────────────
+// Tabla de pagos con su IBAN, vencimiento, importe (editable para pagos
+// parciales) y justificante. Los justificantes del banco se sueltan de golpe y
+// se propone a qué pago va cada uno (nombre del archivo y contenido del PDF);
+// quien paga confirma. Un justificante puede servir para varios pagos. Al
+// marcar como pagado, el justificante se guarda también en la factura, así
+// contabilidad lo tiene en la propia factura y en el Centro de documentación.
+// «Paquete para contabilidad»: ZIP con los justificantes y un resumen CSV.
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { inter } from "@/lib/fonts";
-import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-
-// ─── Firebase ────────────────────────────────────────────────────────────────
-import { auth, db, storage } from "@/lib/firebase";
-import { Button, Field, Input, Modal } from "@/components/ds";
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  Timestamp,
-  updateDoc,
-} from "firebase/firestore";
+import { useParams, useRouter } from "next/navigation";
+import { collection, doc, getDoc, getDocs, Timestamp, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-
-// ─── Icons ───────────────────────────────────────────────────────────────────
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowLeft,
-  Banknote,
-  CheckCircle,
-  CheckCircle2,
-  ChevronDown,
-  CircleDollarSign,
-  Clock,
-  Download,
-  Euro,
-  ExternalLink,
-  FileCheck,
-  FileText,
-  FileUp,
-  Info,
-  Landmark,
-  PiggyBank,
-  Receipt,
-  Shield,
-  ShieldAlert,
-  Trash2,
-  Undo2,
-  Upload,
-  Wallet,
-  X,
-  XCircle,
-} from "lucide-react";
-
-// ─── Internal ────────────────────────────────────────────────────────────────
-import { getCostSettings, shouldRealizeInvoice, shouldRealizeOnStatusChange } from "@/lib/budgetRules";
+import { zipSync, strToU8 } from "fflate";
+import { ArrowLeft, Check, Download, ExternalLink, FileText, Loader2, MoreHorizontal, Package, Paperclip, RotateCcw, ShieldAlert, ShieldCheck, Upload, X } from "lucide-react";
+import { db, storage } from "@/lib/firebase";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { syncBudget } from "@/lib/ledgerClient";
+import { toast } from "@/lib/toast";
+import { matchReceipt, type ReceiptTarget } from "@/lib/payments/matchReceipts";
+import { Button, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Select } from "@/components/ds";
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const PAYMENT_TYPES = {
-  invoice: { label: "Factura", icon: Receipt, bgColor: "bg-emerald-50", textColor: "text-emerald-600" },
-  partial: { label: "Pago parcial", icon: CircleDollarSign, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
-  proforma: { label: "Proforma", icon: FileText, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
-  budget: { label: "Presupuesto", icon: Wallet, bgColor: "bg-amber-50", textColor: "text-amber-600" },
-  deposit: { label: "Depósito", icon: PiggyBank, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
-  guarantee: { label: "Fianza", icon: Shield, bgColor: "bg-slate-100", textColor: "text-slate-600" },
-  cash_funding: { label: "Reposición de caja", icon: Wallet, bgColor: "bg-[#F7F7F8]", textColor: "text-slate-700" },
-};
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type PaymentType = keyof typeof PAYMENT_TYPES;
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
 interface PaymentItem {
   id: string;
-  type: PaymentType;
+  type: string;
   invoiceId?: string;
   invoiceNumber?: string;
   supplier: string;
@@ -96,855 +45,593 @@ interface PaymentItem {
   iban?: string;
   bic?: string;
   attachmentUrl?: string;
+  cashMovementId?: string;
+  [k: string]: unknown;
 }
+interface Forecast { id: string; name: string; paymentDate: Date; type: "remesa" | "fuera_remesa"; status: "draft" | "pending" | "completed"; items: PaymentItem[]; totalAmount: number }
+interface BankAccount { id: string; alias: string; fiscalName: string; taxId: string; iban: string; bic?: string; isDefault?: boolean }
+interface SupplierInfo { name: string; iban: string; bic?: string; cert: "verified" | "unverified" | "none" }
+interface InvoiceInfo { displayNumber?: string; supplierNumber?: string; dueDate?: Date; attachmentUrl?: string }
+/** Archivo soltado, pendiente de confirmar a qué pago(s) va. */
+interface Pending { key: string; file: File; target: string; reasons: string[]; reading: boolean }
 
-interface PaymentForecast {
-  id: string;
-  name: string;
-  paymentDate: Date;
-  type: "remesa" | "fuera_remesa";
-  status: "draft" | "pending" | "completed";
-  items: PaymentItem[];
-  totalAmount: number;
-  createdAt: Date;
-  createdBy: string;
-  createdByName: string;
-}
+const TYPE_LABEL: Record<string, string> = { invoice: "Factura", partial: "Pago parcial", proforma: "Proforma", budget: "Presupuesto", deposit: "Depósito", guarantee: "Fianza", cash_funding: "Reposición de caja" };
+const money = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0) + " €";
+const dateEs = (d?: Date) => (d ? new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(d) : "—");
+const isPdf = (url?: string, name?: string) => /\.pdf($|\?)/i.test(name || "") || (url || "").toLowerCase().includes(".pdf");
+const safeName = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+const SELECTED = "__selected__";
+const ALL_MISSING = "__all_missing__";
 
-interface BankAccount {
-  id: string;
-  alias: string;
-  fiscalName: string;
-  taxId: string;
-  iban: string;
-  bic?: string;
-  isDefault?: boolean;
-}
-
-interface SupplierData {
-  id: string;
-  name: string;
-  iban?: string;
-  bic?: string;
-}
+const serialize = (items: PaymentItem[]) => items.map((it) => {
+  const o: Record<string, unknown> = { ...it, addedAt: it.addedAt instanceof Date ? Timestamp.fromDate(it.addedAt) : it.addedAt };
+  o.completedAt = it.completedAt instanceof Date ? Timestamp.fromDate(it.completedAt) : it.completedAt ?? null;
+  for (const k of Object.keys(o)) if (o[k] === undefined) delete o[k];
+  return o;
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function PaymentPayPage() {
+export default function PayForecastPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
   const forecastId = params?.forecastId as string;
-
-  const {
-    loading: permissionsLoading,
-    error: permissionsError,
-    permissions,
-  } = useAccountingPermissions(id);
+  const { loading: permLoading, error: permError, permissions } = useAccountingPermissions(id);
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [forecast, setForecast] = useState<PaymentForecast | null>(null);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [selectedBankAccount, setSelectedBankAccount] = useState<BankAccount | null>(null);
-  const [suppliers, setSuppliers] = useState<Record<string, SupplierData>>({});
-  const [dragOver, setDragOver] = useState(false);
-  const [showSepaModal, setShowSepaModal] = useState(false);
-  const [sepaDate, setSepaDate] = useState(new Date().toISOString().split("T")[0]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [suppliers, setSuppliers] = useState<Record<string, SupplierInfo>>({});
+  const [invoices, setInvoices] = useState<Record<string, InvoiceInfo>>({});
+  const [banks, setBanks] = useState<BankAccount[]>([]);
+  const [amounts, setAmounts] = useState<Record<string, number>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [incoming, setIncoming] = useState<Pending[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; name?: string; title: string } | null>(null);
+  const [sepa, setSepa] = useState<{ open: boolean; bankId: string; date: string; onlySelected: boolean }>({ open: false, bankId: "", date: new Date().toISOString().slice(0, 10), onlySelected: false });
+  const [confirmMissing, setConfirmMissing] = useState<string[] | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const rowFileInput = useRef<HTMLInputElement>(null);
+  const rowTarget = useRef<string | null>(null);
 
-  // Bloquea el scroll de la página de detrás mientras el modal SEPA está abierto.
-  useBodyScrollLock(showSepaModal);
-  const [tempAmounts, setTempAmounts] = useState<Record<string, number>>({});
-  const [itemReceipts, setItemReceipts] = useState<Record<string, { file: File; url: string }>>({});
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
-  const bulkFileInputRef = useRef<HTMLInputElement>(null);
+  const canAccess = permissions.accountingAccessLevel === "accounting_extended";
 
-  const showToast = (type: "success" | "error" | "warning" | "info", message: string) => { if (type === "error") appToast.error(message); else appToast[type](message); };
-  const formatCurrency = (a: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(a || 0);
-  const formatDate = (d: Date) => d ? new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(d) : "-";
+  // ── Carga ────────────────────────────────────────────────────────────────
+  const load = useCallback(async () => {
+    const snap = await getDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId));
+    if (!snap.exists()) { toast.error("Previsión no encontrada"); router.push(`/project/${id}/accounting/payments`); return; }
+    const d = snap.data();
+    const f: Forecast = {
+      id: snap.id, name: d.name, paymentDate: d.paymentDate?.toDate?.() || new Date(), type: d.type || "remesa", status: d.status, totalAmount: d.totalAmount || 0,
+      items: (d.items || []).map((it: any) => ({ ...it, addedAt: it.addedAt?.toDate ? it.addedAt.toDate() : new Date(it.addedAt || Date.now()), completedAt: it.completedAt?.toDate ? it.completedAt.toDate() : undefined })),
+    };
+    setForecast(f);
+    setAmounts(Object.fromEntries(f.items.map((it) => [it.id, it.partialAmount || it.amount])));
+    const supplierIds = [...new Set(f.items.map((i) => i.supplierId).filter(Boolean))] as string[];
+    const invoiceIds = [...new Set(f.items.map((i) => i.invoiceId).filter(Boolean))] as string[];
+    const [banksSnap, supSnaps, invSnaps] = await Promise.all([
+      getDocs(collection(db, `projects/${id}/config/company/bankAccounts`)).catch(() => null),
+      Promise.all(supplierIds.map((sid) => getDoc(doc(db, `projects/${id}/suppliers`, sid)).catch(() => null))),
+      Promise.all(invoiceIds.map((iid) => getDoc(doc(db, `projects/${id}/invoices`, iid)).catch(() => null))),
+    ]);
+    const bk = ((banksSnap?.docs || []).map((x) => ({ id: x.id, ...x.data() })) as BankAccount[]).sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault));
+    setBanks(bk);
+    setSepa((s) => ({ ...s, bankId: s.bankId || bk[0]?.id || "" }));
+    const sm: Record<string, SupplierInfo> = {};
+    supSnaps.forEach((x, k) => {
+      const v = x?.data(); if (!v) return;
+      const c = v.certificates?.bankOwnership;
+      sm[supplierIds[k]] = { name: v.fiscalName || v.commercialName || v.name || "", iban: (v.bankAccount || v.iban || "").replace(/\s+/g, ""), bic: v.bic, cert: c?.verified ? "verified" : c?.uploaded ? "unverified" : "none" };
+    });
+    setSuppliers(sm);
+    const im: Record<string, InvoiceInfo> = {};
+    invSnaps.forEach((x, k) => { const v = x?.data(); if (v) im[invoiceIds[k]] = { displayNumber: v.displayNumber, supplierNumber: v.supplierNumber, dueDate: v.dueDate?.toDate?.(), attachmentUrl: v.attachmentUrl }; });
+    setInvoices(im);
+  }, [id, forecastId, router]);
 
   useEffect(() => {
-    if (!permissions.userId || !id || !forecastId || permissionsLoading) return;
-    const loadData = async () => {
-      try {
-        const forecastSnap = await getDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId));
-        if (!forecastSnap.exists()) { showToast("error", "Previsión no encontrada"); router.push(`/project/${id}/accounting/payments`); return; }
-        const data = forecastSnap.data();
-        const forecastData: PaymentForecast = { id: forecastSnap.id, name: data.name, paymentDate: data.paymentDate?.toDate() || new Date(), type: data.type || "remesa", status: data.status, totalAmount: data.totalAmount || 0, createdAt: data.createdAt?.toDate() || new Date(), createdBy: data.createdBy, createdByName: data.createdByName, items: (data.items || []).map((item: any) => ({ ...item, addedAt: item.addedAt?.toDate ? item.addedAt.toDate() : new Date(item.addedAt), completedAt: item.completedAt?.toDate ? item.completedAt.toDate() : undefined })) };
-        setForecast(forecastData);
-        const amounts: Record<string, number> = {};
-        forecastData.items.forEach((item) => { amounts[item.id] = item.partialAmount || item.amount; });
-        setTempAmounts(amounts);
-        const firstPending = forecastData.items.find((i) => i.status === "pending");
-        if (firstPending) setSelectedPaymentId(firstPending.id);
-        
-        const bankAccountsSnap = await getDocs(collection(db, `projects/${id}/config/company/bankAccounts`));
-        const accounts = bankAccountsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as BankAccount[];
-        const sortedAccounts = accounts.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
-        setBankAccounts(sortedAccounts);
-        if (sortedAccounts[0]) setSelectedBankAccount(sortedAccounts.find((a) => a.isDefault) || sortedAccounts[0]);
-        
-        const suppliersMap: Record<string, SupplierData> = {};
-        const uniqueSupplierIds = [...new Set(
-          forecastData.items.filter(i => i.supplierId).map(i => i.supplierId!)
-        )];
-        const supplierSnaps = await Promise.all(
-          uniqueSupplierIds.map(sid => getDoc(doc(db, `projects/${id}/suppliers`, sid)))
-        );
-        supplierSnaps.forEach((snap, idx) => {
-          if (snap.exists()) {
-            const sData = snap.data();
-            suppliersMap[uniqueSupplierIds[idx]] = { id: snap.id, name: sData.fiscalName || sData.commercialName || sData.name, iban: (sData.bankAccount || sData.iban || "").replace(/\s+/g, ""), bic: sData.bic };
-          }
-        });
-        setSuppliers(suppliersMap);
-        setLoading(false);
-      } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido cargar datos"); setLoading(false); }
-    };
-    loadData();
-  }, [permissions.userId, id, forecastId, router, permissionsLoading]);
+    if (permLoading || !permissions.userId) return;
+    load().catch((e) => toast.error(e)).finally(() => setLoading(false));
+  }, [permLoading, permissions.userId, load]);
 
-  const pendingItems = forecast?.items.filter((i) => i.status === "pending") || [];
-  const completedItems = forecast?.items.filter((i) => i.status === "completed") || [];
-  const totalPending = pendingItems.reduce((sum, i) => sum + (tempAmounts[i.id] || i.partialAmount || i.amount), 0);
-  const totalCompleted = completedItems.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
-  const selectedPayment = forecast?.items.find((i) => i.id === selectedPaymentId);
+  // ── Datos derivados ──────────────────────────────────────────────────────
+  const items = forecast?.items || [];
+  const pending = items.filter((i) => i.status === "pending");
+  const done = items.filter((i) => i.status === "completed");
+  const amountOf = (it: PaymentItem) => (it.status === "completed" ? it.partialAmount || it.amount : amounts[it.id] ?? it.amount);
+  const totals = useMemo(() => ({
+    all: items.reduce((a, it) => a + amountOf(it), 0),
+    paid: done.reduce((a, it) => a + amountOf(it), 0),
+    pending: pending.reduce((a, it) => a + amountOf(it), 0),
+    withReceipt: items.filter((i) => i.receiptUrl).length,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [items, amounts]);
+  const ibanOf = (it: PaymentItem) => (it.supplierId && suppliers[it.supplierId]?.iban) || (it.iban || "").replace(/\s+/g, "");
+  const numberOf = (it: PaymentItem) => (it.invoiceId && invoices[it.invoiceId]?.displayNumber) || it.invoiceNumber || "";
+  const selItems = pending.filter((i) => selected.has(i.id));
 
-  const handleUploadReceipt = (itemId: string, file: File) => { const url = URL.createObjectURL(file); setItemReceipts((prev) => ({ ...prev, [itemId]: { file, url } })); showToast("success", "Justificante añadido"); };
-  const handleRemoveReceipt = (itemId: string) => { setItemReceipts((prev) => { const n = { ...prev }; if (n[itemId]?.url) URL.revokeObjectURL(n[itemId].url); delete n[itemId]; return n; }); };
-
-  const handleMarkAsPaid = async (itemIds: string[]) => {
-    if (!forecast || itemIds.length === 0) return;
-    const withoutReceipt = itemIds.filter((i) => !itemReceipts[i]);
-    if (withoutReceipt.length > 0) { showToast("warning", `${withoutReceipt.length} pago(s) sin justificante`); return; }
-    setSaving(true);
-    try {
-      // Obtener configuración de costes
-      const costSettings = await getCostSettings(id);
-      
-      const updatedItems = [...forecast.items];
-      const newPendingItems: PaymentItem[] = [];
-      
-      for (const itemId of itemIds) {
-        const idx = updatedItems.findIndex((i) => i.id === itemId);
-        if (idx === -1) continue;
-        const item = updatedItems[idx];
-        const receipt = itemReceipts[itemId];
-        const payingAmount = tempAmounts[itemId] || item.partialAmount || item.amount;
-        const isPartialPayment = payingAmount < item.amount * 0.99;
-        
-        let receiptUrl = "", receiptName = "";
-        if (receipt) { 
-          const storageRef = ref(storage, `projects/${id}/receipts/${forecastId}/${itemId}_${receipt.file.name}`); 
-          await uploadBytes(storageRef, receipt.file); 
-          receiptUrl = await getDownloadURL(storageRef); 
-          receiptName = receipt.file.name; 
-        }
-        
-        // Mark current item as completed with the paid amount
-        updatedItems[idx] = { 
-          ...item, 
-          status: "completed" as const, 
-          partialAmount: payingAmount, 
-          receiptUrl, 
-          receiptName, 
-          completedAt: new Date(), 
-          completedBy: permissions.userId || "", 
-          completedByName: permissions.userName 
-        };
-        
-        // If partial payment, create a new pending item for the remaining amount
-        if (isPartialPayment) {
-          const remainingAmount = item.amount - payingAmount;
-          const newItem: PaymentItem = {
-            id: `${item.id}_remaining_${Date.now()}`,
-            type: item.type,
-            invoiceId: item.invoiceId,
-            invoiceNumber: item.invoiceNumber,
-            supplier: item.supplier,
-            supplierId: item.supplierId,
-            description: `${item.description} (restante)`,
-            amount: remainingAmount,
-            addedAt: new Date(),
-            status: "pending",
-            iban: item.iban,
-            bic: item.bic,
-            attachmentUrl: item.attachmentUrl,
-          } as PaymentItem;
-          newPendingItems.push(newItem);
-        }
-        
-        // Reposición de caja de efectivo: tesorería ya ha pagado; el cajero
-        // confirmará la recepción desde Cajas › Efectivo.
-        if ((item as any).cashMovementId && !isPartialPayment) {
-          await updateDoc(doc(db, `projects/${id}/cashMovements`, (item as any).cashMovementId), {
-            treasuryPaidAt: Timestamp.now(),
-            treasuryPaidByName: permissions.userName,
-          });
-        }
-
-        // Update invoice status and handle budget realization
-        if (item.invoiceId) {
-          const newStatus = isPartialPayment ? "partial_paid" : "paid";
-          
-          // Obtener estado anterior de la factura
-          const invoiceRef = doc(db, `projects/${id}/invoices`, item.invoiceId);
-          const invoiceSnap = await getDoc(invoiceRef);
-          const oldStatus = invoiceSnap.exists() ? invoiceSnap.data().status : "pending";
-          
-          // Actualizar estado de la factura
-          await updateDoc(invoiceRef, { 
-            status: newStatus, 
-            paidAmount: payingAmount, 
-            paidAt: Timestamp.now(), 
-            paymentForecastId: forecastId 
-          });
-          
-          // Presupuesto: se recalcula desde los documentos (lib/budgetLedger).
-          await syncBudget(id);
-        }
-      }
-      
-      // Add new pending items for partial payments
-      const allItems = [...updatedItems, ...newPendingItems];
-      
-      const allCompleted = allItems.every((item) => item.status === "completed");
-      const newTotalAmount = allItems.reduce((sum, item) => sum + (item.partialAmount || item.amount), 0);
-      
-      await updateDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId), { 
-        items: allItems.map((item) => ({ 
-          ...item, 
-          addedAt: item.addedAt instanceof Date ? Timestamp.fromDate(item.addedAt) : item.addedAt, 
-          completedAt: item.completedAt instanceof Date ? Timestamp.fromDate(item.completedAt) : item.completedAt 
-        })), 
-        status: allCompleted ? "completed" : forecast.status,
-        totalAmount: newTotalAmount
-      });
-      
-      itemIds.forEach((itemId) => { if (itemReceipts[itemId]?.url) URL.revokeObjectURL(itemReceipts[itemId].url); });
-      setForecast({ ...forecast, items: allItems, status: allCompleted ? "completed" : forecast.status, totalAmount: newTotalAmount });
-      setItemReceipts((prev) => { const n = { ...prev }; itemIds.forEach((i) => delete n[i]); return n; });
-      setTempAmounts((prev) => { const n = { ...prev }; newPendingItems.forEach((item) => { n[item.id] = item.amount; }); return n; });
-      
-      const nextPending = allItems.find((i) => i.status === "pending");
-      setSelectedPaymentId(nextPending?.id || null);
-      
-      if (newPendingItems.length > 0) {
-        showToast("success", `Pago parcial completado. Creado item pendiente por ${formatCurrency(newPendingItems.reduce((sum, i) => sum + i.amount, 0))} €`);
-      } else {
-        showToast("success", `${itemIds.length} pago(s) completado(s)`);
-      }
-    } catch (error) { console.error("Error:", error); showToast("error", "No se ha podido procesar pagos"); } finally { setSaving(false); }
+  // ── Guardar ──────────────────────────────────────────────────────────────
+  const saveItems = async (next: PaymentItem[], extra: Record<string, unknown> = {}) => {
+    const total = next.reduce((a, it) => a + (it.status === "completed" ? it.partialAmount || it.amount : it.amount), 0);
+    await updateDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId), { items: serialize(next), totalAmount: total, ...extra });
+    setForecast((f) => (f ? { ...f, items: next, totalAmount: total, ...(extra as Partial<Forecast>) } : f));
+  };
+  const upload = async (file: File, tag: string) => {
+    const r = ref(storage, `projects/${id}/receipts/${forecastId}/${tag}_${Date.now()}_${safeName(file.name)}`);
+    await uploadBytes(r, file, { contentType: file.type || undefined });
+    return getDownloadURL(r);
+  };
+  /** El justificante también en la factura: lo ve contabilidad y el Centro de documentación. */
+  const receiptToInvoice = async (it: PaymentItem, url: string | null, name: string | null) => {
+    if (!it.invoiceId || it.status !== "completed") return;
+    await updateDoc(doc(db, `projects/${id}/invoices`, it.invoiceId), url ? { receiptUrl: url, receiptName: name, receiptUploadedAt: Timestamp.now() } : { receiptUrl: null, receiptName: null }).catch(() => {});
   };
 
-  const handleUndoPayment = async (itemId: string) => {
-    if (!forecast) return;
-    setSaving(true);
-    try {
-      // Obtener configuración de costes
-      const costSettings = await getCostSettings(id);
-      
-      let updatedItems = [...forecast.items];
-      const idx = updatedItems.findIndex((i) => i.id === itemId);
-      if (idx === -1) { setSaving(false); return; }
-      
-      const item = updatedItems[idx];
-      const originalAmount = item.amount;
-      
-      // Check if this item has a "remaining" counterpart (was a partial payment)
-      // The remaining item would have an ID like "{itemId}_remaining_*"
-      const baseItemId = itemId.replace(/_remaining_\d+$/, "");
-      const remainingItemIdx = updatedItems.findIndex((i) => i.id.startsWith(`${itemId}_remaining_`));
-      
-      // If there's a remaining item, we need to consolidate back
-      if (remainingItemIdx !== -1) {
-        const remainingItem = updatedItems[remainingItemIdx];
-        // Restore full amount to original item
-        updatedItems[idx] = { 
-          ...item, 
-          status: "pending" as const, 
-          amount: item.amount + remainingItem.amount, // Combine amounts
-          partialAmount: undefined,
-          receiptUrl: undefined, 
-          receiptName: undefined, 
-          completedAt: undefined, 
-          completedBy: undefined, 
-          completedByName: undefined 
-        };
-        // Remove the remaining item
-        updatedItems = updatedItems.filter((_, i) => i !== remainingItemIdx);
-      } else {
-        // Simple undo - just reset to pending
-        updatedItems[idx] = { 
-          ...item, 
-          status: "pending" as const, 
-          partialAmount: undefined,
-          receiptUrl: undefined, 
-          receiptName: undefined, 
-          completedAt: undefined, 
-          completedBy: undefined, 
-          completedByName: undefined 
-        };
-      }
-      
-      // Update invoice status back to pending if it was paid
-      if (item.invoiceId) {
-        try {
-          // Check if invoice exists first
-          const invoiceRef = doc(db, `projects/${id}/invoices`, item.invoiceId);
-          const invoiceSnap = await getDoc(invoiceRef);
-          
-          if (invoiceSnap.exists()) {
-            const invoiceData = invoiceSnap.data();
-            const oldStatus = invoiceData.status;
-            
-            // Check if there are other completed payments for this invoice
-            const otherPaymentsForInvoice = updatedItems.filter(
-              (i) => i.invoiceId === item.invoiceId && i.status === "completed" && i.id !== itemId
-            );
-            
-            let newStatus: string;
-            if (otherPaymentsForInvoice.length > 0) {
-              // There are still other payments, calculate total paid
-              const totalPaid = otherPaymentsForInvoice.reduce((sum, i) => sum + (i.partialAmount || i.amount), 0);
-              newStatus = "partial_paid";
-              await updateDoc(invoiceRef, { 
-                status: newStatus, 
-                paidAmount: totalPaid
-              });
-            } else {
-              // No other payments, reset to pending
-              newStatus = "pending";
-              await updateDoc(invoiceRef, { 
-                status: newStatus, 
-                paidAmount: 0, 
-                paidAt: null, 
-                paymentForecastId: null 
-              });
-            }
-            
-            await syncBudget(id);
-          }
-        } catch (invoiceError) {
-          console.warn("Could not update invoice:", invoiceError);
-          // Continue with forecast update even if invoice update fails
-        }
-      }
-      
-      const newTotalAmount = updatedItems.reduce((sum, it) => sum + (it.status === "pending" ? it.amount : (it.partialAmount || it.amount)), 0);
-      
-      // Update forecast
-      await updateDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId), { 
-        items: updatedItems.map((it) => ({ 
-          ...it, 
-          addedAt: it.addedAt instanceof Date ? Timestamp.fromDate(it.addedAt) : it.addedAt, 
-          completedAt: it.completedAt instanceof Date ? Timestamp.fromDate(it.completedAt) : it.completedAt 
-        })), 
-        status: "pending",
-        totalAmount: newTotalAmount
+  // ── Justificantes ────────────────────────────────────────────────────────
+  const targets: ReceiptTarget[] = items.filter((i) => i.status === "pending" || !i.receiptUrl).map((it) => ({
+    id: it.id, supplier: (it.supplierId && suppliers[it.supplierId]?.name) || it.supplier, amount: amountOf(it),
+    numbers: [numberOf(it), it.invoiceNumber || "", (it.invoiceId && invoices[it.invoiceId]?.supplierNumber) || ""].filter(Boolean),
+  }));
+
+  /** Archivos soltados: se proponen asignaciones y se abre la revisión. */
+  const receive = async (files: File[]) => {
+    if (!files.length) return;
+    const taken = new Set(items.filter((i) => i.receiptUrl).map((i) => i.id));
+    const list: Pending[] = files.map((file, k) => {
+      const m = matchReceipt(file.name, "", targets, taken);
+      if (m.itemId) taken.add(m.itemId);
+      return { key: `${Date.now()}-${k}`, file, target: m.itemId || "", reasons: m.reasons, reading: !m.itemId && /pdf/i.test(file.type || file.name) };
+    });
+    setIncoming(list);
+    // Sin coincidencia por nombre: se lee el PDF (texto, sin OCR) para buscar número e importe.
+    const { readFile } = await import("@/lib/ocr/readDocument");
+    for (const p of list.filter((x) => x.reading)) {
+      let text = "";
+      try { text = (await readFile(p.file, () => {}, { ocr: false })).text; } catch { /* sin texto */ }
+      setIncoming((cur) => {
+        const used = new Set([...items.filter((i) => i.receiptUrl).map((i) => i.id), ...cur.filter((x) => x.key !== p.key && x.target && !x.target.startsWith("__")).map((x) => x.target)]);
+        const m = matchReceipt(p.file.name, text, targets, used);
+        return cur.map((x) => (x.key === p.key ? { ...x, reading: false, target: x.target || m.itemId || "", reasons: m.itemId ? m.reasons : x.reasons } : x));
       });
-      
-      setForecast({ ...forecast, items: updatedItems, status: "pending", totalAmount: newTotalAmount });
-      setSelectedPaymentId(itemId);
-      setTempAmounts((prev) => ({ ...prev, [itemId]: updatedItems[idx].amount }));
-      showToast("success", "Pago deshecho correctamente");
-    } catch (error) { 
-      console.error("Error:", error); 
-      showToast("error", "No se ha podido deshacer pago"); 
-    } finally { 
-      setSaving(false); 
     }
   };
 
-  const handleUpdateReceipt = async (itemId: string, file: File) => {
+  const confirmIncoming = async () => {
     if (!forecast) return;
-    setSaving(true);
+    setBusy("receipts");
     try {
-      const storageRef = ref(storage, `projects/${id}/receipts/${forecastId}/${itemId}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const receiptUrl = await getDownloadURL(storageRef);
-      
-      const updatedItems = forecast.items.map((item) => 
-        item.id === itemId ? { ...item, receiptUrl, receiptName: file.name } : item
-      );
-      
-      await updateDoc(doc(db, `projects/${id}/paymentForecasts`, forecastId), { 
-        items: updatedItems.map((it) => ({ 
-          ...it, 
-          addedAt: it.addedAt instanceof Date ? Timestamp.fromDate(it.addedAt) : it.addedAt, 
-          completedAt: it.completedAt instanceof Date ? Timestamp.fromDate(it.completedAt) : it.completedAt 
-        }))
-      });
-      
-      setForecast({ ...forecast, items: updatedItems });
-      showToast("success", "Justificante actualizado");
-    } catch (error) { 
-      console.error("Error:", error); 
-      showToast("error", "No se ha podido actualizar justificante"); 
-    } finally { 
-      setSaving(false); 
-    }
+      let next = [...forecast.items];
+      const missing = () => next.filter((i) => i.status === "pending" && !i.receiptUrl).map((i) => i.id);
+      for (const p of incoming) {
+        const ids = p.target === SELECTED ? [...selected] : p.target === ALL_MISSING ? missing() : p.target ? [p.target] : [];
+        if (!ids.length) continue;
+        const url = await upload(p.file, ids.length > 1 ? "multi" : ids[0]);
+        next = next.map((it) => (ids.includes(it.id) ? { ...it, receiptUrl: url, receiptName: p.file.name } : it));
+        for (const it of next.filter((x) => ids.includes(x.id))) await receiptToInvoice(it, url, p.file.name);
+      }
+      await saveItems(next);
+      const n = incoming.filter((p) => p.target).length;
+      toast.success(`${n} ${n === 1 ? "justificante asignado" : "justificantes asignados"}`);
+      setIncoming([]);
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
   };
 
-  const handleBulkUpload = (files: FileList) => {
-    if (!forecast || files.length === 0) return;
-    let matched = 0;
-    for (const file of Array.from(files)) { const fn = file.name.toLowerCase(); for (const item of pendingItems) { const num = item.invoiceNumber?.toLowerCase(); if (num && (fn.includes(num) || fn.includes(`fac-${num}`) || fn.includes(`fac${num}`))) { handleUploadReceipt(item.id, file); matched++; break; } } }
-    if (matched === 0) showToast("warning", "Sin coincidencias"); else showToast("success", `${matched} justificante(s) añadido(s)`);
+  const setRowReceipt = async (itemId: string, file: File | null) => {
+    if (!forecast) return;
+    setBusy(itemId);
+    try {
+      const url = file ? await upload(file, itemId) : null;
+      const next = forecast.items.map((it) => (it.id === itemId ? { ...it, receiptUrl: url || undefined, receiptName: file?.name || undefined } : it));
+      await saveItems(next);
+      const it = next.find((x) => x.id === itemId)!;
+      await receiptToInvoice(it, url, file?.name || null);
+      toast.success(file ? "Justificante guardado" : "Justificante quitado");
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length > 0) handleBulkUpload(e.dataTransfer.files); }, [forecast, pendingItems]);
-
-  const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-
-  const generateSepaXml = () => {
-    if (!forecast || !selectedBankAccount) { showToast("error", "Selecciona cuenta bancaria"); return; }
-    const items = pendingItems;
-    if (items.length === 0) { showToast("error", "No hay pagos"); return; }
-    const noIban = items.filter((item) => { const s = item.supplierId ? suppliers[item.supplierId] : null; return !s?.iban && !item.iban; });
-    if (noIban.length > 0) { showToast("error", `${noIban.length} sin IBAN`); return; }
-    const total = items.reduce((sum, i) => sum + (tempAmounts[i.id] || i.partialAmount || i.amount), 0);
-    const msgId = `REMESA-${forecast.id.substring(0, 8)}-${Date.now()}`;
-    let txs = "";
-    items.forEach((item, idx) => { const s = item.supplierId ? suppliers[item.supplierId] : null; const iban = s?.iban || item.iban || ""; const bic = s?.bic || item.bic || ""; const amt = (tempAmounts[item.id] || item.partialAmount || item.amount).toFixed(2); const r = item.invoiceNumber ? `FRA-${item.invoiceNumber}` : item.description.substring(0, 35); txs += `<CdtTrfTxInf><PmtId><EndToEndId>${msgId}-${idx + 1}</EndToEndId></PmtId><Amt><InstdAmt Ccy="EUR">${amt}</InstdAmt></Amt>${bic ? `<CdtrAgt><FinInstnId><BIC>${bic}</BIC></FinInstnId></CdtrAgt>` : ""}<Cdtr><Nm>${escapeXml(item.supplier.substring(0, 70))}</Nm></Cdtr><CdtrAcct><Id><IBAN>${iban.replace(/\s/g, "")}</IBAN></Id></CdtrAcct><RmtInf><Ustrd>${escapeXml(r)}</Ustrd></RmtInf></CdtTrfTxInf>`; });
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03"><CstmrCdtTrfInitn><GrpHdr><MsgId>${msgId}</MsgId><CreDtTm>${new Date().toISOString()}</CreDtTm><NbOfTxs>${items.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><InitgPty><Nm>${escapeXml(selectedBankAccount.fiscalName)}</Nm><Id><OrgId><Othr><Id>${selectedBankAccount.taxId}</Id></Othr></OrgId></Id></InitgPty></GrpHdr><PmtInf><PmtInfId>${msgId}-INFO</PmtInfId><PmtMtd>TRF</PmtMtd><BtchBookg>true</BtchBookg><NbOfTxs>${items.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><PmtTpInf><SvcLvl><Cd>SEPA</Cd></SvcLvl></PmtTpInf><ReqdExctnDt>${sepaDate}</ReqdExctnDt><Dbtr><Nm>${escapeXml(selectedBankAccount.fiscalName)}</Nm></Dbtr><DbtrAcct><Id><IBAN>${selectedBankAccount.iban.replace(/\s/g, "")}</IBAN></Id></DbtrAcct>${selectedBankAccount.bic ? `<DbtrAgt><FinInstnId><BIC>${selectedBankAccount.bic}</BIC></FinInstnId></DbtrAgt>` : ""}<ChrgBr>SLEV</ChrgBr>${txs}</PmtInf></CstmrCdtTrfInitn></Document>`;
-    const blob = new Blob([xml], { type: "application/xml" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `SEPA_${forecast.name.replace(/\s/g, "_")}_${sepaDate}.xml`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    setShowSepaModal(false); showToast("success", "SEPA generado");
+  // ── Pagar ────────────────────────────────────────────────────────────────
+  const markPaid = async (ids: string[], force = false) => {
+    if (!forecast || !ids.length) return;
+    const noReceipt = ids.filter((i) => !forecast.items.find((x) => x.id === i)?.receiptUrl);
+    if (noReceipt.length && !force) { setConfirmMissing(ids); return; }
+    setConfirmMissing(null);
+    setBusy("pay");
+    try {
+      const now = new Date();
+      let next = [...forecast.items];
+      const extra: PaymentItem[] = [];
+      for (const itemId of ids) {
+        const k = next.findIndex((x) => x.id === itemId);
+        if (k < 0) continue;
+        const it = next[k];
+        const paying = Math.min(amounts[itemId] ?? it.amount, it.amount);
+        const partial = paying < it.amount - 0.005;
+        next[k] = { ...it, status: "completed", partialAmount: paying, completedAt: now, completedBy: permissions.userId || "", completedByName: permissions.userName || "" };
+        if (partial) {
+          extra.push({ ...it, id: `${it.id}_remaining_${Date.now()}`, description: `${it.description} (restante)`, amount: +(it.amount - paying).toFixed(2), partialAmount: undefined, receiptUrl: undefined, receiptName: undefined, addedAt: now, status: "pending" });
+        }
+        if (it.cashMovementId && !partial) {
+          await updateDoc(doc(db, `projects/${id}/cashMovements`, it.cashMovementId), { treasuryPaidAt: Timestamp.now(), treasuryPaidByName: permissions.userName || "" }).catch(() => {});
+        }
+        if (it.invoiceId) {
+          await updateDoc(doc(db, `projects/${id}/invoices`, it.invoiceId), {
+            status: partial ? "partial_paid" : "paid", paidAmount: paying, paidAt: Timestamp.now(), paymentForecastId: forecastId, paymentMethod: "transfer",
+            ...(it.receiptUrl ? { receiptUrl: it.receiptUrl, receiptName: it.receiptName || null, receiptUploadedAt: Timestamp.now() } : {}),
+          });
+        }
+      }
+      next = [...next, ...extra];
+      const allDone = next.every((x) => x.status === "completed");
+      await saveItems(next, { status: allDone ? "completed" : forecast.status === "draft" ? "pending" : forecast.status });
+      setAmounts((a) => ({ ...a, ...Object.fromEntries(extra.map((x) => [x.id, x.amount])) }));
+      setSelected(new Set());
+      if (ids.some((i) => forecast.items.find((x) => x.id === i)?.invoiceId)) await syncBudget(id);
+      toast.success(extra.length ? `Pagado. Queda un pago pendiente por ${money(extra.reduce((a, x) => a + x.amount, 0))}` : `${ids.length} ${ids.length === 1 ? "pago marcado" : "pagos marcados"} como pagados`);
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
   };
 
-  const isPDF = (url?: string) => url?.toLowerCase().includes(".pdf") || url?.toLowerCase().includes("application/pdf");
+  const undo = async (itemId: string) => {
+    if (!forecast) return;
+    setBusy(itemId);
+    try {
+      let next = [...forecast.items];
+      const k = next.findIndex((x) => x.id === itemId);
+      const it = next[k];
+      const rest = next.findIndex((x) => x.id.startsWith(`${itemId}_remaining_`) && x.status === "pending");
+      next[k] = { ...it, status: "pending", amount: rest >= 0 ? +(it.amount + next[rest].amount).toFixed(2) : it.amount, partialAmount: undefined, completedAt: undefined, completedBy: undefined, completedByName: undefined };
+      if (rest >= 0) next = next.filter((_, j) => j !== rest);
+      if (it.invoiceId) {
+        const others = next.filter((x) => x.invoiceId === it.invoiceId && x.status === "completed");
+        await updateDoc(doc(db, `projects/${id}/invoices`, it.invoiceId), others.length
+          ? { status: "partial_paid", paidAmount: others.reduce((a, x) => a + (x.partialAmount || x.amount), 0) }
+          : { status: "submitted", paidAmount: 0, paidAt: null, paymentForecastId: null, receiptUrl: null, receiptName: null }).catch(() => {});
+        await syncBudget(id);
+      }
+      await saveItems(next, { status: "pending" });
+      setAmounts((a) => ({ ...a, [itemId]: next[k].amount }));
+      toast.success("Pago deshecho");
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
 
-  // Verificar permisos - solo accounting_extended puede acceder
-  const canAccessPayments = permissions.accountingAccessLevel === "accounting_extended";
+  // ── SEPA ─────────────────────────────────────────────────────────────────
+  const xmlEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  const sepaItems = sepa.onlySelected && selItems.length ? selItems : pending;
+  const sepaNoIban = sepaItems.filter((i) => !ibanOf(i));
+  const generateSepa = () => {
+    const bank = banks.find((b) => b.id === sepa.bankId);
+    if (!forecast || !bank) { toast.error("Elige la cuenta ordenante"); return; }
+    const list = sepaItems.filter((i) => ibanOf(i));
+    if (!list.length) { toast.error("No hay pagos con IBAN"); return; }
+    const total = list.reduce((a, i) => a + amountOf(i), 0);
+    const msgId = `REMESA-${forecast.id.slice(0, 8)}-${Date.now()}`;
+    const txs = list.map((it, k) => {
+      const bic = (it.supplierId && suppliers[it.supplierId]?.bic) || it.bic || "";
+      const ref = numberOf(it) || it.description.slice(0, 35);
+      return `<CdtTrfTxInf><PmtId><EndToEndId>${msgId}-${k + 1}</EndToEndId></PmtId><Amt><InstdAmt Ccy="EUR">${amountOf(it).toFixed(2)}</InstdAmt></Amt>${bic ? `<CdtrAgt><FinInstnId><BIC>${xmlEsc(bic)}</BIC></FinInstnId></CdtrAgt>` : ""}<Cdtr><Nm>${xmlEsc(((it.supplierId && suppliers[it.supplierId]?.name) || it.supplier).slice(0, 70))}</Nm></Cdtr><CdtrAcct><Id><IBAN>${ibanOf(it)}</IBAN></Id></CdtrAcct><RmtInf><Ustrd>${xmlEsc(ref)}</Ustrd></RmtInf></CdtTrfTxInf>`;
+    }).join("");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03"><CstmrCdtTrfInitn><GrpHdr><MsgId>${msgId}</MsgId><CreDtTm>${new Date().toISOString().slice(0, 19)}</CreDtTm><NbOfTxs>${list.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><InitgPty><Nm>${xmlEsc(bank.fiscalName)}</Nm><Id><OrgId><Othr><Id>${xmlEsc(bank.taxId)}</Id></Othr></OrgId></Id></InitgPty></GrpHdr><PmtInf><PmtInfId>${msgId}-1</PmtInfId><PmtMtd>TRF</PmtMtd><BtchBookg>true</BtchBookg><NbOfTxs>${list.length}</NbOfTxs><CtrlSum>${total.toFixed(2)}</CtrlSum><PmtTpInf><SvcLvl><Cd>SEPA</Cd></SvcLvl></PmtTpInf><ReqdExctnDt>${sepa.date}</ReqdExctnDt><Dbtr><Nm>${xmlEsc(bank.fiscalName)}</Nm></Dbtr><DbtrAcct><Id><IBAN>${bank.iban.replace(/\s/g, "")}</IBAN></Id></DbtrAcct>${bank.bic ? `<DbtrAgt><FinInstnId><BIC>${xmlEsc(bank.bic)}</BIC></FinInstnId></DbtrAgt>` : ""}<ChrgBr>SLEV</ChrgBr>${txs}</PmtInf></CstmrCdtTrfInitn></Document>`;
+    downloadBlob(new Blob([xml], { type: "application/xml" }), `SEPA_${safeName(forecast.name)}_${sepa.date}.xml`);
+    setSepa((s) => ({ ...s, open: false }));
+    toast.success(`Fichero SEPA con ${list.length} ${list.length === 1 ? "pago" : "pagos"}`);
+  };
 
-  // Loading
-  if (permissionsLoading || loading) {
+  // ── Paquete para contabilidad ────────────────────────────────────────────
+  const buildPackage = async () => {
+    if (!forecast) return;
+    setBusy("zip");
+    try {
+      const files: Record<string, Uint8Array> = {};
+      const seen = new Map<string, string>();
+      const rows = [["Estado", "Proveedor", "Factura", "Concepto", "Importe", "Fecha de pago", "Pagado por", "Justificante"]];
+      for (const it of items) {
+        let fname = "";
+        if (it.receiptUrl) {
+          if (seen.has(it.receiptUrl)) fname = seen.get(it.receiptUrl)!;
+          else {
+            const ext = (it.receiptName || "").match(/\.[a-z0-9]+$/i)?.[0] || ".pdf";
+            fname = `Justificantes/${safeName(numberOf(it) || it.id)}_${safeName(it.supplier).slice(0, 40)}${ext}`;
+            const r = await fetch(`/api/storage-proxy?url=${encodeURIComponent(it.receiptUrl)}`);
+            if (r.ok) { files[fname] = new Uint8Array(await r.arrayBuffer()); seen.set(it.receiptUrl, fname); } else fname = "(no disponible)";
+          }
+        }
+        rows.push([it.status === "completed" ? "Pagado" : "Pendiente", it.supplier, numberOf(it), it.description, amountOf(it).toFixed(2).replace(".", ","), it.completedAt ? it.completedAt.toLocaleDateString("es-ES") : "", it.completedByName || "", fname]);
+      }
+      const csv = "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
+      files["resumen.csv"] = strToU8(csv);
+      const zip = zipSync(files, { level: 0 });
+      downloadBlob(new Blob([zip as BlobPart], { type: "application/zip" }), `${safeName(forecast.name)}_justificantes.zip`);
+      toast.success("Paquete descargado");
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
+
+  // ── Arrastrar en toda la página ──────────────────────────────────────────
+  useEffect(() => {
+    const over = (e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); setDragging(true); } };
+    const leave = (e: DragEvent) => { if (!e.relatedTarget) setDragging(false); };
+    const drop = (e: DragEvent) => { if (!e.dataTransfer?.files.length) return; e.preventDefault(); setDragging(false); receive(Array.from(e.dataTransfer.files)); };
+    window.addEventListener("dragover", over); window.addEventListener("dragleave", leave); window.addEventListener("drop", drop);
+    return () => { window.removeEventListener("dragover", over); window.removeEventListener("dragleave", leave); window.removeEventListener("drop", drop); };
+  });
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  if (permLoading || loading) return <PageLoading />;
+  if (permError || !canAccess) {
     return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
-      </div>
+      <Page>
+        <PageHeader title="Pagos" />
+        <div className="mt-6"><EmptyState title="Pagos es solo para contabilidad ampliada" action={<Link href={`/project/${id}/accounting`} className="text-[13px] text-slate-700 underline">Volver al panel</Link>} /></div>
+      </Page>
     );
   }
+  if (!forecast) return null;
 
-  // Acceso denegado
-  if (permissionsError || !canAccessPayments) {
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="text-center max-w-md px-6">
-          <div className="hidden">
-            <ShieldAlert size={32} className="text-red-600" />
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Acceso restringido</h1>
-          <p className="text-slate-500 mb-6">
-            No tienes permisos para acceder a la gestión de pagos. Esta sección está disponible únicamente para usuarios con nivel de acceso &quot;Contabilidad ampliada&quot;.
-          </p>
-          <Link 
-            href={`/project/${id}/accounting`} 
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB]"
-          >
-            <ArrowLeft size={16} />
-            Volver al panel
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Previsión no encontrada
-  if (!forecast) {
-    return (
-      <div className={`min-h-screen bg-white flex items-center justify-center ${inter.className}`}>
-        <div className="text-center">
-          <AlertCircle size={48} className="text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">Previsión no encontrada</p>
-          <Link href={`/project/${id}/accounting/payments`} className="text-[13px] text-emerald-600 hover:underline mt-2 inline-block">Volver</Link>
-        </div>
-      </div>
-    );
-  }
+  const progress = items.length ? Math.round((done.length / items.length) * 100) : 0;
+  const allPendingSelected = pending.length > 0 && pending.every((i) => selected.has(i.id));
+  const optionLabel = (it: PaymentItem) => `${numberOf(it) ? `${numberOf(it)} · ` : ""}${it.supplier} · ${money(amountOf(it))}`;
 
   return (
-    <div className={`min-h-screen bg-slate-100 ${inter.className}`}>
-
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 text-slate-900 px-5 h-[53px] flex items-center justify-between fixed top-0 left-0 right-0 z-50">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.push(`/project/${id}/accounting/payments`)} className="p-1.5 text-slate-400 hover:bg-[#F4F4F5] hover:text-slate-900 rounded-md" title="Salir"><X size={18} /></button>
-          <div className="flex items-center gap-3">
-            <span className="text-[15px] font-semibold tracking-tight">Pagar remesa</span>
-            <span className="rounded border border-slate-200 bg-[#F7F7F8] px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{forecast.name}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-5 text-slate-500 text-[13px]">
-            <span>Pendiente: <span className="font-medium text-slate-900 tabular-nums">{formatCurrency(totalPending)} €</span></span>
-            <span>Completado: <span className="font-medium text-slate-900 tabular-nums">{formatCurrency(totalCompleted)} €</span></span>
-          </div>
-          <button onClick={() => setShowSepaModal(true)} className="flex items-center gap-2 px-3 py-1.5 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium">
-            <Download size={16} />SEPA XML
-          </button>
-        </div>
-      </div>
-
-      <div className="flex pt-[52px]" style={{ height: "100vh" }}>
-        {/* Left: Document Preview */}
-        <div className="w-1/2 bg-slate-800 p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 text-[13px]">
-              {selectedPayment
-                ? `Documento: ${(selectedPayment.supplierId ? suppliers[selectedPayment.supplierId]?.name : null) || selectedPayment.supplier || "—"}`
-                : "Selecciona un pago"}
-            </span>
-            <div className="flex items-center gap-2">
-              {selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl) && (
-                <span className="text-xs text-emerald-400 flex items-center gap-1"><FileCheck size={12} />Justificante</span>
-              )}
-              {(selectedPayment?.attachmentUrl || selectedPayment?.receiptUrl || (selectedPayment && itemReceipts[selectedPayment.id]?.url)) && (
-                <a href={selectedPayment?.receiptUrl || itemReceipts[selectedPayment?.id || ""]?.url || selectedPayment?.attachmentUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-slate-700 text-slate-300 rounded hover:bg-slate-600">
-                  <ExternalLink size={16} />
-                </a>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 bg-slate-900 rounded-md overflow-auto flex items-center justify-center">
-            {(() => {
-              const previewUrl = selectedPayment && (itemReceipts[selectedPayment.id]?.url || selectedPayment.receiptUrl || selectedPayment.attachmentUrl);
-              if (previewUrl) {
-                return isPDF(previewUrl) ? (
-                  <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full" />
-                ) : (
-                  <img src={previewUrl} alt="Documento" className="max-w-full max-h-full object-contain" />
-                );
-              } else if (selectedPayment) {
-                return (
-                  <div className="text-center text-slate-500">
-                    <FileText size={48} className="mx-auto mb-3 opacity-50" />
-                    <p>Sin documento adjunto</p>
-                    <p className="text-xs mt-1">Sube el justificante a la derecha</p>
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="text-center text-slate-500">
-                    <Banknote size={48} className="mx-auto mb-3 opacity-50" />
-                    <p>Selecciona un pago de la lista</p>
-                  </div>
-                );
-              }
-            })()}
-          </div>
-        </div>
-
-        {/* Right: Payment List & Form */}
-        <div className="w-1/2 overflow-y-auto p-6">
-          {/* Progreso de la remesa */}
-          <div className="mb-5 flex items-center gap-3 text-xs text-slate-600">
-            <span aria-hidden="true" className="flex h-[3px] flex-1 overflow-hidden rounded-full bg-[#F1F1F3]">
-              <span className="bg-emerald-500" style={{ width: `${((totalCompleted / (totalPending + totalCompleted)) * 100) || 0}%` }} />
-            </span>
-            <span className="tabular-nums">{completedItems.length} de {pendingItems.length + completedItems.length} pagados</span>
-          </div>
-
-          {/* Bulk Upload */}
-          {pendingItems.length > 0 && (
-            <div 
-              className={`mb-4 border-2 border-dashed rounded-md p-4 transition-colors ${dragOver ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-white hover:border-slate-400"}`}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-            >
-              <div className="flex items-center justify-center gap-4 text-center">
-                <FileUp size={20} className={dragOver ? "text-emerald-500" : "text-slate-400"} />
-                <div>
-                  <p className="text-[13px] font-medium text-slate-700">Arrastra justificantes aquí</p>
-                  <p className="text-xs text-slate-500">Nombra con nº factura (FRA-001.pdf)</p>
-                </div>
-                <button onClick={() => bulkFileInputRef.current?.click()} className="px-3 py-1.5 text-[13px] text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium">Seleccionar</button>
-              </div>
-              <input ref={bulkFileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => e.target.files && handleBulkUpload(e.target.files)} />
-            </div>
-          )}
-
-          {/* Pending Items */}
-          {pendingItems.length > 0 && (
-            <div className="bg-white rounded-lg border border-slate-200 mb-4">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                <Clock size={16} className="text-amber-500" />
-                <span className="font-semibold text-slate-900 text-[13px]">Pagos pendientes</span>
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">{pendingItems.length}</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {pendingItems.map((item) => {
-                  const typeInfo = PAYMENT_TYPES[item.type];
-                  const TypeIcon = typeInfo.icon;
-                  const isSelected = selectedPaymentId === item.id;
-                  const hasReceipt = !!itemReceipts[item.id];
-                  const payingAmount = tempAmounts[item.id] || item.partialAmount || item.amount;
-                  const enrichedSupplier = item.supplierId ? suppliers[item.supplierId] : null;
-                  const supplierName = enrichedSupplier?.name || item.supplier || "—";
-                  const hasIban = !!(enrichedSupplier?.iban || item.iban);
-
-                  return (
-                    <div key={item.id}>
-                      <button
-                        onClick={() => setSelectedPaymentId(item.id)}
-                        className={`w-full px-4 py-2 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-emerald-50" : "hover:bg-slate-50"}`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? "bg-emerald-100" : typeInfo.bgColor}`}>
-                          <TypeIcon size={14} className={isSelected ? "text-emerald-600" : typeInfo.textColor} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-[13px]">{supplierName}</span>
-                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
-                            {!hasIban && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Sin IBAN</span>}
-                          </div>
-                          <p className="text-xs text-slate-500 truncate">{item.description}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-slate-900 text-[13px]">{formatCurrency(payingAmount)} €</p>
-                          {payingAmount < item.amount && <p className="text-[10px] text-amber-600">Parcial</p>}
-                        </div>
-                        {hasReceipt ? <CheckCircle size={16} className="text-emerald-500" /> : <XCircle size={16} className="text-slate-300" />}
-                      </button>
-
-                      {isSelected && (
-                        <div className="px-4 pb-4 bg-emerald-50 border-t border-emerald-100">
-                          <div className="bg-white rounded-md p-4 mt-3 space-y-4">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-2">Importe a pagar</label>
-                              <div className="flex items-center gap-3">
-                                <div className="relative flex-1 max-w-[180px]">
-                                  <input type="number" step="0.01" min="0.01" max={item.amount} value={tempAmounts[item.id] || item.amount} onChange={(e) => setTempAmounts((prev) => ({ ...prev, [item.id]: Math.min(parseFloat(e.target.value) || 0, item.amount) }))} className="w-full px-2.5 py-1.5 pr-8 border border-slate-200 rounded-lg text-[13px] focus:ring-4 focus:ring-emerald-500 focus:outline-none" />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[13px]">€</span>
-                                </div>
-                                <span className="text-xs text-slate-500">de {formatCurrency(item.amount)} €</span>
-                                {payingAmount < item.amount && <button onClick={() => setTempAmounts((prev) => ({ ...prev, [item.id]: item.amount }))} className="text-xs text-emerald-600 hover:underline">Pagar todo</button>}
-                              </div>
-                              {payingAmount < item.amount && <p className="text-xs text-amber-600 mt-2 flex items-center gap-1"><Info size={12} />Pago parcial: quedarán {formatCurrency(item.amount - payingAmount)} € pendientes</p>}
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-2">Justificante <span className="text-red-500">*</span></label>
-                              {hasReceipt ? (
-                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
-                                  <FileCheck size={18} className="text-emerald-600" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] font-medium text-slate-900 truncate">{itemReceipts[item.id].file.name}</p>
-                                    <p className="text-xs text-slate-500">{(itemReceipts[item.id].file.size / 1024).toFixed(1)} KB</p>
-                                  </div>
-                                  <a href={itemReceipts[item.id].url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-emerald-100 rounded-lg"><ExternalLink size={14} className="text-emerald-600" /></a>
-                                  <button aria-label="Eliminar" onClick={() => handleRemoveReceipt(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 size={14} /></button>
-                                </div>
-                              ) : (
-                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
-                                  <Upload size={18} className="text-slate-400" />
-                                  <span className="text-[13px] text-slate-600">Subir justificante</span>
-                                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadReceipt(item.id, f); }} />
-                                </label>
-                              )}
-                            </div>
-
-                            <button onClick={() => handleMarkAsPaid([item.id])} disabled={!hasReceipt || saving} className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-[#E4E4E7] bg-[#F1F1F3] text-slate-900 hover:bg-[#E8E8EB] rounded-md text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                              {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={16} />}
-                              Marcar como pagado
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Completed Items */}
-          {completedItems.length > 0 && (
-            <div className="bg-white rounded-lg border border-slate-200">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span className="font-semibold text-slate-900 text-[13px]">Completados</span>
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">{completedItems.length}</span>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {completedItems.map((item) => {
-                  const isSelected = selectedPaymentId === item.id;
-                  const isPartialPayment = item.partialAmount && item.partialAmount < item.amount;
-                  const enrichedSupplierC = item.supplierId ? suppliers[item.supplierId] : null;
-                  const supplierNameC = enrichedSupplierC?.name || item.supplier || "—";
-
-                  return (
-                    <div key={item.id}>
-                      <button
-                        onClick={() => setSelectedPaymentId(isSelected ? null : item.id)}
-                        className={`w-full px-4 py-2 flex items-center gap-3 text-left transition-colors ${isSelected ? "bg-slate-50" : "hover:bg-slate-50"}`}
-                      >
-                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <CheckCircle2 size={14} className="text-emerald-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 text-[13px]">{supplierNameC}</span>
-                            {item.invoiceNumber && <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">FRA-{item.invoiceNumber}</span>}
-                            {isPartialPayment && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Parcial</span>}
-                          </div>
-                          <p className="text-xs text-slate-500">{item.description}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-emerald-600 text-[13px]">{formatCurrency(item.partialAmount || item.amount)} €</p>
-                          {isPartialPayment && <p className="text-[10px] text-amber-600">de {formatCurrency(item.amount)} €</p>}
-                          {item.completedAt && !isPartialPayment && <p className="text-[10px] text-slate-400">{formatDate(item.completedAt)}</p>}
-                        </div>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isSelected ? "rotate-180" : ""}`} />
-                      </button>
-
-                      {isSelected && (
-                        <div className="px-4 pb-4 bg-slate-50 border-t border-slate-100">
-                          <div className="bg-white rounded-md p-4 mt-3 space-y-4">
-                            {/* Info */}
-                            <div className="grid grid-cols-2 gap-4 text-[13px]">
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Pagado el</p>
-                                <p className="font-medium">{item.completedAt ? formatDate(item.completedAt) : "-"}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-500 mb-1">Por</p>
-                                <p className="font-medium">{item.completedByName || "-"}</p>
-                              </div>
-                              {isPartialPayment && (
-                                <>
-                                  <div>
-                                    <p className="text-xs text-slate-500 mb-1">Importe pagado</p>
-                                    <p className="font-medium text-emerald-600">{formatCurrency(item.partialAmount!)} €</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-slate-500 mb-1">Pendiente restante</p>
-                                    <p className="font-medium text-amber-600">{formatCurrency(item.amount - item.partialAmount!)} €</p>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            {/* Receipt */}
-                            <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-2">Justificante</label>
-                              {item.receiptUrl ? (
-                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
-                                  <FileCheck size={18} className="text-emerald-600" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] font-medium text-slate-900 truncate">{item.receiptName || "Justificante"}</p>
-                                  </div>
-                                  <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-emerald-100 rounded-lg">
-                                    <ExternalLink size={14} className="text-emerald-600" />
-                                  </a>
-                                  <label className="p-1.5 hover:bg-emerald-100 rounded-lg cursor-pointer" title="Cambiar justificante">
-                                    <Upload size={14} className="text-emerald-600" />
-                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpdateReceipt(item.id, f); }} />
-                                  </label>
-                                </div>
-                              ) : (
-                                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-md cursor-pointer hover:border-emerald-300 hover:bg-emerald-50">
-                                  <Upload size={18} className="text-slate-400" />
-                                  <span className="text-[13px] text-slate-600">Añadir justificante</span>
-                                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpdateReceipt(item.id, f); }} />
-                                </label>
-                              )}
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-2 pt-2 border-t border-slate-100">
-                              <button
-                                onClick={() => handleUndoPayment(item.id)}
-                                disabled={saving}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-1.5 border border-red-200 text-red-600 rounded-md text-[13px] font-medium hover:bg-red-50 disabled:opacity-50"
-                              >
-                                <Undo2 size={14} />
-                                Deshacer pago
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {pendingItems.length === 0 && completedItems.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 text-center mt-4">
-              <CheckCircle2 size={32} className="text-emerald-600 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-emerald-900">¡Todos los pagos completados!</h3>
-              <p className="text-emerald-700 text-[13px] mt-1">Remesa procesada correctamente</p>
-            </div>
-          )}
-
-          {forecast.items.length === 0 && (
-            <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-              <Banknote size={32} className="text-slate-300 mx-auto mb-3" />
-              <h3 className="text-[14px] font-semibold text-slate-900 mb-2">Sin pagos</h3>
-              <p className="text-slate-500 text-[13px]">Esta previsión no tiene pagos</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Fichero SEPA (pain.001.001.03) */}
-      <Modal
-        open={showSepaModal}
-        onClose={() => setShowSepaModal(false)}
-        title="Generar fichero SEPA"
-        width="max-w-lg"
-        footer={
+    <Page>
+      <Link href={`/project/${id}/accounting/payments`} className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900"><ArrowLeft size={12} /> Pagos</Link>
+      <PageHeader
+        title={<>{forecast.name} <span className="text-[15px] font-normal text-slate-400">{forecast.type === "remesa" ? "Remesa" : "Fuera de remesa"} · {dateEs(forecast.paymentDate)}</span></>}
+        actions={
           <>
-            <Button variant="ghost" onClick={() => setShowSepaModal(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={generateSepaXml} disabled={!selectedBankAccount}><Download size={13} /> Descargar XML</Button>
+            <Button onClick={buildPackage} disabled={busy === "zip" || totals.withReceipt === 0} title="Justificantes y resumen en un ZIP">
+              {busy === "zip" ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />} Paquete para contabilidad
+            </Button>
+            <Button variant="primary" onClick={() => setSepa((s) => ({ ...s, open: true, onlySelected: selItems.length > 0 }))} disabled={!pending.length}><Download size={14} /> SEPA XML</Button>
           </>
         }
-      >
-        <div className="flex flex-col gap-4 text-[13px]">
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-slate-600">Cuenta ordenante</p>
-            {bankAccounts.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-slate-200">
-                {bankAccounts.map((acc) => (
-                  <label key={acc.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0 ${selectedBankAccount?.id === acc.id ? "bg-[#F4F4F5]" : "hover:bg-[#FAFAFA]"}`}>
-                    <input type="radio" name="bankAccount" checked={selectedBankAccount?.id === acc.id} onChange={() => setSelectedBankAccount(acc)} className="h-3.5 w-3.5 accent-slate-900" />
-                    <span className="min-w-0 flex-1">
-                      <span className="font-medium text-slate-900">{acc.alias}</span>
-                      {acc.isDefault && <span className="ml-2 text-xs text-slate-400">principal</span>}
-                      <span className="block font-mono text-xs text-slate-500">{acc.iban.replace(/(.{4})/g, "$1 ").trim()}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2.5 text-xs text-amber-900">No hay cuentas bancarias. Añádelas en Configuración de contabilidad.</p>
-            )}
+      />
+
+      {/* Resumen */}
+      <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 md:grid-cols-4">
+        {[
+          ["Total", money(totals.all), `${items.length} ${items.length === 1 ? "pago" : "pagos"}`],
+          ["Pagado", money(totals.paid), `${done.length} de ${items.length}`],
+          ["Pendiente", money(totals.pending), `${pending.length} ${pending.length === 1 ? "pago" : "pagos"}`],
+          ["Justificantes", `${totals.withReceipt} de ${items.length}`, totals.withReceipt === items.length && items.length ? "Todo justificado" : `Faltan ${items.length - totals.withReceipt}`],
+        ].map(([k, v, s], idx) => (
+          <div key={k} className={`px-4 py-3 ${idx ? "border-l border-slate-100" : ""} ${idx === 2 ? "max-md:border-l-0 max-md:border-t" : ""} ${idx === 3 ? "max-md:border-t" : ""}`}>
+            <p className="text-xs text-slate-500">{k}</p>
+            <p className="mt-0.5 text-[17px] font-semibold tabular-nums text-slate-900">{v}</p>
+            <p className="text-xs text-slate-500">{s}</p>
           </div>
-          <Field label="Fecha de ejecución"><Input type="date" value={sepaDate} onChange={(e) => setSepaDate(e.target.value)} /></Field>
-          <div className="flex items-baseline justify-between rounded-md border border-slate-200 px-3 py-2.5">
-            <span className="text-slate-600">{pendingItems.length} {pendingItems.length === 1 ? "pago" : "pagos"}</span>
-            <span className="tabular-nums font-semibold">{formatCurrency(totalPending)} €</span>
-          </div>
-          {(() => {
-            const missing = pendingItems.filter((item) => {
-              const sup = item.supplierId ? suppliers[item.supplierId] : null;
-              return !sup?.iban && !item.iban;
-            });
-            if (missing.length === 0) return null;
-            return (
-              <div className="rounded-md border border-amber-200 bg-[#FFFBEB] px-3 py-2.5 text-xs text-amber-900">
-                <p className="font-medium">{missing.length} {missing.length === 1 ? "pago sin IBAN" : "pagos sin IBAN"}: no entrarán en el fichero.</p>
-                <p className="mt-1">{missing.map((item) => (item.supplierId ? suppliers[item.supplierId]?.name : null) || item.supplier || "—").join(" · ")}</p>
-                <p className="mt-1 text-amber-800">Añade el IBAN en la ficha del proveedor.</p>
-              </div>
-            );
-          })()}
+        ))}
+      </div>
+      <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#F1F1F3]" aria-hidden="true"><div className="h-full bg-[#2F52E0] transition-all" style={{ width: `${progress}%` }} /></div>
+
+      {/* Soltar justificantes */}
+      <button type="button" onClick={() => fileInput.current?.click()}
+        className={`mt-5 flex w-full items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-left transition ${dragging ? "border-[#2F52E0] bg-[#2F52E0]/[.05]" : "border-slate-300 hover:border-slate-400 hover:bg-[#FAFAFA]"}`}>
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-[#F1F1F3] text-slate-600"><Upload size={16} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13px] font-medium text-slate-900">Suelta aquí los justificantes del banco</span>
+          <span className="block text-xs text-slate-500">Varios a la vez. Te proponemos a qué pago va cada uno por el nombre del archivo o leyendo el PDF.</span>
+        </span>
+        <span className="text-xs font-medium text-slate-700">Elegir archivos</span>
+      </button>
+      <input ref={fileInput} type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={(e) => { receive(Array.from(e.target.files || [])); e.target.value = ""; }} />
+      <input ref={rowFileInput} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && rowTarget.current) setRowReceipt(rowTarget.current, f); e.target.value = ""; }} />
+
+      {/* Tabla */}
+      {items.length === 0 ? (
+        <div className="mt-5"><EmptyState title="Esta previsión no tiene pagos" /></div>
+      ) : (
+        <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[980px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-600">
+                <th scope="col" className="w-10 py-2 pl-4">
+                  <input type="checkbox" aria-label="Seleccionar todos los pendientes" checked={allPendingSelected} disabled={!pending.length}
+                    onChange={() => setSelected(allPendingSelected ? new Set() : new Set(pending.map((i) => i.id)))} className="h-3.5 w-3.5 accent-slate-900" />
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-medium">Pago</th>
+                <th scope="col" className="w-44 px-3 py-2 text-left font-medium">Cuenta del proveedor</th>
+                <th scope="col" className="w-24 px-3 py-2 text-left font-medium">Vence</th>
+                <th scope="col" className="w-40 px-3 py-2 text-right font-medium">Importe</th>
+                <th scope="col" className="w-56 px-3 py-2 text-left font-medium">Justificante</th>
+                <th scope="col" className="w-36 px-3 py-2 text-left font-medium">Estado</th>
+                <th scope="col" className="w-12 py-2 pr-3"><span className="sr-only">Acciones</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...pending, ...done].map((it) => {
+                const paid = it.status === "completed";
+                const iban = ibanOf(it);
+                const cert = it.supplierId ? suppliers[it.supplierId]?.cert : undefined;
+                const due = it.invoiceId ? invoices[it.invoiceId]?.dueDate : undefined;
+                const overdue = !paid && due && due < new Date(new Date().toDateString());
+                const num = numberOf(it);
+                return (
+                  <tr key={it.id} className={`border-b border-slate-100 last:border-0 ${selected.has(it.id) ? "bg-[#F7F8FE]" : "hover:bg-[#FAFAFA]"}`}>
+                    <td className="py-2 pl-4 align-top">
+                      {!paid && <input type="checkbox" aria-label={`Seleccionar ${it.supplier}`} checked={selected.has(it.id)} onChange={() => setSelected((s) => { const n = new Set(s); if (n.has(it.id)) n.delete(it.id); else n.add(it.id); return n; })} className="mt-1 h-3.5 w-3.5 accent-slate-900" />}
+                    </td>
+                    <td className="px-3 py-2">
+                      <p className="flex items-center gap-2">
+                        <span className={`font-medium ${paid ? "text-slate-600" : "text-slate-900"}`}>{(it.supplierId && suppliers[it.supplierId]?.name) || it.supplier}</span>
+                        {num && (it.invoiceId
+                          ? <Link href={`/project/${id}/accounting/invoices/${it.invoiceId}`} className="font-mono text-[11px] text-slate-500 hover:text-slate-900">{num}</Link>
+                          : <span className="font-mono text-[11px] text-slate-500">{num}</span>)}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">{TYPE_LABEL[it.type] && it.type !== "invoice" ? `${TYPE_LABEL[it.type]} · ` : ""}{it.description || "Sin concepto"}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      {iban ? (
+                        <span className="flex items-center gap-1.5" title={iban.replace(/(.{4})/g, "$1 ").trim()}>
+                          <span className="font-mono text-xs text-slate-700">···· {iban.slice(-4)}</span>
+                          {cert === "verified" ? <ShieldCheck size={13} className="text-emerald-600" aria-label="Certificado verificado" /> : cert ? <ShieldAlert size={13} className="text-amber-600" aria-label="Sin certificado verificado" /> : null}
+                        </span>
+                      ) : <span className="text-xs text-red-700">Sin IBAN</span>}
+                    </td>
+                    <td className={`px-3 py-2 tabular-nums ${overdue ? "text-red-700" : "text-slate-600"}`}>{dateEs(due)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {paid ? (
+                        <span className="tabular-nums text-slate-900">{money(amountOf(it))}{it.partialAmount && it.partialAmount < it.amount - 0.005 ? <span className="block text-[11px] text-slate-500">de {money(it.amount)}</span> : null}</span>
+                      ) : (
+                        <span className="inline-flex flex-col items-end">
+                          <span className="relative w-32">
+                            <Input inputMode="decimal" aria-label={`Importe a pagar a ${it.supplier}`} value={String(amounts[it.id] ?? it.amount)}
+                              onChange={(e) => { const v = parseFloat(e.target.value.replace(",", ".")); setAmounts((a) => ({ ...a, [it.id]: isNaN(v) ? 0 : Math.min(v, it.amount) })); }}
+                              className="h-8 pr-6 text-right tabular-nums" />
+                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">€</span>
+                          </span>
+                          {(amounts[it.id] ?? it.amount) < it.amount - 0.005 && <span className="mt-0.5 text-[11px] text-amber-700">Parcial de {money(it.amount)}</span>}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {busy === it.id ? <Loader2 size={14} className="animate-spin text-slate-400" /> : it.receiptUrl ? (
+                        <span className="flex items-center gap-1.5">
+                          <button type="button" onClick={() => setPreview({ url: it.receiptUrl!, name: it.receiptName, title: `Justificante · ${it.supplier}` })}
+                            className="flex min-w-0 items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:border-slate-300 hover:text-slate-900">
+                            <Paperclip size={12} className="flex-shrink-0 text-slate-400" /><span className="max-w-[140px] truncate">{it.receiptName || "Justificante"}</span>
+                          </button>
+                          <IconButton label="Quitar justificante" onClick={() => setRowReceipt(it.id, null)}><X size={13} /></IconButton>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => { rowTarget.current = it.id; rowFileInput.current?.click(); }}
+                          className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-slate-400 hover:text-slate-900">
+                          <Upload size={12} /> Subir
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {paid ? (
+                        <span className="text-xs">
+                          <span className="flex items-center gap-1.5 text-slate-900"><span className="h-1.5 w-1.5 rounded-full bg-[#2F52E0]" />Pagado {dateEs(it.completedAt)}</span>
+                          {it.completedByName && <span className="block pl-3 text-slate-500">{it.completedByName}</span>}
+                        </span>
+                      ) : <span className="flex items-center gap-1.5 text-xs text-slate-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Pendiente</span>}
+                    </td>
+                    <td className="py-2 pr-3 text-right">
+                      <Menu trigger={(toggle) => <IconButton label="Acciones" onClick={toggle}><MoreHorizontal size={15} /></IconButton>}>
+                        {(close) => (
+                          <>
+                            {!paid && <MenuItem onClick={() => { close(); markPaid([it.id]); }}>Marcar como pagado</MenuItem>}
+                            {it.receiptUrl
+                              ? <MenuItem onClick={() => { close(); rowTarget.current = it.id; rowFileInput.current?.click(); }}>Cambiar justificante</MenuItem>
+                              : <MenuItem onClick={() => { close(); rowTarget.current = it.id; rowFileInput.current?.click(); }}>Subir justificante</MenuItem>}
+                            {it.invoiceId && invoices[it.invoiceId]?.attachmentUrl && <MenuItem onClick={() => { close(); setPreview({ url: invoices[it.invoiceId!]!.attachmentUrl!, title: `Factura ${num}` }); }}>Ver la factura</MenuItem>}
+                            {paid && (<><MenuSeparator /><MenuItem onClick={() => { close(); undo(it.id); }}>Deshacer el pago</MenuItem></>)}
+                          </>
+                        )}
+                      </Menu>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+      )}
+      <p className="mt-3 text-xs text-slate-500">Los justificantes se guardan también en cada factura: contabilidad los tiene en la factura y en el Centro de documentación.</p>
+
+      {/* Barra de selección */}
+      {selItems.length > 0 && (
+        <div className="sticky bottom-4 z-30 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
+          <span className="text-[13px] text-slate-900"><span className="font-medium tabular-nums">{selItems.length}</span> {selItems.length === 1 ? "pago" : "pagos"} · <span className="tabular-nums">{money(selItems.reduce((a, i) => a + amountOf(i), 0))}</span></span>
+          <span className="text-xs text-slate-500">{selItems.filter((i) => !i.receiptUrl).length ? `${selItems.filter((i) => !i.receiptUrl).length} sin justificante` : "Todos con justificante"}</span>
+          <span className="ml-auto flex gap-2">
+            <Button variant="ghost" onClick={() => setSelected(new Set())}>Quitar selección</Button>
+            <Button onClick={() => setSepa((s) => ({ ...s, open: true, onlySelected: true }))}><Download size={14} /> SEPA de estos</Button>
+            <Button variant="primary" onClick={() => markPaid(selItems.map((i) => i.id))} disabled={busy === "pay"}>{busy === "pay" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Marcar como pagados</Button>
+          </span>
+        </div>
+      )}
+
+      {/* Revisión de justificantes soltados */}
+      <Modal open={incoming.length > 0} onClose={() => !busy && setIncoming([])} title={`Asignar ${incoming.length} ${incoming.length === 1 ? "justificante" : "justificantes"}`} width="max-w-3xl"
+        footer={<>
+          <Button variant="ghost" onClick={() => setIncoming([])} disabled={busy === "receipts"}>Cancelar</Button>
+          <Button variant="primary" onClick={confirmIncoming} disabled={busy === "receipts" || !incoming.some((p) => p.target) || incoming.some((p) => p.reading)}>
+            {busy === "receipts" ? <><Loader2 size={14} className="animate-spin" /> Guardando…</> : `Asignar ${incoming.filter((p) => p.target).length}`}
+          </Button>
+        </>}>
+        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {incoming.map((p) => (
+            <div key={p.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-3 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-[13px] text-slate-900"><FileText size={13} className="flex-shrink-0 text-slate-400" />{p.file.name}</p>
+                <p className="text-[11.5px] text-slate-500">
+                  {p.reading ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Leyendo el PDF…</span>
+                    : p.reasons.length && p.target && !p.target.startsWith("__") ? `Coincide por ${p.reasons.join(" y ")}` : p.target ? "Asignado a mano" : "Sin coincidencia: elige el pago"}
+                </p>
+              </div>
+              <Select value={p.target} onChange={(e) => setIncoming((cur) => cur.map((x) => (x.key === p.key ? { ...x, target: e.target.value, reasons: [] } : x)))}>
+                <option value="">Sin asignar</option>
+                {selected.size > 1 && <option value={SELECTED}>{`Los ${selected.size} pagos seleccionados`}</option>}
+                <option value={ALL_MISSING}>Todos los pendientes sin justificante</option>
+                {items.map((it) => <option key={it.id} value={it.id}>{optionLabel(it)}{it.receiptUrl ? " (ya tiene)" : ""}</option>)}
+              </Select>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-slate-500">Un mismo justificante puede servir para varios pagos: elige «pagos seleccionados» o «todos los pendientes sin justificante».</p>
       </Modal>
-    </div>
+
+      {/* SEPA */}
+      <Modal open={sepa.open} onClose={() => setSepa((s) => ({ ...s, open: false }))} title="Fichero SEPA"
+        footer={<><Button variant="ghost" onClick={() => setSepa((s) => ({ ...s, open: false }))}>Cancelar</Button><Button variant="primary" onClick={generateSepa} disabled={!banks.length}><Download size={14} /> Descargar XML</Button></>}>
+        {banks.length === 0 ? (
+          <p className="text-[13px] text-slate-700">Añade una cuenta ordenante en <Link href={`/project/${id}/accounting/config`} className="underline">Configuración › Empresa</Link>.</p>
+        ) : (
+          <div className="space-y-4">
+            <Field label="Cuenta ordenante">
+              <Select value={sepa.bankId} onChange={(e) => setSepa((s) => ({ ...s, bankId: e.target.value }))}>
+                {banks.map((b) => <option key={b.id} value={b.id}>{b.alias} · ···· {b.iban.replace(/\s/g, "").slice(-4)}</option>)}
+              </Select>
+            </Field>
+            <Field label="Fecha de ejecución"><Input type="date" value={sepa.date} onChange={(e) => setSepa((s) => ({ ...s, date: e.target.value }))} /></Field>
+            <div className="rounded-md border border-slate-200 px-3 py-2 text-[13px]">
+              <p className="text-slate-900">{sepaItems.length - sepaNoIban.length} {sepaItems.length - sepaNoIban.length === 1 ? "pago" : "pagos"} · <span className="tabular-nums">{money(sepaItems.filter((i) => ibanOf(i)).reduce((a, i) => a + amountOf(i), 0))}</span></p>
+              {sepaNoIban.length > 0 && <p className="mt-1 text-xs text-amber-800">Quedan fuera {sepaNoIban.length} sin IBAN: {sepaNoIban.map((i) => i.supplier).join(", ")}.</p>}
+              {selItems.length > 0 && (
+                <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={sepa.onlySelected} onChange={(e) => setSepa((s) => ({ ...s, onlySelected: e.target.checked }))} className="h-3.5 w-3.5 accent-slate-900" /> Solo los {selItems.length} seleccionados
+                </label>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Pagar sin justificante */}
+      <Modal open={!!confirmMissing} onClose={() => setConfirmMissing(null)} title="Pagos sin justificante"
+        footer={<><Button variant="ghost" onClick={() => setConfirmMissing(null)}>Volver</Button><Button variant="primary" onClick={() => confirmMissing && markPaid(confirmMissing, true)}>Marcar igualmente</Button></>}>
+        <p className="text-[13px] text-slate-700">
+          {confirmMissing?.filter((i) => !items.find((x) => x.id === i)?.receiptUrl).length} de {confirmMissing?.length} no tienen justificante. Puedes subirlo después: la factura quedará marcada como «Pagada sin justificante» para contabilidad hasta entonces.
+        </p>
+      </Modal>
+
+      {/* Vista previa */}
+      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.title || ""} width="max-w-4xl"
+        footer={preview ? <a href={preview.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[13px] text-slate-700 hover:text-slate-900">Abrir en otra pestaña <ExternalLink size={12} /></a> : undefined}>
+        {preview && (isPdf(preview.url, preview.name)
+          ? <iframe title={preview.title} src={preview.url} className="h-[70vh] w-full rounded-md border border-slate-200" />
+          // eslint-disable-next-line @next/next/no-img-element
+          : <img src={preview.url} alt={preview.title} className="max-h-[70vh] w-full rounded-md object-contain" />)}
+      </Modal>
+
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center bg-[#2F52E0]/[.06]">
+          <div className="rounded-xl border-2 border-dashed border-[#2F52E0] bg-white px-8 py-6 text-center shadow-lg">
+            <Upload size={22} className="mx-auto text-[#2F52E0]" />
+            <p className="mt-2 text-[14px] font-medium text-slate-900">Suelta los justificantes</p>
+            <p className="text-xs text-slate-500">Te proponemos a qué pago va cada uno</p>
+          </div>
+        </div>
+      )}
+    </Page>
   );
+}
+
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

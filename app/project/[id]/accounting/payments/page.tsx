@@ -11,7 +11,8 @@ import { inter } from "@/lib/fonts";
 import { AnchoredPanel } from "@/components/ds";
 
 // ─── Firebase ────────────────────────────────────────────────────────────────
-import { auth, db } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import {
   addDoc,
   collection,
@@ -282,6 +283,53 @@ export default function PaymentsPage() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // Facturas pagadas sin justificante (lo que contabilidad echa en falta).
+  const [noReceipt, setNoReceipt] = useState<{ id: string; number: string; supplier: string; total: number; paidAt?: Date; forecastId?: string; supplierNumber?: string }[]>([]);
+  const [showNoReceipt, setShowNoReceipt] = useState(false);
+  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
+  const receiptInput = useRef<HTMLInputElement>(null);
+  const bulkReceiptInput = useRef<HTMLInputElement>(null);
+  const receiptTarget = useRef<string | null>(null);
+
+  const attachReceipt = async (invoiceId: string, file: File) => {
+    const inv = noReceipt.find((x) => x.id === invoiceId);
+    if (!inv) return;
+    const r = storageRef(storage, `projects/${id}/receipts/${inv.forecastId || "sin-prevision"}/${invoiceId}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]+/g, "_")}`);
+    await uploadBytes(r, file, { contentType: file.type || undefined });
+    const url = await getDownloadURL(r);
+    await updateDoc(doc(db, `projects/${id}/invoices`, invoiceId), { receiptUrl: url, receiptName: file.name, receiptUploadedAt: Timestamp.now() });
+    // También en el pago de la previsión, si lo hay.
+    if (inv.forecastId) {
+      const f = forecasts.find((x) => x.id === inv.forecastId);
+      if (f) {
+        const items = f.items.map((it) => (it.invoiceId === invoiceId && it.status === "completed" && !it.receiptUrl ? { ...it, receiptUrl: url, receiptName: file.name } : it));
+        await updateDoc(doc(db, `projects/${id}/paymentForecasts`, f.id), {
+          items: items.map((it) => Object.fromEntries(Object.entries({ ...it, addedAt: it.addedAt instanceof Date ? Timestamp.fromDate(it.addedAt) : it.addedAt, completedAt: it.completedAt instanceof Date ? Timestamp.fromDate(it.completedAt) : it.completedAt ?? null }).filter(([, v]) => v !== undefined))),
+        }).catch(() => {});
+      }
+    }
+    setNoReceipt((list) => list.filter((x) => x.id !== invoiceId));
+  };
+  const uploadOne = async (invoiceId: string, file: File) => {
+    setUploadingReceipt(invoiceId);
+    try { await attachReceipt(invoiceId, file); appToast.success("Justificante guardado"); } catch (e) { appToast.error(e); } finally { setUploadingReceipt(null); }
+  };
+  const uploadMany = async (files: File[]) => {
+    const { matchReceipt } = await import("@/lib/payments/matchReceipts");
+    const taken = new Set<string>();
+    let ok = 0;
+    const left: string[] = [];
+    setUploadingReceipt("bulk");
+    try {
+      for (const file of files) {
+        const m = matchReceipt(file.name, "", noReceipt.map((x) => ({ id: x.id, supplier: x.supplier, amount: x.total, numbers: [x.number, x.supplierNumber || ""].filter(Boolean) })), taken);
+        if (m.itemId) { taken.add(m.itemId); await attachReceipt(m.itemId, file); ok++; } else left.push(file.name);
+      }
+      if (ok) appToast.success(`${ok} ${ok === 1 ? "justificante guardado" : "justificantes guardados"}`);
+      if (left.length) appToast.error(`Sin coincidencia: ${left.join(", ")}. Súbelos en su fila.`);
+    } catch (e) { appToast.error(e); } finally { setUploadingReceipt(null); }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -313,6 +361,9 @@ export default function PaymentsPage() {
       setForecasts(forecastsData);
 
       const invoicesSnap = await getDocs(query(collection(db, "projects/" + id + "/invoices"), orderBy("dueDate", "asc")));
+      setNoReceipt(invoicesSnap.docs
+        .filter((d) => { const x = d.data(); return (x.paidAt || x.status === "paid") && !x.receiptUrl && x.paymentMethod !== "card" && !["cancelled", "void"].includes(x.status); })
+        .map((d) => { const x = d.data(); return { id: d.id, number: x.displayNumber || x.number || "", supplier: x.supplier || "", total: x.paidAmount || x.totalAmount || 0, paidAt: x.paidAt?.toDate?.(), forecastId: x.paymentForecastId || undefined, supplierNumber: x.supplierNumber || "" }; }));
       const assignedInvoiceIds = new Set<string>();
       forecastsData.forEach((f) => f.items.forEach((item) => { if (item.invoiceId) assignedInvoiceIds.add(item.invoiceId); }));
 
@@ -598,7 +649,7 @@ export default function PaymentsPage() {
     const config: Record<string, { bg: string; text: string; label: string; icon: typeof Edit3 }> = {
       draft: { bg: "bg-slate-100", text: "text-slate-700", label: "Borrador", icon: Edit3 },
       pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Pendiente", icon: Clock },
-      completed: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Completada", icon: CheckCircle2 },
+      completed: { bg: "bg-[#F7F7F8]", text: "text-slate-900", label: "Completada", icon: CheckCircle2 },
     };
     return config[status] || config.draft;
   };
@@ -660,6 +711,14 @@ export default function PaymentsPage() {
             </>
           }
         />
+
+        {noReceipt.length > 0 && (
+          <button type="button" onClick={() => setShowNoReceipt(true)}
+            className="mt-5 flex w-full items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2 text-left text-[13px] hover:bg-amber-100/60">
+            <span className="text-amber-900"><span className="font-medium tabular-nums">{noReceipt.length}</span> {noReceipt.length === 1 ? "factura pagada sin justificante" : "facturas pagadas sin justificante"}: contabilidad las necesita</span>
+            <span className="text-xs font-medium text-slate-900">Subir justificantes</span>
+          </button>
+        )}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <SearchBar fields={PAY_FIELDS} field={payField} onField={setPayField} value={searchTerm} onChange={setSearchTerm} count={filteredForecasts.length} />
@@ -770,14 +829,14 @@ export default function PaymentsPage() {
                   const StatusIcon = statusConfig.icon;
                   const TypeIcon = typeConfig.icon;
                   return (
-                    <div key={forecast.id} onDragOver={(e) => handleDragOver(e, forecast.id)} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, forecast.id)} className={cx("bg-white border rounded-lg overflow-hidden transition-all", dragOverForecast === forecast.id && forecast.status === "draft" ? "border-emerald-400 ring-2 ring-emerald-100 scale-[1.01]" : "border-slate-200 hover:shadow-md")}>
+                    <div key={forecast.id} onDragOver={(e) => handleDragOver(e, forecast.id)} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, forecast.id)} className={cx("bg-white border rounded-lg overflow-hidden transition-all", dragOverForecast === forecast.id && forecast.status === "draft" ? "border-[#2F52E0] ring-2 ring-[#2F52E0]/15 scale-[1.01]" : "border-slate-200 hover:shadow-md")}>
                       <div className="px-4 py-3 border-b border-slate-100">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-slate-900 truncate">{forecast.name}</h3>
                             <div className="flex items-center gap-2 mt-1">
                               <Calendar size={12} className="text-slate-400" />
-                              <span className={cx("text-xs", daysUntil < 0 ? "text-red-600 font-semibold" : daysUntil <= 3 ? "text-amber-600 font-semibold" : "text-slate-500")}>{formatDate(forecast.paymentDate)}{daysUntil >= 0 && daysUntil <= 7 ? (" (" + daysUntil + "d)") : ""}{daysUntil < 0 ? (" (hace " + Math.abs(daysUntil) + "d)") : ""}</span>
+                              <span className={cx("text-xs", forecast.status === "completed" ? "text-slate-500" : daysUntil < 0 ? "text-red-700 font-medium" : daysUntil <= 3 ? "text-amber-800 font-medium" : "text-slate-500")}>{formatDate(forecast.paymentDate)}{forecast.status !== "completed" && (daysUntil === 0 ? " · hoy" : daysUntil > 0 && daysUntil <= 7 ? ` · en ${daysUntil} d` : daysUntil < 0 ? ` · hace ${-daysUntil} d` : "")}</span>
                             </div>
                           </div>
                           <div className="relative menu-container">
@@ -804,7 +863,7 @@ export default function PaymentsPage() {
                               >
                                 <button onClick={() => { setShowForecastDetail(forecast); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Eye size={14} /> Ver detalles</button>
                                 {forecast.status === "draft" && (<><button onClick={() => { setSelectedForecastId(forecast.id); setShowAddPaymentModal(true); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2"><Plus size={14} /> Añadir pago</button>{forecast.items.length > 0 && (<button onClick={() => { handleSendForecast(forecast.id); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-amber-600 hover:bg-amber-50 flex items-center gap-2"><Send size={14} /> Enviar</button>)}</>)}
-                                {(forecast.status === "pending" || forecast.status === "completed") && (<button onClick={() => { router.push("/project/" + id + "/accounting/payments/" + forecast.id + "/pay"); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-emerald-600 hover:bg-emerald-50 flex items-center gap-2"><Banknote size={14} /> {forecast.status === "completed" ? "Ver pagos" : "Ir a pagar"}</button>)}
+                                {(forecast.status === "pending" || forecast.status === "completed") && (<button onClick={() => { router.push("/project/" + id + "/accounting/payments/" + forecast.id + "/pay"); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-[#2F52E0] hover:bg-[#F7F7F8] flex items-center gap-2"><Banknote size={14} /> {forecast.status === "completed" ? "Ver pagos" : "Ir a pagar"}</button>)}
                                 <div className="border-t border-slate-100 my-1" />
                                 <button onClick={() => { handleDeleteForecast(forecast.id); setOpenMenuId(null); setMenuPosition(null); }} className="w-full px-4 py-2 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={14} /> Eliminar</button>
                               </div>
@@ -827,10 +886,10 @@ export default function PaymentsPage() {
                               return (
                                 <div key={item.id} className="bg-white p-2 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors group">
                                   <div className="flex items-start gap-2">
-                                    <div className={cx("w-5 h-5 rounded flex items-center justify-center flex-shrink-0", item.status === "completed" ? "bg-emerald-100" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={10} className="text-emerald-600" /> : <ItemIcon size={10} className="text-slate-500" />}</div>
+                                    <div className={cx("w-5 h-5 rounded flex items-center justify-center flex-shrink-0", item.status === "completed" ? "bg-[#2F52E0]/10" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={10} className="text-[#2F52E0]" /> : <ItemIcon size={10} className="text-slate-500" />}</div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-1">
-                                        <p className="text-[11px] font-medium text-slate-900 truncate font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p>
+                                        <p className="text-[11px] font-medium text-slate-900 truncate font-mono">{item.invoiceNumber ? (/^[A-Za-z]/.test(item.invoiceNumber) ? item.invoiceNumber : "FRA-" + item.invoiceNumber) : item.description}</p>
                                         {forecast.status === "draft" && (<button aria-label="Cerrar" onClick={() => handleRemovePaymentItem(forecast.id, item.id)} className="p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><X size={10} /></button>)}
                                       </div>
                                       <div className="flex items-center justify-between mt-0.5">
@@ -852,7 +911,7 @@ export default function PaymentsPage() {
                         </div>
                         {forecast.status !== "draft" && forecast.items.length > 0 && (
                           <div className="flex items-center gap-2 mt-2">
-                            <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: progress.percent + "%" }} /></div>
+                            <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-[#2F52E0] rounded-full transition-all" style={{ width: progress.percent + "%" }} /></div>
                             <span className="text-[10px] text-slate-500">{progress.completed}/{progress.total}</span>
                           </div>
                         )}
@@ -895,7 +954,7 @@ export default function PaymentsPage() {
                             <td className="px-4 py-3"><div className="flex items-center gap-1.5"><Calendar size={14} className="text-slate-400" /><span className="text-[13px] text-slate-700">{formatDate(forecast.paymentDate)}</span></div></td>
                             <td className="px-4 py-3"><span className={cx("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium", typeConfig.bg, typeConfig.text)}><TypeIcon size={12} />{typeConfig.label}</span></td>
                             <td className="px-4 py-3"><span className={cx("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium", statusConfig.bg, statusConfig.text)}><StatusIcon size={12} />{statusConfig.label}</span></td>
-                            <td className="px-4 py-3">{forecast.items.length > 0 ? (<div className="flex items-center gap-2 justify-center"><div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: progress.percent + "%" }} /></div><span className="text-xs text-slate-500">{progress.completed}/{progress.total}</span></div>) : (<span className="text-xs text-slate-400">-</span>)}</td>
+                            <td className="px-4 py-3">{forecast.items.length > 0 ? (<div className="flex items-center gap-2 justify-center"><div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-[#2F52E0] rounded-full" style={{ width: progress.percent + "%" }} /></div><span className="text-xs text-slate-500">{progress.completed}/{progress.total}</span></div>) : (<span className="text-xs text-slate-400">-</span>)}</td>
                             <td className="px-4 py-3 text-right"><span className="text-[13px] font-bold text-slate-900">{formatCurrency(forecast.totalAmount)} €</span></td>
                             <td className="px-4 py-3"><button aria-label="Ver" onClick={() => setShowForecastDetail(forecast)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><Eye size={16} /></button></td>
                           </tr>
@@ -908,11 +967,11 @@ export default function PaymentsPage() {
                                   return (
                                     <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded-md border border-slate-200">
                                       <div className="flex items-center gap-3">
-                                        <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center", item.status === "completed" ? "bg-emerald-100" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={16} className="text-emerald-600" /> : <ItemIcon size={16} className="text-slate-500" />}</div>
-                                        <div><p className="text-[13px] font-medium text-slate-900 font-mono">{item.invoiceNumber ? ("FRA-" + item.invoiceNumber) : item.description}</p><p className="text-xs text-slate-500">{item.supplier}</p></div>
+                                        <div className={cx("w-8 h-8 rounded-lg flex items-center justify-center", item.status === "completed" ? "bg-[#2F52E0]/10" : "bg-slate-100")}>{item.status === "completed" ? <CheckCircle2 size={16} className="text-[#2F52E0]" /> : <ItemIcon size={16} className="text-slate-500" />}</div>
+                                        <div><p className="text-[13px] font-medium text-slate-900 font-mono">{item.invoiceNumber ? (/^[A-Za-z]/.test(item.invoiceNumber) ? item.invoiceNumber : "FRA-" + item.invoiceNumber) : item.description}</p><p className="text-xs text-slate-500">{item.supplier}</p></div>
                                       </div>
                                       <div className="flex items-center gap-4">
-                                        <span className={cx("text-xs px-2 py-1 rounded-lg", item.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{item.status === "completed" ? "Completado" : "Pendiente"}</span>
+                                        <span className={cx("text-xs px-2 py-1 rounded-lg", item.status === "completed" ? "bg-[#F7F7F8] text-slate-900" : "bg-amber-50 text-amber-700")}>{item.status === "completed" ? "Completado" : "Pendiente"}</span>
                                         <span className="text-[13px] font-semibold text-slate-900">{formatCurrency(item.partialAmount || item.amount)} €</span>
                                         {item.receiptUrl && (<a href={item.receiptUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-slate-700"><ExternalLink size={14} /></a>)}
                                       </div>
@@ -1065,14 +1124,14 @@ export default function PaymentsPage() {
                         {fc.items.map((item) => (
                           <tr key={item.id} className="border-b border-slate-100 last:border-0">
                             <td className="px-3 py-1.5">
-                              <span className="font-mono text-xs font-medium">{item.invoiceNumber ? "FRA-" + item.invoiceNumber : item.description}</span>
+                              <span className="font-mono text-xs font-medium">{item.invoiceNumber ? (/^[A-Za-z]/.test(item.invoiceNumber) ? item.invoiceNumber : "FRA-" + item.invoiceNumber) : item.description}</span>
                               <span className="ml-2 text-xs text-slate-400">{PAYMENT_TYPES[item.type]?.label}</span>
                             </td>
                             <td className="px-3 py-1.5">{item.supplier}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums text-xs">{formatCurrency(item.partialAmount || item.amount)}</td>
                             <td className="px-3 py-1.5">
                               <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                                <span className={cx("h-1.5 w-1.5 rounded-full", item.status === "completed" ? "bg-emerald-500" : "bg-amber-500")} />
+                                <span className={cx("h-1.5 w-1.5 rounded-full", item.status === "completed" ? "bg-[#2F52E0]" : "bg-amber-500")} />
                                 {item.status === "completed" ? "Pagado" : "Pendiente"}
                               </span>
                             </td>
@@ -1132,6 +1191,31 @@ export default function PaymentsPage() {
       >
         <p className="text-[13px] text-slate-600">{confirmDialog?.message}</p>
       </Modal>
+
+      <Modal open={showNoReceipt} onClose={() => setShowNoReceipt(false)} title="Pagadas sin justificante" width="max-w-2xl"
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowNoReceipt(false)}>Cerrar</Button>
+          <Button variant="primary" onClick={() => bulkReceiptInput.current?.click()} disabled={uploadingReceipt === "bulk" || !noReceipt.length}>{uploadingReceipt === "bulk" ? "Subiendo…" : "Subir varios"}</Button>
+        </>}>
+        {noReceipt.length === 0 ? <p className="text-[13px] text-slate-600">Todo justificado.</p> : (
+          <>
+            <div className="max-h-[50vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+              {noReceipt.map((x) => (
+                <div key={x.id} className="flex items-center gap-3 px-3 py-2 text-[13px]">
+                  <span className="w-20 font-mono text-xs text-slate-600">{x.number}</span>
+                  <span className="min-w-0 flex-1 truncate text-slate-900">{x.supplier}</span>
+                  <span className="text-xs text-slate-500">{x.paidAt ? x.paidAt.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : ""}</span>
+                  <span className="w-24 text-right tabular-nums">{new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(x.total)} €</span>
+                  <Button size="sm" onClick={() => { receiptTarget.current = x.id; receiptInput.current?.click(); }} disabled={!!uploadingReceipt}>{uploadingReceipt === x.id ? "Subiendo…" : "Subir"}</Button>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">«Subir varios» asigna cada archivo por el número de factura de su nombre (por ejemplo, FAC-0012.pdf).</p>
+          </>
+        )}
+      </Modal>
+      <input ref={receiptInput} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && receiptTarget.current) uploadOne(receiptTarget.current, f); e.target.value = ""; }} />
+      <input ref={bulkReceiptInput} type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={(e) => { uploadMany(Array.from(e.target.files || [])); e.target.value = ""; }} />
     </div>
   );
 }

@@ -56,11 +56,20 @@ async function ocrImages(images: (Blob | HTMLCanvasElement)[], progress: Progres
 export async function readDocument(url: string, progress: Progress = () => {}): Promise<ReadResult> {
   progress("Abriendo el documento…");
   const { bytes, type } = await fetchBytes(url);
+  return readBytes(bytes, type, progress);
+}
+
+/** Lo mismo con un archivo que aún no se ha subido (p. ej. un justificante arrastrado). */
+export async function readFile(file: File, progress: Progress = () => {}, opts: { ocr?: boolean } = {}): Promise<ReadResult> {
+  return readBytes(new Uint8Array(await file.arrayBuffer()), file.type, progress, opts);
+}
+
+async function readBytes(bytes: Uint8Array, type: string, progress: Progress, opts: { ocr?: boolean } = {}): Promise<ReadResult> {
   const isPdf = type.includes("pdf") || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46);
   if (isPdf) {
     const { text, pages, doc } = await pdfText(bytes);
     // Con texto suficiente no hace falta OCR.
-    if (text.replace(/\s/g, "").length > 60) return { text, method: "pdf-text", pages };
+    if (text.replace(/\s/g, "").length > 60 || opts.ocr === false) return { text, method: "pdf-text", pages };
     // Escaneado: se pintan las dos primeras páginas y se pasan por OCR.
     const canvases: HTMLCanvasElement[] = [];
     for (let p = 1; p <= Math.min(2, pages); p++) {
@@ -72,5 +81,6 @@ export async function readDocument(url: string, progress: Progress = () => {}): 
     }
     return { text: await ocrImages(canvases, progress), method: "ocr", pages };
   }
+  if (opts.ocr === false) return { text: "", method: "ocr", pages: 1 };
   return { text: await ocrImages([new Blob([bytes as BlobPart], { type: type || "image/jpeg" })], progress), method: "ocr", pages: 1 };
 }
