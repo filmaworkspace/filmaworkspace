@@ -149,7 +149,7 @@ export default function DemoIntro({ name, onChoose, ready = true, error }: {
       ))}
 
       {/* Marca y saltar */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-5 sm:px-10">
+      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-5 sm:px-10">
         <Image src="/logo.svg" alt="Filma" width={96} height={19} className="h-auto w-[84px] opacity-90" priority />
         {i < last && (
           <button onClick={() => go(last)} className="rounded-md px-2.5 py-1 text-[13px] text-white/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
@@ -319,14 +319,14 @@ export default function DemoIntro({ name, onChoose, ready = true, error }: {
       </main>
 
       {/* Progreso */}
-      <nav aria-label="Diapositivas" className="absolute inset-x-0 bottom-6 z-10 flex justify-center gap-2">
+      <nav aria-label="Diapositivas" className="absolute inset-x-0 bottom-6 z-20 flex justify-center gap-2">
         {slides.map((_, k) => (
           <button key={k} onClick={() => go(k)} aria-label={`Ir a la diapositiva ${k + 1}`} aria-current={k === i}
             className={`h-1.5 rounded-full transition-all ${k === i ? "w-6 bg-white" : "w-1.5 bg-white/35 hover:bg-white/60"}`} />
         ))}
       </nav>
 
-      {entering && <div aria-hidden="true" className="demo-fade fixed inset-0 z-20 bg-white" />}
+      {entering && <div aria-hidden="true" className="demo-fade fixed inset-0 z-30 bg-white" />}
     </div>
   );
 }
