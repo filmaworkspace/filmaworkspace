@@ -350,7 +350,7 @@ export default function AccountingPanelPage() {
 
   // ── Aprobaciones pendientes (punto en el acceso directo) ─────────────────
   useEffect(() => {
-    if (!id || !userId || !isApprover) return;
+    if (!id || !userId) return;
     let po = 0, inv = 0;
     const isMine = (d: any) => canApprove(d, userId);
     // Solo los documentos en los que figura como aprobador (las reglas no dejan
@@ -367,7 +367,7 @@ export default function AccountingPanelPage() {
       },
     );
     return () => { u1(); u2(); };
-  }, [id, userId, isApprover]);
+  }, [id, userId]);
 
   // ── Derivados ──────────────────────────────────────────────────────────────
   const sortedRows = useMemo(
@@ -418,17 +418,6 @@ export default function AccountingPanelPage() {
         title="Panel de contabilidad"
         actions={
           <>
-            {isApprover && (
-              <Link
-                href={`/project/${id}/accounting/approvals`}
-                title="Aprobaciones"
-                aria-label="Aprobaciones"
-                className="relative flex h-9 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900"
-              >
-                <ClipboardCheck size={17} />
-                {pendingApprovals > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />}
-              </Link>
-            )}
             {showDocsAndConfig && (
               <>
                 <Link href={`/project/${id}/accounting/document-center`} title="Centro de documentación" aria-label="Centro de documentación" className="flex h-9 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-900">
@@ -461,16 +450,19 @@ export default function AccountingPanelPage() {
             const tiles = [
               { href: `/project/${id}/accounting/pos`, icon: FileText, title: "Órdenes de compra", main: poRows.length, sub: `${openPOs.length} ${openPOs.length === 1 ? "abierta" : "abiertas"}` },
               { href: `/project/${id}/accounting/invoices`, icon: Receipt, title: "Facturas", main: live.length, sub: `${unpaid} sin pagar` },
-            ];
+            ] as { href: string; icon: any; title: string; main: number; sub: string; line?: string; alert?: boolean }[];
+            if (isApprover || pendingApprovals > 0 || profile === "accounting")
+              tiles.push({ href: `/project/${id}/accounting/approvals`, icon: ClipboardCheck, title: "Aprobaciones", main: pendingApprovals, sub: "",
+                line: pendingApprovals === 0 ? "Nada pendiente de ti" : `${pendingApprovals} ${pendingApprovals === 1 ? "pendiente" : "pendientes"} de ti`, alert: pendingApprovals > 0 });
             return (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className={`grid gap-3 ${tiles.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 {tiles.map((t) => (
                   <div key={t.title} className="group relative overflow-hidden rounded-xl border border-[#2F52E0]/20 bg-gradient-to-br from-[#2F52E0]/[.07] via-white to-white transition hover:border-[#2F52E0]/45 hover:shadow-sm">
                     <Link href={t.href} className="flex items-center gap-4 px-5 py-4">
-                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-[#2F52E0] text-white"><t.icon size={20} strokeWidth={1.75} /></span>
+                      <span className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-[#2F52E0] text-white"><t.icon size={20} strokeWidth={1.75} />{t.alert && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold tabular-nums ring-2 ring-white">{t.main}</span>}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold text-slate-900">{t.title}</span>
-                        <span className="block text-xs text-slate-500"><span className="tabular-nums text-slate-900">{t.main}</span> en total · {t.sub}</span>
+                        <span className="block text-xs text-slate-500">{t.line ? <span className={t.alert ? "font-medium text-amber-700" : ""}>{t.line}</span> : <><span className="tabular-nums text-slate-900">{t.main}</span> en total · {t.sub}</>}</span>
                       </span>
                       <ArrowRight size={18} className="text-[#2F52E0] transition-transform group-hover:translate-x-0.5" />
                     </Link>
