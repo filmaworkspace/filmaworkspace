@@ -48,6 +48,7 @@ import {
   ShieldAlert,
   Trash2,
   Upload,
+  Banknote,
   X,
   XCircle,
 } from "lucide-react";
@@ -739,6 +740,9 @@ export default function InvoicesPage() {
                 </>
               )}
             </Menu>
+            {permissions.accountingAccessLevel === "accounting_extended" && (
+              <Link href={`/project/${id}/accounting/payments`} className={buttonClass("secondary")}><Banknote size={14} /> Pagos</Link>
+            )}
             {permissions.canCreatePO && (
               <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("primary")}><Upload size={14} /> Subir documento</Link>
             )}
