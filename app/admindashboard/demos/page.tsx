@@ -10,10 +10,11 @@ import Link from "next/link";
 import { Check, Copy, MoreHorizontal, Plus } from "lucide-react";
 import { Button, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Textarea } from "@/components/ds";
 import { adminFetch, Pills, RowBar } from "@/components/admin/ui";
+import { useUser } from "@/contexts/UserContext";
 import { toast } from "@/lib/toast";
 
 interface DemoLink {
-  id: string; name: string; email: string | null; note: string; status: "active" | "revoked" | "expired"; createdByName: string;
+  id: string; name: string; email: string | null; note: string; status: "active" | "revoked" | "expired"; createdByName: string; senderName: string;
   createdAt: string | null; expiresAt: string | null; firstOpenedAt: string | null; lastOpenedAt: string | null; opens: number; projectId: string | null; sentAt: string | null;
 }
 type Filter = "all" | "active" | "used" | "ended";
@@ -32,7 +33,8 @@ export default function AdminDemosPage() {
   const [links, setLinks] = useState<DemoLink[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", days: "14", note: "" });
+  const { user } = useUser();
+  const [form, setForm] = useState({ name: "", email: "", days: "14", note: "", senderName: "" });
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ url: string; sent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -65,7 +67,7 @@ export default function AdminDemosPage() {
   return (
     <Page>
       <PageHeader title={<>Demos <span className="text-[15px] font-normal text-slate-400">{links.length}</span></>}
-        actions={<Button variant="primary" onClick={() => { setForm({ name: "", email: "", days: "14", note: "" }); setCreated(null); setModal(true); }}><Plus size={14} /> Nuevo enlace</Button>} />
+        actions={<Button variant="primary" onClick={() => { setForm({ name: "", email: "", days: "14", note: "", senderName: user?.name || "" }); setCreated(null); setModal(true); }}><Plus size={14} /> Nuevo enlace</Button>} />
 
       <div className="mt-6">
         <Pills value={filter} onChange={setFilter} options={[
@@ -99,7 +101,7 @@ export default function AdminDemosPage() {
                       <td className="relative px-4 py-1.5">
                         <RowBar tone={s.tone} />
                         <p className="font-medium text-slate-900">{l.name}</p>
-                        <p className="text-xs text-slate-500">{l.email || "Sin email"}{l.sentAt ? " · enviado por email" : ""}{l.note ? ` · ${l.note}` : ""}</p>
+                        <p className="text-xs text-slate-500">{l.email || "Sin email"}{l.sentAt ? ` · enviado por email${l.senderName ? ` en nombre de ${l.senderName}` : ""}` : ""}{l.note ? ` · ${l.note}` : ""}</p>
                       </td>
                       <td className={`px-3 py-1.5 text-xs ${s.cls}`}>{s.label}</td>
                       <td className="px-3 py-1.5 text-slate-600" title={l.createdByName ? `Por ${l.createdByName}` : undefined}>{d(l.createdAt)}</td>
@@ -155,6 +157,9 @@ export default function AdminDemosPage() {
               <Field label="Nombre"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus /></Field>
               <Field label="Email"><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Opcional si no lo envías" /></Field>
             </div>
+            <Field label="Lo envía" hint={`Asunto: «${form.senderName.trim() || user?.name || "…"} te invita a probar Filma Workspace»`}>
+              <Input value={form.senderName} onChange={(e) => setForm({ ...form, senderName: e.target.value })} placeholder={user?.name || "Nombre"} />
+            </Field>
             <Field label="Validez">
               <Segmented value={form.days} onChange={(v) => setForm({ ...form, days: v })} options={[{ value: "7", label: "7 días" }, { value: "14", label: "14 días" }, { value: "30", label: "30 días" }]} />
             </Field>
