@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { canApprove } from "@/lib/approvalFlow";
-import { ClipboardCheck, FolderDown, Plus, Settings, Upload } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FileText, FolderDown, Plus, Receipt, Settings, Upload } from "lucide-react";
 
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from "firebase/firestore";
@@ -452,6 +452,34 @@ export default function AccountingPanelPage() {
       <div className={`mt-7 grid items-start gap-7 text-[13px] text-slate-900 ${hasAside ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>
         {/* ── Columna principal ─────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-col gap-7">
+          {/* Accesos principales: POs y facturas */}
+          {(() => {
+            const poRows = rows.filter((r) => r.kind === "po");
+            const dead = ["cancelled", "void", "rejected"];
+            const live = invoices.filter((i) => !dead.includes(i.state));
+            const unpaid = live.filter((i) => i.state !== "paid").length;
+            const tiles = [
+              { href: `/project/${id}/accounting/pos`, icon: FileText, title: "Órdenes de compra", main: poRows.length, sub: `${openPOs.length} ${openPOs.length === 1 ? "abierta" : "abiertas"}` },
+              { href: `/project/${id}/accounting/invoices`, icon: Receipt, title: "Facturas", main: live.length, sub: `${unpaid} sin pagar` },
+            ];
+            return (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {tiles.map((t) => (
+                  <div key={t.title} className="group relative overflow-hidden rounded-xl border border-[#2F52E0]/20 bg-gradient-to-br from-[#2F52E0]/[.07] via-white to-white transition hover:border-[#2F52E0]/45 hover:shadow-sm">
+                    <Link href={t.href} className="flex items-center gap-4 px-5 py-4">
+                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-[#2F52E0] text-white"><t.icon size={20} strokeWidth={1.75} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-semibold text-slate-900">{t.title}</span>
+                        <span className="block text-xs text-slate-500"><span className="tabular-nums text-slate-900">{t.main}</span> en total · {t.sub}</span>
+                      </span>
+                      <ArrowRight size={18} className="text-[#2F52E0] transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {profile === "accounting" && (
             <section aria-labelledby="flow-title" className="flex flex-col gap-2.5">
               <h2 id="flow-title" className="text-xs font-medium text-slate-500">Circuito de facturas</h2>
@@ -546,10 +574,6 @@ export default function AccountingPanelPage() {
                   </tbody>
                 </table>
               )}
-              <div className="flex gap-4 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-600">
-                <Link href={`/project/${id}/accounting/pos`} className="hover:text-slate-900">Ver POs →</Link>
-                <Link href={`/project/${id}/accounting/invoices`} className="hover:text-slate-900">Ver facturas →</Link>
-              </div>
             </div>
           </section>
         </div>
