@@ -783,7 +783,7 @@ export default function InvoicesPage() {
         <div className="w-44">
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="all">Todos los tipos</option>
-            {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
+            {(Object.entries(DOCUMENT_TYPES) as [DocumentType, typeof DOCUMENT_TYPES.invoice][]).filter(([k]) => k !== "budget" || invoices.some((i) => i.documentType === "budget")).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
           </Select>
         </div>
         <div className="w-44">
