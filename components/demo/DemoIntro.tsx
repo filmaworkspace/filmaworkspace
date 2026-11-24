@@ -159,7 +159,7 @@ export default function DemoIntro({ name, onChoose, ready = true, error }: {
       </div>
 
       {/* Diapositiva */}
-      <main className="relative z-10 flex h-full items-center justify-center px-6 sm:px-10" aria-live="polite">
+      <main className="relative z-10 flex h-full items-center justify-center px-6 pb-[12vh] sm:px-10" aria-live="polite">
         <div key={i} className={`w-full ${["hero", "end", "flow", "cloud", "phone", "brand"].includes(s.kind) ? "max-w-5xl" : "max-w-3xl"} [text-wrap:balance] ${leaving ? "demo-out" : ""}`}>
           {s.kind === "brand" && (
             <div className="flex flex-col items-center text-center">
