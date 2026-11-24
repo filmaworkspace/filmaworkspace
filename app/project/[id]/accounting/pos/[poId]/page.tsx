@@ -83,6 +83,8 @@ import { syncBudget } from "@/lib/ledgerClient";
 import { AmountSummary } from "@/components/accounting/AmountSummary";
 import { SupplierHeader } from "@/components/accounting/SupplierPreview";
 import { needsNewVersion, revisePO } from "@/lib/poRevision";
+import { ReassignModal } from "@/components/accounting/ReassignModal";
+import { UserCog } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -189,6 +191,7 @@ interface PO {
   originalAttachmentFileName?: string;
   createdAt: Date;
   createdBy: string;
+  reassignments?: any[];
   createdByName: string;
   approvedAt?: Date;
   approvedBy?: string;
@@ -244,6 +247,7 @@ export default function PODetailPage() {
   const [modificationReason, setModificationReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showReassign, setShowReassign] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showApprovalNoteModal, setShowApprovalNoteModal] = useState<ApprovalComment | null>(null);
   const [replacingDocument, setReplacingDocument] = useState(false);
@@ -301,6 +305,7 @@ export default function PODetailPage() {
           approvedByNames: step.approvedByNames || [],
         })),
         currentApprovalStep: poDoc.data().currentApprovalStep ?? null,
+        reassignments: poDoc.data().reassignments || [],
         comments: (poDoc.data().comments || []).map((c: any) => ({
           ...c,
           createdAt: c.createdAt?.toDate?.() || new Date(),
@@ -386,6 +391,7 @@ export default function PODetailPage() {
 
   // Verificar si se puede eliminar (borrador sin versión anterior)
   // Modificar (revisar) una PO: quien la puede editar, roles de proyecto y contabilidad.
+  const isExtended = permissions.accountingAccessLevel === "accounting_extended";
   const canModify = !!po && (getPOPermissions(po).canEdit || permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)));
   const canDeleteDraft = po?.status === "draft" && (!po.version || po.version === 1) && getPOPermissions(po).canEdit;
   
@@ -779,6 +785,13 @@ export default function PODetailPage() {
                         </>
                       )}
 
+                      {isExtended && (
+                        <button onClick={() => { setShowActionsMenu(false); setShowReassign(true); }} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                          <UserCog size={16} className="text-slate-400" />
+                          Reasignar responsable
+                        </button>
+                      )}
+
                       {/* Acciones para estado Aprobada */}
                       {po.status === "approved" && (
                         <>
@@ -824,6 +837,11 @@ export default function PODetailPage() {
                 )}
               </div>
               
+
+              <ReassignModal open={showReassign} onClose={() => setShowReassign(false)} projectId={projectId} kind="po"
+                target={{ id: po.id, label: `PO-${po.number}`, createdBy: po.createdBy, createdByName: (po as any).createdByName, department: po.department }}
+                actor={{ uid: permissions.userId || "", name: permissions.userName || "" }}
+                onDone={() => loadData()} />
               {/* Input oculto para reemplazar documento */}
               <input 
                 type="file" 
@@ -1128,8 +1146,9 @@ export default function PODetailPage() {
                 <div className="flex items-center gap-3">
                   <User size={16} className="text-slate-400" />
                   <div>
-                    <p className="text-slate-500">Creado por</p>
+                    <p className="text-slate-500">Responsable</p>
                     <p className="font-medium text-slate-900">{po.createdByName}</p>
+                    {(po as any).reassignments?.length > 0 && (() => { const r = (po as any).reassignments[(po as any).reassignments.length - 1]; return <p className="text-xs text-slate-500 mt-0.5">Reasignada por {r.byName}{r.at?.toDate ? ` el ${r.at.toDate().toLocaleDateString("es-ES")}` : ""}{r.reason ? ` · ${r.reason}` : ""}</p>; })()}
                   </div>
                 </div>
                 {po.approvedAt && (

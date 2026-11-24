@@ -56,6 +56,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { syncBudget } from "@/lib/ledgerClient";
 import { pendingTooltip } from "@/components/accounting/ApprovalFlow";
+import { ReassignModal, type ReassignTarget } from "@/components/accounting/ReassignModal";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getInvoiceDisplayState, inInvoiceView, type InvoiceView } from "@/lib/invoiceHelpers";
@@ -244,6 +245,7 @@ export default function InvoicesPage() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  const [reassign, setReassign] = useState<ReassignTarget | null>(null);
   const loadData = async () => {
     try {
       setLoading(true);
@@ -722,6 +724,8 @@ export default function InvoicesPage() {
 
   return (
     <Page>
+      <ReassignModal open={!!reassign} onClose={() => setReassign(null)} projectId={id} kind="invoice" target={reassign}
+        actor={{ uid: permissions.userId || "", name: permissions.userName || "" }} onDone={() => loadData()} />
       <PageHeader
         title={
           <>
@@ -839,6 +843,7 @@ export default function InvoicesPage() {
                           <MenuItem onClick={() => { close(); handleCancelInvoice(invoice.id); }}>Anular</MenuItem>
                         </>
                       )}
+                      {permissions.accountingAccessLevel === "accounting_extended" && invoice.status !== "cancelled" && <MenuItem onClick={() => { close(); setReassign({ id: invoice.id, label: invoice.displayNumber, createdBy: invoice.createdBy, createdByName: invoice.createdByName, department: (invoice as any).department }); }}>Reasignar responsable</MenuItem>}
                       {canDeleteInvoice(invoice) && <MenuItem danger onClick={() => { close(); handleDeleteInvoice(invoice.id); }}>Eliminar</MenuItem>}
                     </>
                   )}

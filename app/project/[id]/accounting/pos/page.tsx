@@ -65,6 +65,7 @@ import jsPDF from "jspdf";
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { syncBudget } from "@/lib/ledgerClient";
 import { needsNewVersion, revisePO } from "@/lib/poRevision";
+import { ReassignModal, type ReassignTarget } from "@/components/accounting/ReassignModal";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
@@ -206,6 +207,7 @@ export default function POsPage() {
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [openMenuId]);
 
+  const [reassign, setReassign] = useState<ReassignTarget | null>(null);
   const loadData = async () => {
     try {
       setLoading(true);
@@ -754,6 +756,8 @@ export default function POsPage() {
 
   return (
     <Page>
+      <ReassignModal open={!!reassign} onClose={() => setReassign(null)} projectId={id} kind="po" target={reassign}
+        actor={{ uid: permissions.userId || "", name: permissions.userName || "" }} onDone={() => loadData()} />
       <PageHeader
         title={
           <>
@@ -836,6 +840,7 @@ export default function POsPage() {
                       {po.status === "approved" && poPerms.canCreateInvoice && <MenuItem onClick={() => { close(); handleCreateInvoice(po); }}>Subir factura de esta PO</MenuItem>}
                       {po.status === "approved" && (permissions.isProjectRole || poPerms.canClose || poPerms.canCancel) && <MenuSeparator />}
                       {(permissions.isProjectRole || ["accounting", "accounting_extended"].includes(String(permissions.accountingAccessLevel)) || po.createdBy === permissions.userId) && <MenuItem onClick={() => { close(); handleModifyPO(po); }}>Modificar</MenuItem>}
+                      {permissions.accountingAccessLevel === "accounting_extended" && po.status !== "cancelled" && <MenuItem onClick={() => { close(); setReassign({ id: po.id, label: `PO-${po.number}`, createdBy: po.createdBy, createdByName: po.createdByName, department: (po as any).department }); }}>Reasignar responsable</MenuItem>}
                       {po.status === "approved" && poPerms.canClose && <MenuItem onClick={() => { close(); handleClosePO(po); }}>Cerrar</MenuItem>}
                       {po.status === "approved" && poPerms.canCancel && (po.invoicedAmount || 0) === 0 && <MenuItem danger onClick={() => { close(); handleCancelPO(po); }}>Anular</MenuItem>}
                       {po.status === "closed" && poPerms.canReopen && <MenuItem onClick={() => { close(); handleReopenPO(po); }}>Reabrir</MenuItem>}

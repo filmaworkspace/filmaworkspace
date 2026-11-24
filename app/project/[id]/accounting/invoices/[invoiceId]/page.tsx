@@ -88,6 +88,8 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { getInvoiceDisplayState, type InvoiceDisplayState } from "@/lib/invoiceHelpers";
 import { IBANField } from "@/components/IBANField";
 import { CodingWorkspace } from "@/components/accounting/CodingWorkspace";
+import { ReassignModal } from "@/components/accounting/ReassignModal";
+import { UserCog } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,7 @@ interface Invoice {
   createdAt: Date;
   createdBy: string;
   createdByName: string;
+  reassignments?: any[];
   codedAt?: Date;
   codedBy?: string;
   codedByName?: string;
@@ -340,6 +343,7 @@ export default function InvoiceDetailPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showReassign, setShowReassign] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [showOriginalDoc, setShowOriginalDoc] = useState(false);
   
@@ -411,7 +415,7 @@ export default function InvoiceDetailPage() {
         baseAmount: data.baseAmount || 0, vatAmount: data.vatAmount || 0, irpfAmount: data.irpfAmount || 0, totalAmount: data.totalAmount || 0,
         invoiceDate: data.invoiceDate?.toDate(), dueDate: data.dueDate?.toDate() || new Date(), status: data.status || "pending",
         approvalStatus: data.approvalStatus, attachmentUrl: data.attachmentUrl, attachmentFileName: data.attachmentFileName,
-        createdAt: data.createdAt?.toDate() || new Date(), createdBy: data.createdBy || "", createdByName: data.createdByName || "",
+        createdAt: data.createdAt?.toDate() || new Date(), createdBy: data.createdBy || "", createdByName: data.createdByName || "", reassignments: data.reassignments || [],
         codedAt: data.codedAt?.toDate(), codedBy: data.codedBy, codedByName: data.codedByName,
         approvedAt: data.approvedAt?.toDate(), approvedBy: data.approvedBy, approvedByName: data.approvedByName,
         paidAt: data.paidAt?.toDate(), paidBy: data.paidBy, paidByName: data.paidByName, paidAmount: data.paidAmount, paymentMethod: data.paymentMethod, paymentReference: data.paymentReference,
@@ -674,6 +678,7 @@ export default function InvoiceDetailPage() {
   const modifyAsCorrection = () => !!invoice && (!!invoice.accounted || !!invoice.accountedAt || !!invoice.paidAt || ["cancelled", "void", "paid"].includes(invoice.status));
 
   // Solo contabilidad ampliada puede hacer corrección administrativa (sin nueva versión)
+  const isExtended = permissions.accountingAccessLevel === "accounting_extended";
   const canAdminCorrect = () => {
     if (invoice?.accounted) return false;
     if (invoice?.status === "cancelled") return false;
@@ -989,8 +994,13 @@ export default function InvoiceDetailPage() {
                     </button>
                   )}
                   {canAdminCorrect() && <Link href={`/project/${projectId}/accounting/invoices/${invoice.id}/edit?mode=correction`} onClick={() => setShowActionsMenu(false)} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><FileCheck size={16} className="text-slate-400" />Corrección administrativa</Link>}
+                  {isExtended && <button onClick={() => { setShowActionsMenu(false); setShowReassign(true); }} className="w-full px-4 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-3"><UserCog size={16} className="text-slate-400" />Reasignar responsable</button>}
                   {canCancel() && <><div className="border-t border-slate-100 my-1" /><button onClick={() => { setShowCancelModal(true); setShowActionsMenu(false); }} className="w-full px-4 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-3"><XCircle size={16} />Anular</button></>}
                 </AnchoredPanel></>)}
+                <ReassignModal open={showReassign} onClose={() => setShowReassign(false)} projectId={projectId} kind="invoice"
+                  target={{ id: invoice.id, label: invoice.displayNumber || `Factura ${invoice.number || ""}`, createdBy: invoice.createdBy, createdByName: invoice.createdByName, department: invoice.department }}
+                  actor={{ uid: permissions.userId || "", name: permissions.userName || "" }}
+                  onDone={() => loadData()} />
               </div>
               
               {/* Input oculto para reemplazar documento */}
@@ -1412,8 +1422,9 @@ export default function InvoiceDetailPage() {
                 <div className="flex items-center gap-2">
                   <User size={14} className="text-slate-400" />
                   <div>
-                    <p className="text-xs text-slate-500">Creado por</p>
+                    <p className="text-xs text-slate-500">Responsable</p>
                     <p className="font-medium">{invoice.createdByName}</p>
+                    {(invoice as any).reassignments?.length > 0 && (() => { const r = (invoice as any).reassignments[(invoice as any).reassignments.length - 1]; return <p className="text-xs text-slate-500 mt-0.5">Reasignada por {r.byName}{r.at?.toDate ? ` el ${r.at.toDate().toLocaleDateString("es-ES")}` : ""}{r.reason ? ` · ${r.reason}` : ""}</p>; })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
