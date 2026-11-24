@@ -443,31 +443,28 @@ export default function AccountingPanelPage() {
         <div className="flex min-w-0 flex-col gap-7">
           {/* Accesos principales: POs y facturas */}
           {(() => {
-            const poRows = rows.filter((r) => r.kind === "po");
-            const dead = ["cancelled", "void", "rejected"];
-            const live = invoices.filter((i) => !dead.includes(i.state));
-            const unpaid = live.filter((i) => i.state !== "paid").length;
+            const showApprovals = isApprover || pendingApprovals > 0 || profile === "accounting";
             const tiles = [
-              { href: `/project/${id}/accounting/pos`, icon: FileText, title: "Órdenes de compra", main: poRows.length, sub: `${openPOs.length} ${openPOs.length === 1 ? "abierta" : "abiertas"}` },
-              { href: `/project/${id}/accounting/invoices`, icon: Receipt, title: "Facturas", main: live.length, sub: `${unpaid} sin pagar` },
-            ] as { href: string; icon: any; title: string; main: number; sub: string; line?: string; alert?: boolean }[];
-            if (isApprover || pendingApprovals > 0 || profile === "accounting")
-              tiles.push({ href: `/project/${id}/accounting/approvals`, icon: ClipboardCheck, title: "Aprobaciones", main: pendingApprovals, sub: "",
-                line: pendingApprovals === 0 ? "Nada pendiente de ti" : `${pendingApprovals} ${pendingApprovals === 1 ? "pendiente" : "pendientes"} de ti`, alert: pendingApprovals > 0 });
+              { href: `/project/${id}/accounting/pos`, icon: FileText, title: "Órdenes de compra" },
+              { href: `/project/${id}/accounting/invoices`, icon: Receipt, title: "Facturas" },
+            ];
             return (
-              <div className={`grid gap-3 ${tiles.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+              <div className={`grid gap-3 ${showApprovals ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 {tiles.map((t) => (
-                  <div key={t.title} className="group relative overflow-hidden rounded-xl border border-[#2F52E0]/20 bg-gradient-to-br from-[#2F52E0]/[.07] via-white to-white transition hover:border-[#2F52E0]/45 hover:shadow-sm">
-                    <Link href={t.href} className="flex items-center gap-4 px-5 py-4">
-                      <span className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-[#2F52E0] text-white"><t.icon size={20} strokeWidth={1.75} />{t.alert && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold tabular-nums ring-2 ring-white">{t.main}</span>}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[15px] font-semibold text-slate-900">{t.title}</span>
-                        <span className="block text-xs text-slate-500">{t.line ? <span className={t.alert ? "font-medium text-amber-700" : ""}>{t.line}</span> : <><span className="tabular-nums text-slate-900">{t.main}</span> en total · {t.sub}</>}</span>
-                      </span>
-                      <ArrowRight size={18} className="text-[#2F52E0] transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  </div>
+                  <Link key={t.title} href={t.href} className="group flex items-center gap-4 rounded-xl border border-[#2F52E0]/20 bg-gradient-to-br from-[#2F52E0]/[.07] via-white to-white px-5 py-4 transition hover:border-[#2F52E0]/45 hover:shadow-sm">
+                    <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-[#2F52E0] text-white"><t.icon size={20} strokeWidth={1.75} /></span>
+                    <span className="min-w-0 flex-1 text-[15px] font-semibold text-slate-900">{t.title}</span>
+                    <ArrowRight size={18} className="text-[#2F52E0] transition-transform group-hover:translate-x-0.5" />
+                  </Link>
                 ))}
+                {showApprovals && (
+                  <Link href={`/project/${id}/accounting/approvals`} className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 transition hover:border-slate-400 hover:shadow-sm">
+                    <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-[#2F52E0]/25 text-[#2F52E0]"><ClipboardCheck size={20} strokeWidth={1.75} /></span>
+                    <span className="min-w-0 flex-1 text-[15px] font-semibold text-slate-900">Aprobaciones</span>
+                    {pendingApprovals > 0 && <span aria-label={`${pendingApprovals} pendientes`} className="flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 px-2 text-xs font-semibold tabular-nums text-white">{pendingApprovals}</span>}
+                    <ArrowRight size={18} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-900" />
+                  </Link>
+                )}
               </div>
             );
           })()}
