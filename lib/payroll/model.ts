@@ -128,16 +128,19 @@ export const DEFAULT_DAILY_ITEMS: DailyItem[] = [
   { id: "horasExtra", label: "Horas extra", short: "HE", unit: "hour", code: 436, rate: 0, active: true },
   { id: "6d", label: "6D", short: "6D", unit: "day", code: 214, rate: 0, active: true },
   { id: "7d", label: "7D", short: "7D", unit: "day", code: 215, rate: 0, active: true },
-  { id: "festivo", label: "Festivo", short: "F", unit: "day", code: 12, rate: 0, active: true },
+  { id: "festivo", label: "Festivo trabajado", short: "FT", unit: "day", code: 12, rate: 0, active: true },
   { id: "diaExtra", label: "Día extra", short: "DE", unit: "day", code: 213, rate: 0, active: false },
   { id: "ensayo", label: "Ensayo", short: "En", unit: "day", code: 240, rate: 0, active: false },
   { id: "desplazamiento", label: "Plus desplazamiento", short: "PD", unit: "day", code: 20, rate: 0, active: false },
 ];
 
 /** Estado del día de la persona (no es un importe). */
-export type DayState = "w" | "comp" | "it";
+export type DayState = "w" | "fnt" | "comp" | "it";
+/** Marcas que son estados del día (no importes). */
+export const STATE_IDS = new Set<string>(["w", "fnt", "comp", "it"]);
 export const DAY_STATES: { id: DayState; label: string; short: string }[] = [
   { id: "w", label: "Trabajado", short: "T" },
+  { id: "fnt", label: "Festivo no trabajado", short: "FN" },
   { id: "comp", label: "Compensación sin cobro", short: "Cp" },
   { id: "it", label: "Baja IT", short: "IT" },
 ];
@@ -202,6 +205,7 @@ export function readSettings(raw: any): PayrollSettings {
   const saved: DailyItem[] = Array.isArray(r.items) ? r.items : [];
   const items = DEFAULT_DAILY_ITEMS.map((d) => {
     const s = saved.find((x) => x.id === d.id);
+    if (s && d.id === "festivo" && s.label === "Festivo") return { ...d, ...s, label: d.label, short: s.short === "F" ? d.short : s.short };
     if (s) return { ...d, ...s };
     const l = legacy[d.id];
     if (l && typeof r[l[0]] === "number") {
@@ -412,6 +416,8 @@ export interface Line {
   person: PayrollPerson;
   daysAlta: number | null;
   worked: number;
+  /** Festivos no trabajados incluidos en worked. */
+  holidaysOff: number;
   comp: number;
   itDays: number;
   salaryDay: number | null;
@@ -466,7 +472,10 @@ export function computeLine(key: string, p: PayrollPerson, runs: Record<string, 
 
   // Días trabajados, compensación e IT, en su ventana
   let worked = 0, comp = 0, itDays = 0;
-  eachDay(windows.dias, days, p.id, (_d, c) => { if (c.w) worked += 1; if (c.comp) comp += 1; if (c.it) itDays += 1; });
+  // Un festivo no trabajado se cobra como día (cuenta en los días trabajados), sin plus.
+  let holidaysOff = 0;
+  eachDay(windows.dias, days, p.id, (_d, c) => { if (c.w) worked += 1; else if (c.fnt) holidaysOff += 1; if (c.comp) comp += 1; if (c.it) itDays += 1; });
+  worked += holidaysOff;
   if (typeof pr.workedOverride === "number") worked = pr.workedOverride;
   if (typeof pr.compOverride === "number") comp = pr.compOverride;
   if (typeof pr.itOverride === "number") itDays = pr.itOverride;
@@ -505,7 +514,7 @@ export function computeLine(key: string, p: PayrollPerson, runs: Record<string, 
     + s.projectDiscounts.reduce((a, _c, i) => a + (amounts[projectKey("d", i)] || 0), 0);
   const totalDiscounts = r2(especie + discounts);
 
-  const line: Line = { person: p, daysAlta, worked, comp, itDays, salaryDay, salaryUsed: S ?? null, gross, breakdown: pr.breakdown || "", comment: pr.comment || "", amounts, sources, inKind: r2(especie), totalGross, totalDiscounts, windows, issues: [], warnings: [] };
+  const line: Line = { person: p, daysAlta, worked, holidaysOff, comp, itDays, salaryDay, salaryUsed: S ?? null, gross, breakdown: pr.breakdown || "", comment: pr.comment || "", amounts, sources, inKind: r2(especie), totalGross, totalDiscounts, windows, issues: [], warnings: [] };
   return line;
 }
 
@@ -552,7 +561,7 @@ export function checkLines(key: string, lines: Line[], days: Record<string, Mont
     const startAlta = p.startDate, endAlta = personEnd(p);
     const seen = new Set<string>();
     const winOfKey = (k: string): Window => {
-      if (k === "w" || k === "comp" || k === "it") return l.windows.dias;
+      if (STATE_IDS.has(k)) return l.windows.dias;
       const it = settings?.items.find((i) => i.id === k);
       return it ? l.windows[cutGroupOfItem(it)] : l.windows.dietas;
     };
@@ -562,7 +571,7 @@ export function checkLines(key: string, lines: Line[], days: Record<string, Mont
         seen.add(d);
         const keys = Object.keys(c).filter((k) => c[k] && d >= winOfKey(k).from && d <= winOfKey(k).to);
         if (!keys.length) return;
-        const hasMoney = keys.some((k) => k !== "w" && k !== "comp" && k !== "it");
+        const hasMoney = keys.some((k) => !STATE_IDS.has(k));
         if (hasMoney && !c.w && !c.it && p.periodicity !== "Mensual" && p.periodicity !== "Cerrado") mealsOff++;
         if ((startAlta && d < startAlta) || (endAlta && d > endAlta)) outside++;
       });

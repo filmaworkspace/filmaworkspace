@@ -78,7 +78,7 @@ export function PersonPanel({ line, runKey, run, settings, onClose, onRun, onPer
           <section>
             <h3 className="mb-2 text-xs font-medium text-slate-500">Nómina del mes</h3>
             <div className="rounded-lg border border-slate-200">
-              <Row label="Salario" sub={line.person.periodicity === "Mensual" ? `${line.daysAlta ?? 0} días de alta${line.comp ? ` − ${line.comp} de compensación` : ""}` : line.person.periodicity === "Cerrado" ? "Cerrado" : `${line.worked} días trabajados`} value={line.gross} />
+              <Row label="Salario" sub={line.person.periodicity === "Mensual" ? `${line.daysAlta ?? 0} días de alta${line.comp ? ` − ${line.comp} de compensación` : ""}` : line.person.periodicity === "Cerrado" ? "Cerrado" : `${line.worked - line.holidaysOff} días trabajados${line.holidaysOff ? ` + ${line.holidaysOff} ${line.holidaysOff === 1 ? "festivo no trabajado" : "festivos no trabajados"}` : ""}`} value={line.gross} />
               {amountKeys.map((k) => (
                 <Row key={k} label={labelOf(k, settings)} code={/^\d+$/.test(k) ? k : undefined}
                   sub={[...(line.sources[k] || []).map((s) => `${s.item} ${s.qty} × ${eur(s.rate)}`), p.fixed[k] ? `fijo ${eur(p.fixed[k])}` : "", run.amounts?.[k] ? `este mes ${eur(run.amounts[k])}` : ""].filter(Boolean).join(" · ")}

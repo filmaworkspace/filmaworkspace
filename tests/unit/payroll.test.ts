@@ -110,3 +110,15 @@ it("rellena la plantilla del cuadro sin tocar las fórmulas", () => {
   expect(xml).toContain("<f>IF(OR(S19=&quot;&quot;,T19=&quot;&quot;)".replace(/&quot;/g, '"'));
   expect(xml).toMatch(/<c r="R19" s="105" t="n"><v>0.15<\/v>/);
 });
+
+it("festivo trabajado suma el plus; festivo no trabajado se cobra como día, sin plus", () => {
+  const st = readSettings({ items: [{ id: "festivo", label: "Festivo", short: "F", unit: "day", code: 12, rate: 40, active: true }] });
+  expect(st.items.find((i) => i.id === "festivo")!.label).toBe("Festivo trabajado");
+  const p = personFromDocs("a", { firstName: "A", lastName1: "B", startDate: "2026-10-01", salaryType: "weekly", salaryAmount: 700 }, {});
+  const days: Record<string, MonthDays> = { "2026-10": { a: { "12": { fnt: 1 }, "13": { w: 1, festivo: 1 }, "14": { w: 1 } } } };
+  const l = computeLine("2026-10", p, {}, days, st);
+  expect(l.worked).toBe(3);
+  expect(l.holidaysOff).toBe(1);
+  expect(l.gross).toBe(300);
+  expect(l.amounts["12"]).toBe(40);
+});

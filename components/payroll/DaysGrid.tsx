@@ -5,7 +5,7 @@
 // de la marca elegida se atenúan: van en otra nómina.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDays, dayDiff, fullName, parseIso, personEnd, type MonthDays, type PayrollPerson, type Window } from "@/lib/payroll/model";
+import { STATE_IDS, addDays, dayDiff, fullName, parseIso, personEnd, type MonthDays, type PayrollPerson, type Window } from "@/lib/payroll/model";
 
 export interface Brush { id: string; label: string; short: string; unit: "day" | "km" | "hour"; state?: boolean }
 export interface CellChange { memberId: string; date: string; cell: Record<string, number> }
@@ -98,17 +98,17 @@ export function DaysGrid({ people, days, range, active, brush, qty, brushes, onC
                   const out = (p.startDate && d < p.startDate) || (end && d > end);
                   const win = inWin(d);
                   if (win && c[brush.id]) total += brush.unit === "day" ? 1 : c[brush.id];
-                  const marks = Object.keys(c).filter((k) => c[k] && k !== "w" && k !== "comp" && k !== "it");
+                  const marks = Object.keys(c).filter((k) => c[k] && !STATE_IDS.has(k));
                   const wd = dowOf(d), wk = wd === 0 || wd === 6;
-                  const bg = c.it ? "bg-amber-50" : c.comp ? "bg-slate-50" : c.w ? "bg-[#EEF1F6]" : wk ? "bg-[#FBFBFC]" : "";
+                  const bg = c.it ? "bg-amber-50" : c.comp ? "bg-slate-50" : c.w ? "bg-[#EEF1F6]" : c.fnt ? "bg-[#F3F0FA]" : wk ? "bg-[#FBFBFC]" : "";
                   return (
                     <td key={d}
                       onMouseDown={(e) => { e.preventDefault(); const add = !c[brush.id]; paint.current = { add }; apply(p.id, d, add); }}
                       onMouseEnter={() => { if (paint.current) apply(p.id, d, paint.current.add); }}
-                      title={`${fullName(p)} · ${Number(d.slice(8))}/${Number(d.slice(5, 7))}${c.w ? " · trabajado" : ""}${c.it ? " · IT" : ""}${c.comp ? " · compensación" : ""}${marks.length ? " · " + marks.map((m) => `${short(m)}${c[m] !== 1 ? " " + c[m] : ""}`).join(", ") : ""}`}
+                      title={`${fullName(p)} · ${Number(d.slice(8))}/${Number(d.slice(5, 7))}${c.w ? " · trabajado" : ""}${c.fnt ? " · festivo no trabajado" : ""}${c.it ? " · IT" : ""}${c.comp ? " · compensación" : ""}${marks.length ? " · " + marks.map((m) => `${short(m)}${c[m] !== 1 ? " " + c[m] : ""}`).join(", ") : ""}`}
                       className={`h-9 cursor-pointer p-0 text-center align-middle ${monthChange(i) ? "border-l-2 border-slate-300" : "border-l border-slate-100"} ${bg} ${out ? "bg-[repeating-linear-gradient(135deg,transparent,transparent_3px,#F1F1F3_3px,#F1F1F3_5px)]" : ""} ${win ? "" : "opacity-40"} ${c[brush.id] ? "ring-1 ring-inset ring-slate-900" : "hover:bg-slate-100"}`}>
                       <span className="block truncate px-0.5 leading-tight text-slate-700">
-                        {c.it ? <span className="font-medium text-amber-700">IT</span> : c.comp ? <span className="text-slate-500">Cp</span> : null}
+                        {c.it ? <span className="font-medium text-amber-700">IT</span> : c.comp ? <span className="text-slate-500">Cp</span> : c.fnt ? <span className="block text-slate-600">FN</span> : null}
                         {marks.slice(0, 2).map((m) => <span key={m} className="block">{short(m)}{c[m] !== 1 ? <sup className="ml-px">{c[m]}</sup> : null}</span>)}
                         {marks.length > 2 && <span className="block text-slate-400">+{marks.length - 2}</span>}
                       </span>
