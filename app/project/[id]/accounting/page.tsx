@@ -428,11 +428,11 @@ export default function AccountingPanelPage() {
                 </Link>
               </>
             )}
-            <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("secondary")}>
-              <Upload size={14} /> Subir factura
-            </Link>
             <Link href={`/project/${id}/accounting/pos/new`} className={buttonClass("primary")}>
               <Plus size={14} /> Nueva PO
+            </Link>
+            <Link href={`/project/${id}/accounting/invoices/new`} className={buttonClass("secondary")}>
+              <Upload size={14} /> Subir factura
             </Link>
           </>
         }
