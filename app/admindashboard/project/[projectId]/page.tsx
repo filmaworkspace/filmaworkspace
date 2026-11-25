@@ -1371,8 +1371,8 @@ export default function AdminProjectPage() {
               {[
                 { label: "Cuentas presup.", value: accountingStats.accountCount, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
                 { label: "Proveedores", value: accountingStats.supplierCount, icon: Building2, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Facturas", value: accountingStats.invoiceCount, icon: FileText, color: "text-violet-600", bg: "bg-violet-50" },
                 { label: "POs", value: accountingStats.poCount, icon: ShoppingCart, color: "text-amber-600", bg: "bg-amber-50" },
+                { label: "Facturas", value: accountingStats.invoiceCount, icon: FileText, color: "text-violet-600", bg: "bg-violet-50" },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white border border-slate-200 rounded-lg p-5">
                   <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center mb-3`}>
@@ -1393,8 +1393,8 @@ export default function AdminProjectPage() {
                 {[
                   { label: "Presupuesto", href: `/project/${projectId}/accounting/budget`, icon: BarChart3 },
                   { label: "Proveedores", href: `/project/${projectId}/accounting/suppliers`, icon: Building2 },
-                  { label: "Facturas", href: `/project/${projectId}/accounting/invoices`, icon: FileText },
                   { label: "POs", href: `/project/${projectId}/accounting/pos`, icon: ShoppingCart },
+                  { label: "Facturas", href: `/project/${projectId}/accounting/invoices`, icon: FileText },
                 ].map((link) => (
                   <Link
                     key={link.label}
@@ -1467,7 +1467,7 @@ export default function AdminProjectPage() {
                 <div>
                   <p className="text-sm font-medium text-slate-900">Eliminar presupuesto</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Borra las {accountingStats.accountCount} cuentas y todas sus subcuentas. Las facturas y POs ya codificadas contra ellas quedarán sin cuenta asignada.
+                    Borra las {accountingStats.accountCount} cuentas y todas sus subcuentas. Las POs y facturas ya codificadas contra ellas quedarán sin cuenta asignada.
                   </p>
                 </div>
                 <button
@@ -2353,7 +2353,7 @@ export default function AdminProjectPage() {
                     <p className="font-medium">¿Estás seguro?</p>
                     <p className="text-xs mt-1">
                       Se eliminarán las {accountingStats.accountCount} cuentas de "{project.name}" y todas sus subcuentas.
-                      Las facturas y órdenes de compra ya codificadas contra ellas quedarán sin cuenta asignada. Esta acción no se puede deshacer.
+                      Las órdenes de compra y facturas ya codificadas contra ellas quedarán sin cuenta asignada. Esta acción no se puede deshacer.
                     </p>
                   </div>
                 </div>

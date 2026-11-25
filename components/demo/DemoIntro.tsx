@@ -40,7 +40,7 @@ const slidesFor = (first: string): Slide[] => [
   { kind: "hero", icon: Users, title: "Equipo", text: "Las personas que hacen posible el rodaje, en un mismo sitio y siempre al día.", tones: [{ theme: "team" }] },
   { kind: "flow", title: "Nada sale sin aprobar", steps: [{ title: "Se pide", icon: FilePlus2 }, { title: "Se aprueba", icon: BadgeCheck }, { title: "Se paga", icon: Banknote }], text: "Circuitos por rol, por departamento o por importe. Cada decisión queda registrada.", tones: [{ theme: "accounting" }] },
   { kind: "cloud", icon: FolderOpen, title: "Filma Hub", text: "Toda la documentación del proyecto, ordenada y a un clic.",
-    words: ["Contratos", "Facturas", "Presupuestos", "Certificados", "Órdenes de compra", "Fichas del equipo", "Justificantes", "Informes"], tones: [{ theme: "both" }] },
+    words: ["Contratos", "Órdenes de compra", "Facturas", "Presupuestos", "Certificados", "Fichas del equipo", "Justificantes", "Informes"], tones: [{ theme: "both" }] },
   { kind: "list", title: "Cada persona, su lugar", tones: [{ theme: "both" }], items: [
     { title: "La producción", text: "Lo ve todo.", icon: Clapperboard },
     { title: "Cada departamento", text: "Ve lo suyo.", icon: Users },

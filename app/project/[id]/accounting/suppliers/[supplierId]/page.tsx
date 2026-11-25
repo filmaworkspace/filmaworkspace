@@ -183,7 +183,7 @@ export default function SupplierDetailPage() {
   } | null>(null);
   const [allSuppliers, setAllSuppliers] = useState<{ id: string; fiscalName: string; taxId: string }[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
-  const [docTab, setDocTab] = useState<"invoices" | "pos">("invoices");
+  const [docTab, setDocTab] = useState<"invoices" | "pos">("pos");
   const [docSearch, setDocSearch] = useState("");
   const [docField, setDocField] = useState<"all" | "number" | "concept">("all");
   const [showSupplierSearch, setShowSupplierSearch] = useState(false);
@@ -846,8 +846,8 @@ export default function SupplierDetailPage() {
               value={docTab}
               onChange={setDocTab}
               options={[
-                { value: "invoices", label: `Facturas · ${invoices.length}` },
                 { value: "pos", label: `POs · ${pos.length}` },
+                { value: "invoices", label: `Facturas · ${invoices.length}` },
               ]}
             />
           </div>
