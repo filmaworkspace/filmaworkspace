@@ -39,7 +39,7 @@ import {
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useUser } from "@/contexts/UserContext";
 import ProjectCover from "@/components/ProjectCover";
-import PendingForYou from "@/components/PendingForYou";
+import { loadMyPending } from "@/lib/myPending";
 import { coverGradient } from "@/lib/projectCover";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -336,6 +336,25 @@ export default function Dashboard() {
   const iconButton = "relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[#F1F1F3] hover:text-slate-900";
   const glassPill = "inline-flex h-6 items-center gap-1 rounded-md border border-white/25 bg-black/25 px-2 text-[11px] font-medium text-white backdrop-blur-md";
 
+  // Cosas pendientes de ti por proyecto (aprobaciones y documentos tuyos rechazados)
+  const [pendingBy, setPendingBy] = useState<Record<string, number>>({});
+  const activeKey = projects.filter((p) => !p.archived).map((p) => p.id).join(",");
+  useEffect(() => {
+    if (!userId || !activeKey) return;
+    let alive = true;
+    loadMyPending(userId, projects.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })))
+      .then((d) => {
+        if (!alive) return;
+        const m: Record<string, number> = {};
+        for (const a of d.approvals) m[a.projectId] = (m[a.projectId] || 0) + 1;
+        for (const x of d.myDocs) if (x.state === "rejected") m[x.projectId] = (m[x.projectId] || 0) + 1;
+        setPendingBy(m);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, activeKey]);
+
   const renderProjectCard = (project: Project, archived = false) => {
     const hasConfig = project.permissions.config;
     const hasAccounting = project.permissions.accounting && project.modules?.accounting !== false;
@@ -368,6 +387,13 @@ export default function Dashboard() {
               </span>
             )}
           </div>
+          {!archived && (pendingBy[project.id] || 0) > 0 && (
+            <Link href={`/project/${project.id}/accounting/approvals`} title={`${pendingBy[project.id]} ${pendingBy[project.id] === 1 ? "cosa pendiente" : "cosas pendientes"} de ti`}
+              aria-label={`${pendingBy[project.id]} pendientes de ti`}
+              className="absolute right-3 top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold tabular-nums text-white shadow-sm ring-2 ring-white/70 transition-transform hover:scale-105">
+              {pendingBy[project.id]}
+            </Link>
+          )}
         </ProjectCover>
 
         {/* Datos */}
@@ -475,8 +501,6 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Pendiente de ti: aprobaciones y estado de tus documentos (también en móvil) */}
-        {userId && <PendingForYou uid={userId} projects={projects.map((p) => ({ id: p.id, name: p.name, archived: p.archived }))} />}
 
         {projects.length === 0 && invitations.length === 0 ? (
           /* Sin proyectos */
