@@ -12,6 +12,8 @@ import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, 
 import { ArrowDown, ArrowUp, ExternalLink, Lock, MoreHorizontal, Plus, RotateCcw, Search, X } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "@/lib/toast";
+import { PayrollSettingsForm } from "@/components/payroll/PayrollSettingsForm";
+import { readSettings, type PayrollSettings } from "@/lib/payroll/model";
 import { useUser } from "@/contexts/UserContext";
 import { Button, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Page, PageHeader, PageLoading, Segmented, Select } from "@/components/ds";
 
@@ -31,25 +33,6 @@ const ALLOWANCES: { key: AKey; label: string }[] = [
   { key: "accommodation", label: "Alojamiento" }, { key: "car", label: "Vehículo" },
 ];
 
-interface Rates {
-  mealRate: number; halfPerDiemRate: number; halfPerDiemRateArtistic: number; perDiemRate: number; perDiemRateArtistic: number;
-  halfIntlPerDiemRate: number; halfIntlPerDiemRateArtistic: number; intlPerDiemRate: number; intlPerDiemRateArtistic: number;
-  accommodationRate: number; carRate: number;
-}
-const DEFAULT_RATES: Rates = {
-  mealRate: 15, halfPerDiemRate: 18.5, halfPerDiemRateArtistic: 18.5, perDiemRate: 37, perDiemRateArtistic: 37,
-  halfIntlPerDiemRate: 47.5, halfIntlPerDiemRateArtistic: 47.5, intlPerDiemRate: 95, intlPerDiemRateArtistic: 95, accommodationRate: 80, carRate: 40,
-};
-// Concepto → [técnicos, artísticos] (una sola clave: igual para todos)
-const RATE_ROWS: { label: string; unit: string; tech: keyof Rates; art?: keyof Rates }[] = [
-  { label: "Comida", unit: "día", tech: "mealRate" },
-  { label: "½ dieta nacional", unit: "día", tech: "halfPerDiemRate", art: "halfPerDiemRateArtistic" },
-  { label: "Dieta nacional", unit: "día", tech: "perDiemRate", art: "perDiemRateArtistic" },
-  { label: "½ dieta internacional", unit: "día", tech: "halfIntlPerDiemRate", art: "halfIntlPerDiemRateArtistic" },
-  { label: "Dieta internacional", unit: "día", tech: "intlPerDiemRate", art: "intlPerDiemRateArtistic" },
-  { label: "Alojamiento", unit: "noche", tech: "accommodationRate" },
-  { label: "Vehículo", unit: "día", tech: "carRate" },
-];
 
 interface FormCfg {
   showPhoto: boolean; showLastName2: boolean; showArtisticName: boolean; showDocExpiry: boolean; showBirthPlace: boolean; showNationality: boolean;
@@ -111,7 +94,7 @@ export default function TeamConfigPage() {
   const [lastSaved, setLastSaved] = useState<{ at?: Date; by?: string } | null>(null);
 
   // Ajustes (borrador y guardado, para saber si hay cambios)
-  type Settings = { requireApproval: boolean; approverUserIds: string[]; approverNames: Record<string, string>; form: FormCfg; rates: Rates; departments: string[] };
+  type Settings = { requireApproval: boolean; approverUserIds: string[]; approverNames: Record<string, string>; form: FormCfg; payroll: PayrollSettings; departments: string[] };
   const [saved, setSaved] = useState<Settings | null>(null);
   const [s, setS] = useState<Settings | null>(null);
   const dirty = !!s && !!saved && JSON.stringify(s) !== JSON.stringify(saved);
@@ -156,12 +139,11 @@ export default function TeamConfigPage() {
       approverUserIds: appr?.approverUserIds || [],
       approverNames: appr?.approverNames || {},
       form: { ...DEFAULT_FORM, ...(form || {}) } as FormCfg,
-      rates: { ...DEFAULT_RATES, ...(payroll || {}) } as Rates,
+      payroll: readSettings(payroll),
       departments: [...savedOrder.filter((d) => depts.includes(d)), ...depts.filter((d) => !savedOrder.includes(d))],
     };
     // Solo las claves conocidas (los documentos llevan además updatedAt/updatedBy)
     settings.form = Object.fromEntries(Object.keys(DEFAULT_FORM).map((k) => [k, (settings.form as never)[k]])) as unknown as FormCfg;
-    settings.rates = Object.fromEntries(Object.keys(DEFAULT_RATES).map((k) => [k, Number((settings.rates as never)[k]) || 0])) as unknown as Rates;
     setSaved(settings); setS(settings);
     const stamps = [appr, order, form, payroll].filter(Boolean).map((x) => ({ at: x!.updatedAt?.toDate?.() as Date | undefined, by: x!.updatedByName as string | undefined })).filter((x) => x.at);
     stamps.sort((a, b) => b.at!.getTime() - a.at!.getTime());
@@ -188,7 +170,7 @@ export default function TeamConfigPage() {
         setDoc(doc(db, base, "approvals"), { requireApproval: s.requireApproval, approverUserIds: s.approverUserIds, approverNames: s.approverNames, ...meta }),
         setDoc(doc(db, base, "departmentOrder"), { order: s.departments, ...meta }),
         setDoc(doc(db, base, "formConfig"), { ...s.form, linkDays: Math.min(90, Math.max(1, Math.round(s.form.linkDays) || 14)), ...meta }),
-        setDoc(doc(db, base, "payrollConfig"), { ...s.rates, ...meta }),
+        setDoc(doc(db, base, "payrollConfig"), { ...JSON.parse(JSON.stringify(s.payroll)), ...meta }, { merge: true }),
       ]);
       setSaved(s); setLastSaved({ at: new Date(), by: meta.updatedByName });
       toast.success("Configuración guardada");
@@ -344,50 +326,7 @@ export default function TeamConfigPage() {
       {/* ── Nóminas ─────────────────────────────────────────────────────── */}
       {tab === "payroll" && (
         <div className="mt-6">
-          <H2 action={JSON.stringify(s.rates) !== JSON.stringify(DEFAULT_RATES) ? <Button variant="ghost" size="sm" onClick={() => set({ rates: DEFAULT_RATES })}><RotateCcw size={13} /> Tarifas por defecto</Button> : undefined}>
-            Tarifas de dietas y complementos
-          </H2>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[560px] border-collapse text-[13px]">
-              <thead>
-                <tr className={TH}>
-                  <th scope="col" className="px-4 py-2 text-left font-medium">Concepto</th>
-                  <th scope="col" className="w-20 px-3 py-2 text-left font-medium">Por</th>
-                  <th scope="col" className="w-40 px-3 py-2 text-right font-medium">Técnicos</th>
-                  <th scope="col" className="w-40 px-4 py-2 text-right font-medium">Artísticos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {RATE_ROWS.map((r) => {
-                  const cell = (k: keyof Rates, label: string) => (
-                    <div className="relative ml-auto w-28">
-                      <Input inputMode="decimal" aria-label={`${r.label} · ${label}`} value={String(s.rates[k])}
-                        onChange={(e) => set({ rates: { ...s.rates, [k]: parseFloat(e.target.value.replace(",", ".")) || 0 } })}
-                        className={`h-8 pr-6 text-right tabular-nums ${s.rates[k] !== DEFAULT_RATES[k] ? "font-medium" : ""}`} />
-                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">€</span>
-                    </div>
-                  );
-                  return (
-                    <tr key={r.label} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-1.5 text-slate-900">{r.label}</td>
-                      <td className="px-3 py-1.5 text-slate-500">{r.unit}</td>
-                      {r.art ? (
-                        <>
-                          <td className="px-3 py-1.5">{cell(r.tech, "técnicos")}</td>
-                          <td className="px-4 py-1.5">{cell(r.art, "artísticos")}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-3 py-1.5">{cell(r.tech, "todos")}</td>
-                          <td className="px-4 py-1.5 text-right text-xs text-slate-500">La misma</td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <PayrollSettingsForm value={s.payroll} onChange={(payroll) => set({ payroll })} />
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { inter } from "@/lib/fonts";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { LEGACY_MAP, daysOfDoc, toLegacyMonth } from "@/lib/payroll/model";
 import Image from "next/image";
 import {
   AlertCircle, Car, Check, ChevronLeft, ChevronRight,
@@ -142,7 +143,7 @@ export default function AccessPage() {
     if (status !== "ready" || !access) return;
     (async () => {
       const snap = await getDoc(doc(db, `projects/${access.projectId}/payrollMonths`, monthKey));
-      setEntries(snap.exists() ? (snap.data().entries || {}) : {});
+      setEntries(snap.exists() ? toLegacyMonth(daysOfDoc(snap.data())) : {});
     })();
   }, [status, access, monthKey]);
 
@@ -152,7 +153,7 @@ export default function AccessPage() {
     (async () => {
       setSheetLoading(true);
       const snap = await getDoc(doc(db, `projects/${access.projectId}/payrollMonths`, sheetMonthKey));
-      setSheetEntries(snap.exists() ? (snap.data().entries || {}) : {});
+      setSheetEntries(snap.exists() ? toLegacyMonth(daysOfDoc(snap.data())) : {});
       setExpandedDay(null);
       setSheetLoading(false);
     })();
@@ -205,19 +206,17 @@ const allowances = access
       const monthRef  = doc(db, `projects/${access.projectId}/payrollMonths`, sheetMonthKey);
       const current   = await getDoc(monthRef);
       const cData     = current.exists() ? current.data() : {};
-      const cEntries  = (cData.entries || {}) as MonthEntries;
-      const cDay      = cEntries[memberId]?.[dk(d)] || {};
-      const newVal    = !cDay[key];
-      const newEntries: MonthEntries = {
-        ...cEntries,
-        [memberId]: {
-          ...(cEntries[memberId]||{}),
-          [dk(d)]: { ...cDay, [key]: newVal },
-        },
-      };
+      // Registro diario de Nóminas (formato nuevo)
+      const days      = daysOfDoc(cData);
+      const cell      = { ...(days[memberId]?.[dk(d)] || {}) };
+      const id        = LEGACY_MAP[key];
+      const newVal    = !cell[id];
+      if (newVal) cell[id] = 1; else delete cell[id];
+      const newDays   = { ...days, [memberId]: { ...(days[memberId] || {}), [dk(d)]: cell } };
+      const newEntries: MonthEntries = toLegacyMonth(newDays);
       await setDoc(monthRef, {
         ...cData,
-        entries: newEntries,
+        days: newDays,
         accessCode: code,
         updatedAt: Timestamp.now(),
       });

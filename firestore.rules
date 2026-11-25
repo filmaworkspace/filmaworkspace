@@ -557,6 +557,17 @@ service cloud.firestore {
                       ));
       }
 
+      // Nóminas: importes del mes y datos de nómina de cada persona. Solo
+      // quien tiene acceso a Equipo (hay salarios).
+      match /payrollRuns/{runId} {
+        allow read: if isSignedIn() && (isAdmin() || hasTeamAccess(projectId));
+        allow write: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId));
+      }
+      match /payrollPeople/{personId} {
+        allow read: if isSignedIn() && (isAdmin() || hasTeamAccess(projectId));
+        allow write: if projectOpen(projectId) && (isAdmin() || hasTeamAccess(projectId));
+      }
+
       match /dietasForms/{formId} {
         allow read: if isSignedIn() && (
           isAdmin() ||
