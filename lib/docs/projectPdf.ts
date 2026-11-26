@@ -135,7 +135,7 @@ export interface ProjectDocSpec {
   /** Caja destacada (p. ej. "Todas las facturas abonadas"). */
   highlight?: { title: string; text: string };
   /** Firma al final (cartas, vales). */
-  signature?: { label: string; name: string; role?: string }[];
+  signature?: { label: string; name: string; role?: string; image?: string; signedAt?: Date | null; note?: string }[];
   /** Tabla: filas sueltas o agrupadas (departamentos, cuentas…), con fila de totales opcional. */
   table?: { columns: DocColumn[]; rows?: string[][]; subRows?: (string | null)[]; groups?: DocTableGroup[]; foot?: string[] };
   /** La base imponible es la cifra protagonista; IVA, IRPF y total van debajo en pequeño. */
@@ -362,17 +362,27 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
   }
 
   if (spec.signature?.length) {
-    ensure(34);
+    ensure(38);
     y += 4;
     const sw = (W - 2 * M - 10 * (spec.signature.length - 1)) / spec.signature.length;
     spec.signature.forEach((sg, i) => {
       const x = M + i * (sw + 10);
       set(6.5, FAINT, "bold"); pdf.text(sg.label.toUpperCase(), x, y, { charSpace: 0.4 });
+      if (sg.image) {
+        // Firma real (hecha en la app del cajero), encajada sobre la línea
+        try {
+          const p = pdf.getImageProperties(sg.image);
+          const maxW = Math.min(sw, 60), maxH = 14;
+          const k = Math.min(maxW / p.width, maxH / p.height);
+          pdf.addImage(sg.image, "PNG", x, y + 17.5 - p.height * k, p.width * k, p.height * k);
+        } catch { /* imagen no válida: queda la línea */ }
+      }
       pdf.setDrawColor(...MUTED); pdf.setLineWidth(0.3); pdf.line(x, y + 18, x + sw, y + 18);
       set(8.5, INK, "bold"); pdf.text(sg.name || " ", x, y + 23);
       if (sg.role) { set(7.5, MUTED); pdf.text(sg.role, x, y + 27); }
+      if (sg.signedAt || sg.note) { set(6.8, MUTED); pdf.text([sg.signedAt ? `Firmado el ${fmtStamp(sg.signedAt)}` : "", sg.note || ""].filter(Boolean).join(" · "), x, y + (sg.role ? 31 : 27)); }
     });
-    y += 34;
+    y += 38;
   }
 
   // ── Historial de versiones ────────────────────────────────────────────────

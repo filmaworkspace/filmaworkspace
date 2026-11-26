@@ -507,6 +507,12 @@ service cloud.firestore {
                          resource.data.status != 'accounted');
       }
 
+      // Firmas en la app del cajero (anticipos, entregas de tickets, liquidaciones).
+      match /boxSignatures/{requestId} {
+        allow read, create, update: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
+        allow delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));
+      }
+
       match /cashCounts/{countId} {
         allow read, create: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccountant(projectId) || isBoxUser(projectId));
         allow update, delete: if projectOpen(projectId) && (isAdmin() || isEPorPM(projectId) || isAccExtended(projectId));

@@ -8,7 +8,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { Bell, CheckCircle2, CloudOff, Home, Search, User } from "lucide-react";
+import { Bell, CheckCircle2, CloudOff, Home, Search, User, Wallet } from "lucide-react";
+import { useCashierBadge } from "@/components/mobile/useCashier";
 import { inter } from "@/lib/fonts";
 import { useUser } from "@/contexts/UserContext";
 import { MobileDataProvider, useMobileData } from "@/components/mobile/MobileData";
@@ -23,13 +24,18 @@ function BottomNav() {
   // Novedades de Actividad desde la última visita (se recalcula al cambiar de pantalla).
   const fresh = useMemo(() => (user?.uid && !pathname.startsWith("/m/actividad") ? countNew(buildActivity(data, invitations), activitySeen(user.uid)) : 0),
     [data, invitations, user?.uid, pathname]);
+  const cashier = useCashierBadge(pathname);
+  // En la pantalla de firma, sin barra: toda la pantalla para firmar.
+  const signing = /^\/m\/caja\/[^/]+\/[^/]+/.test(pathname);
   const items = [
     { href: "/m", label: "Inicio", icon: Home, active: pathname === "/m" || pathname.startsWith("/m/p/") },
     { href: "/m/aprobaciones", label: "Aprobar", icon: CheckCircle2, active: pathname.startsWith("/m/aprobaciones"), badge: pending },
+    ...(cashier.enabled ? [{ href: "/m/caja", label: "Caja", icon: Wallet, active: pathname.startsWith("/m/caja"), badge: cashier.pending }] : []),
     { href: "/m/buscar", label: "Buscar", icon: Search, active: pathname.startsWith("/m/buscar") },
     { href: "/m/actividad", label: "Actividad", icon: Bell, active: pathname.startsWith("/m/actividad"), badge: fresh },
     { href: "/m/perfil", label: "Perfil", icon: User, active: pathname.startsWith("/m/perfil") },
   ];
+  if (signing) return null;
   return (
     <nav aria-label="Secciones" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>

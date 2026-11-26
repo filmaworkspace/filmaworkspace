@@ -337,7 +337,14 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
             { version: "V01", at: toDate(env.createdAt) || new Date(), by: String(env.createdByName || "—"), change: "Apertura del sobre" },
             ...(closed ? [{ version: "V01", at: toDate(env.closedAt || env.settledAt) || new Date(), by: String(env.closedByName || env.settledByName || "—"), change: "Liquidación" }] : []),
           ],
-          signature: kind === "transfer" ? [{ label: "Liquida", name: String(env.personName || ""), role: String(env.personDepartment || "") }, { label: "Revisa", name: String(env.settledByName || ""), role: "Contabilidad" }] : undefined,
+          signature: kind === "transfer" ? (() => {
+            // Firmas hechas en la app del cajero (anticipo, entrega de tickets, liquidación)
+            const sigs = (env.signatures || {}) as Record<string, { image: string; signedAt: unknown; cashierName?: string }>;
+            const app = ([["transfer_advance", "Recibí el anticipo"], ["transfer_tickets", "Entrego los tickets"], ["transfer_settlement", "Conforme con la liquidación"]] as const)
+              .filter(([k]) => sigs[k]?.image)
+              .map(([k, label]) => ({ label, name: String(env.personName || ""), role: String(env.personDepartment || ""), image: sigs[k].image, signedAt: toDate(sigs[k].signedAt), note: sigs[k].cashierName ? `ante ${sigs[k].cashierName}` : undefined }));
+            return app.length ? app : [{ label: "Liquida", name: String(env.personName || ""), role: String(env.personDepartment || "") }, { label: "Revisa", name: String(env.settledByName || ""), role: "Contabilidad" }];
+          })() : undefined,
         }),
       });
     };
@@ -369,7 +376,16 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
             subRows: lines.map((l) => (l.subAccountDescription as string) || null),
           } : undefined,
           totals: { base: eur(baseAmt), rows: [["IVA", eur(vat)], ["Total", eur(num(m.amount))]] },
-          signature: m.type === "advance" ? [{ label: "Recibí", name: String(m.personName || ""), role: String(m.personDepartment || "") }, { label: "Entrega", name: String(m.createdByName || ""), role: "Caja" }] : undefined,
+          signature: (() => {
+            const sig = m.signature as { image?: string; signedAt?: unknown; cashierName?: string } | undefined;
+            const label = m.type === "advance" || m.type === "reimbursement" ? "Recibí" : m.type === "return" ? "Devuelvo" : m.type === "settlement" ? "Entrego los tickets" : null;
+            if (!label) return undefined;
+            if (!sig?.image && m.type !== "advance") return undefined;
+            return [
+              { label, name: String(m.personName || ""), role: String(m.personDepartment || ""), image: sig?.image, signedAt: sig ? toDate(sig.signedAt) : undefined },
+              { label: m.type === "return" || m.type === "settlement" ? "Recibe" : "Entrega", name: String(sig?.cashierName || m.createdByName || ""), role: "Caja" },
+            ];
+          })(),
           versions: [{ version: "V01", at: toDate(m.createdAt) || toDate(m.date) || new Date(), by: String(m.createdByName || "—"), change: "Registro" }],
         }),
       });

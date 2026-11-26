@@ -25,6 +25,7 @@ import {
   doc,
   getDocs,
   getDoc,
+  onSnapshot,
   orderBy,
   query,
   setDoc,
@@ -87,6 +88,8 @@ import { strFromU8, unzipSync } from "fflate";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
+import { SignInApp } from "@/components/box/SignInApp";
+import type { SignDirection, SignMoment } from "@/lib/box/signatures";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,6 +541,16 @@ export default function BoxesPage() {
   const [selectedTransferEnvelope, setSelectedTransferEnvelope] = useState<TransferEnvelope | null>(null);
   const [showCreateTransferEnvelopeModal, setShowCreateTransferEnvelopeModal] = useState(false);
   const [showDeleteTransferEnvelopeModal, setShowDeleteTransferEnvelopeModal] = useState<TransferEnvelope | null>(null);
+  // Firmas del sobre abierto en vivo (se firman en el móvil del cajero)
+  const selTrfId = selectedTransferEnvelope?.id;
+  useEffect(() => {
+    if (!selTrfId || !projectId) return;
+    return onSnapshot(doc(db, `projects/${projectId}/transferEnvelopes`, selTrfId), (snap) => {
+      const d = snap.data();
+      if (!d) return;
+      setSelectedTransferEnvelope((cur) => (cur && cur.id === selTrfId ? ({ ...cur, signatures: d.signatures, signatureRequests: d.signatureRequests } as any) : cur));
+    });
+  }, [selTrfId, projectId]);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
   const [showAddAdvanceModal, setShowAddAdvanceModal] = useState(false);
@@ -2425,6 +2438,30 @@ export default function BoxesPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Firmas en la app del cajero (opcionales) */}
+                    {(() => {
+                      const cashAdv = env.advances.filter((a) => a.method === "cash").reduce((t, a) => t + (a.amount || 0), 0);
+                      const anyEnv = env as any;
+                      const rows: { moment: SignMoment; direction: SignDirection; label: string; amount: number; detail: string }[] = [];
+                      if (cashAdv > 0) rows.push({ moment: "transfer_advance", direction: "receives", label: "Recibe el anticipo en efectivo", amount: cashAdv, detail: `${env.advances.filter((a) => a.method === "cash").length} anticipo(s) en efectivo` });
+                      if (env.expenseCount > 0) rows.push({ moment: "transfer_tickets", direction: "delivers", label: "Entrega los tickets", amount: env.totalAmount, detail: `${env.expenseCount} ${env.expenseCount === 1 ? "ticket" : "tickets"}` });
+                      if (!draft && env.settlementDirection && env.settlementDirection !== "none" && (env.settlementAmount || 0) > 0)
+                        rows.push({ moment: "transfer_settlement", direction: env.settlementDirection === "production_to_person" ? "receives" : "delivers", label: env.settlementDirection === "production_to_person" ? "Recibe la liquidación" : "Devuelve la diferencia", amount: env.settlementAmount || 0, detail: env.settlementReference ? `Ref. ${env.settlementReference}` : "Liquidación del sobre" });
+                      if (!rows.length) return null;
+                      return (
+                        <div className="overflow-hidden rounded-lg border border-slate-200">
+                          {rows.map((r) => (
+                            <div key={r.moment} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-2 text-[13px] last:border-0">
+                              <span className="text-slate-700">{env.personName} · {r.label} <span className="tabular-nums text-slate-900">{fmt(r.amount)} €</span></span>
+                              <SignInApp projectId={projectId} user={{ uid: userId || "", name: userName }}
+                                target={{ kind: "transfer", moment: r.moment, direction: r.direction, personName: env.personName, personDepartment: env.personDepartment, amount: r.amount, detail: r.detail, reference: env.displayNumber, sourceId: env.id }}
+                                state={{ request: anyEnv.signatureRequests?.[r.moment], signature: anyEnv.signatures?.[r.moment] }} />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {env.notes && <p className="text-xs text-slate-600">Notas: {env.notes}</p>}
 

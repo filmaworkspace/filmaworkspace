@@ -18,6 +18,8 @@ import {
   Button, Checkbox, EmptyState, Field, IconButton, Input, Menu, MenuItem, MenuSeparator, Modal, Segmented, Select, Textarea,
 } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
+import { SignInApp } from "@/components/box/SignInApp";
+import type { SignDirection, SignMoment } from "@/lib/box/signatures";
 import { matchAmount, matchCode, matchWords } from "@/lib/search";
 import {
   CashCount, CashFloat, CashLine, CashMovement, CashMovementType, DENOMINATIONS, MOVEMENT_LABEL,
@@ -35,6 +37,14 @@ interface Props {
   departments: string[];
   onToast: (type: "success" | "error", message: string) => void;
 }
+
+// Movimientos que la persona puede firmar en la app del cajero.
+const SIGNABLE: Partial<Record<string, { moment: SignMoment; direction: SignDirection }>> = {
+  advance: { moment: "cash_advance", direction: "receives" },
+  reimbursement: { moment: "cash_reimbursement", direction: "receives" },
+  return: { moment: "cash_return", direction: "delivers" },
+  settlement: { moment: "cash_settlement", direction: "delivers" },
+};
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0);
@@ -618,7 +628,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                     <EmptyState title={floatMovements.length ? "Sin resultados" : "Sin movimientos"} />
                   ) : (
                     <div className="overflow-x-auto rounded-lg border border-slate-200">
-                      <table className="tbl w-full min-w-[920px] border-collapse text-[13px]">
+                      <table className="tbl w-full min-w-[1040px] border-collapse text-[13px]">
                         <thead>
                           <tr className="border-b border-slate-200 bg-[#FAFAFA] text-[11px] text-slate-500">
                             <th scope="col" className="px-4 py-2 text-left font-medium">Fecha</th>
@@ -629,6 +639,7 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                             <th scope="col" className="px-3 py-2 text-right font-medium">Salida</th>
                             <th scope="col" className="px-3 py-2 text-right font-medium">Saldo</th>
                             <th scope="col" className="px-3 py-2 text-left font-medium">Estado</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium">Firma</th>
                             <th scope="col" className="w-12 py-2 pr-3" />
                           </tr>
                         </thead>
@@ -662,6 +673,19 @@ export default function CashBox({ projectId, projectName, userId, userName, subA
                                     </span>
                                   ) : st ? <span className={`inline-flex items-center gap-1.5 ${st.text}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span> : <span className="text-slate-400">—</span>}
                                   {isCostMovement(m) && !m.attachmentUrl && <span className="ml-1.5 text-red-700" title="Falta el ticket o la factura">· sin ticket</span>}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-1.5">
+                                  {(() => {
+                                    const sm = SIGNABLE[m.type];
+                                    if (!sm || !m.personName) return null;
+                                    return (
+                                      <SignInApp projectId={projectId} user={{ uid: userId || "", name: userName }}
+                                        target={{ kind: "cash", moment: sm.moment, direction: sm.direction, personName: m.personName, personDepartment: m.personDepartment, amount: m.amount,
+                                          detail: m.type === "settlement" ? `${(m as any).attachments?.length || (m.attachmentUrl ? 1 : 0) || (m.lines || []).length} ${((m as any).attachments?.length || (m.lines || []).length) === 1 ? "ticket" : "tickets"}${m.supplier ? ` · ${m.supplier}` : ""}` : m.description || MOVEMENT_LABEL[m.type],
+                                          reference: m.number, sourceId: m.id }}
+                                        state={{ request: (m as any).signatureRequest, signature: (m as any).signature }} />
+                                    );
+                                  })()}
                                 </td>
                                 <td className="py-1.5 pr-3 text-right">
                                   <Menu trigger={(t) => <IconButton label="Acciones del movimiento" onClick={t} className="-my-1"><span className="text-base leading-none">⋯</span></IconButton>}>
