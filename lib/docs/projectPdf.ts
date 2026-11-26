@@ -125,6 +125,8 @@ export interface ProjectDocSpec {
   number: string;          // "LUZ-PO-0013"
   version?: string;        // "V01"
   status?: { label: string; tone: "ok" | "warn" | "bad" | "none" };
+  /** Franja ancha bajo la cabecera para estados que cambian el valor del documento (cerrada, anulada). */
+  banner?: { title: string; text: string; tone: "closed" | "void" };
   meta: [string, string][];
   party?: { title: string; name: string; lines: string[] };
   summary?: { title: string; text: string };
@@ -181,8 +183,22 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     set(7, white); pdf.text([spec.version, spec.status?.label].filter(Boolean).join("  ·  "), W - M, 26.5, { align: "right" });
   }
 
-  // ── Datos clave ────────────────────────────────────────────────────────────
+  // ── Franja de estado (cerrada / anulada) ───────────────────────────────────
   y = HB + 10;
+  if (spec.banner) {
+    const col: RGB = spec.banner.tone === "void" ? [220, 38, 38] : [51, 65, 85];
+    const bg: RGB = spec.banner.tone === "void" ? [254, 242, 242] : [241, 245, 249];
+    set(8.5, TEXT); const t = pdf.splitTextToSize(spec.banner.text, W - 2 * M - 16);
+    const h = 11 + t.length * 4.2;
+    const top = HB + 6;
+    pdf.setFillColor(...bg); pdf.roundedRect(M, top, W - 2 * M, h, 1.6, 1.6, "F");
+    pdf.setFillColor(...col); pdf.rect(M, top, 1.6, h, "F");
+    set(10, col, "bold"); pdf.text(spec.banner.title.toUpperCase(), M + 7, top + 7, { charSpace: 0.5 });
+    set(8.5, TEXT); pdf.text(t, M + 7, top + 12.2);
+    y = top + h + 10;
+  }
+
+  // ── Datos clave ────────────────────────────────────────────────────────────
   const cells = spec.meta.slice(0, land ? 6 : 4);
   const cw = (W - 2 * M) / Math.max(1, cells.length);
   cells.forEach(([k, v], i) => {

@@ -36,6 +36,8 @@ export interface HubItem {
   warnings: string[];         // falta el original, pagada sin justificante…
   /** Anulada: el PDF sale con marca de agua ANULADA en todas las páginas. */
   voided?: boolean;
+  /** Otra marca de agua (p. ej. CERRADA). */
+  watermark?: { text: string; rgb: [number, number, number] };
   sortKey: string;
   source: { kind: string; id: string };
   spec: () => Promise<Omit<ProjectDocSpec, "project" | "generatedAt" | "generatedBy" | "fingerprint">>;
@@ -136,15 +138,26 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
     const version = `V${String(po.version || 1).padStart(2, "0")}`;
     const originals: Original[] = po.attachmentUrl ? [{ url: po.attachmentUrl, label: "Presupuesto del proveedor" }] : [];
     const created = toDate(po.createdAt);
+    // Cerrada o anulada: la PO ya no compromete presupuesto. Tiene que verse a simple vista.
+    const closed = po.status === "closed", voided = po.status === "cancelled";
+    const baseAmt = num(po.baseAmount), invoiced = num(po.invoicedAmount);
+    const pendingAmt = Math.max(0, baseAmt - invoiced);
+    const commits = closed || voided ? 0 : po.status === "approved" ? pendingAmt : 0;
+    const banner = closed
+      ? { tone: "closed" as const, title: "PO cerrada · no compromete presupuesto", text: `Cerrada el ${day(toDate(po.closedAt))}${po.closedByName ? ` por ${po.closedByName}` : ""}. Facturado ${eur(invoiced)} de ${eur(baseAmt)}.${pendingAmt > 0 ? ` Los ${eur(pendingAmt)} sin facturar se liberaron del comprometido.` : ""} No admite más facturas.` }
+      : voided
+        ? { tone: "void" as const, title: "PO anulada · sin efecto en el presupuesto", text: `Anulada el ${day(toDate(po.cancelledAt))}${po.cancelledByName ? ` por ${po.cancelledByName}` : ""}.${po.cancellationReason ? ` Motivo: ${po.cancellationReason}.` : ""} No compromete presupuesto ni admite facturas.` }
+        : undefined;
     items.push({
       id: `po:${d.id}`, path: ["Purchase Orders"], number, title: po.supplier || "Sin proveedor",
       fileName: hubFileName(number, po.supplier, version), type: "po", typeLabel: DOC_TYPES.po.label,
       date: created, base: num(po.baseAmount), total: num(po.totalAmount), status: PO_STATUS[po.status] || po.status, version,
-      department: po.department, originals, warnings: [], voided: po.status === "cancelled", sortKey: number, source: { kind: "po", id: d.id },
+      department: po.department, originals, warnings: [], voided, watermark: closed ? { text: "CERRADA", rgb: [0.2, 0.25, 0.33] } : undefined, sortKey: number, source: { kind: "po", id: d.id },
       spec: async () => ({
         docLabel: "Orden de compra", docType: "po", number, version,
-        status: { label: PO_STATUS[po.status] || po.status, tone: po.status === "approved" ? "ok" : po.status === "cancelled" ? "bad" : "warn" },
-        meta: [["Fecha", day(created)], ["Departamento", po.department || "—"], ["Solicitada por", po.createdByName || "—"], ["Facturado", num(po.baseAmount) > 0 ? `${Math.round((num(po.invoicedAmount) / num(po.baseAmount)) * 100)} %` : "—"]],
+        status: { label: PO_STATUS[po.status] || po.status, tone: po.status === "approved" ? "ok" : voided ? "bad" : closed ? "none" : "warn" },
+        banner,
+        meta: [["Fecha", day(created)], ["Departamento", po.department || "—"], ["Facturado", baseAmt > 0 ? `${Math.round((invoiced / baseAmt) * 100)} %` : "—"], ["Compromete", closed || voided ? `${eur(0)} · ${closed ? "cerrada" : "anulada"}` : eur(commits)]],
         party: { title: "Proveedor", name: po.supplier || "—", lines: supLines(po.supplierId) },
         summary: po.generalDescription ? { title: "Concepto", text: po.generalDescription } : undefined,
         table: {
@@ -153,13 +166,18 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
           subRows: (po.items || []).map((it: Record<string, unknown>) => (it.subAccountDescription && it.subAccountDescription !== it.description ? String(it.subAccountDescription) : null)),
         },
         totals: { base: eur(num(po.baseAmount)), rows: [["IVA", eur(num(po.vatAmount))], ["IRPF", eur(-num(po.irpfAmount))], ["Total", eur(num(po.totalAmount))]] },
-        extraSections: [{ title: "Ejecución", rows: [["Facturado", eur(num(po.invoicedAmount))], ["Pendiente", eur(Math.max(0, num(po.baseAmount) - num(po.invoicedAmount)))]].concat(po.paymentTerms ? [["Condiciones de pago", po.paymentTerms]] : []) as [string, string][] }],
+        extraSections: [{ title: "Ejecución", rows: ([
+          ["Solicitada por", po.createdByName || "—"],
+          ["Facturado", eur(invoiced)],
+          ...(closed ? [["Liberado al cerrar", eur(pendingAmt)], ["Compromete", `${eur(0)} (cerrada)`]] : voided ? [["Compromete", `${eur(0)} (anulada)`]] : [["Pendiente de facturar", eur(pendingAmt)], ["Compromete", eur(commits)]]),
+        ] as [string, string][]).concat(po.paymentTerms ? [["Condiciones de pago", po.paymentTerms]] : []) }],
         approvals: approvalsFrom(d.id, po.approvalSteps),
         versions: [
           { version: "V01", at: created || new Date(), by: po.createdByName || "—", change: "Creación" },
           ...((po.modificationHistory || []) as { date: unknown; userName: string; reason: string; previousVersion: number }[]).map((m) => ({
             version: `V${String((m.previousVersion || 1) + 1).padStart(2, "0")}`, at: toDate(m.date) || new Date(), by: m.userName || "—", change: m.reason || "Modificación",
           })),
+          ...(closed && po.closedAt ? [{ version, at: toDate(po.closedAt)!, by: po.closedByName || "—", change: `Cerrada${pendingAmt > 0 ? `: liberados ${eur(pendingAmt)}` : ""}` }] : []),
           ...(po.cancelledAt ? [{ version, at: toDate(po.cancelledAt)!, by: po.cancelledByName || "—", change: `Anulada${po.cancellationReason ? `: ${po.cancellationReason}` : ""}` }] : []),
         ],
         notes: po.notes || undefined,
@@ -197,6 +215,7 @@ export async function loadHub(db: Firestore, projectId: string, scope: DocScope,
       spec: async () => ({
         docLabel: type === "invoice" ? "Factura · expediente" : `${DOC_TYPES[type].label} · expediente`, docType: type, number, version,
         status: { label: status, tone: status === "Pagada" ? "ok" : status === "Anulada" ? "bad" : "warn" },
+        banner: status === "Anulada" ? { tone: "void" as const, title: `${DOC_TYPES[type].label} anulada · sin efecto en el presupuesto`, text: `${inv.cancelledAt ? `Anulada el ${day(toDate(inv.cancelledAt))}${inv.cancelledByName ? ` por ${inv.cancelledByName}` : ""}. ` : ""}${inv.cancellationReason || inv.rejectionReason ? `Motivo: ${inv.cancellationReason || inv.rejectionReason}. ` : ""}No cuenta como realizado ni se paga.` } : undefined,
         meta: [["Nº proveedor", inv.supplierNumber || inv.displayNumber || "—"], ["Fecha", day(toDate(inv.invoiceDate) || created)], ["Vencimiento", day(toDate(inv.dueDate))], ["PO", inv.poNumber ? hubNumber("PO", inv.poNumber) : "—"]],
         party: { title: "Proveedor", name: inv.supplier || "—", lines: supLines(inv.supplierId, inv.supplierTaxId) },
         summary: inv.description ? { title: "Concepto", text: inv.description } : undefined,
@@ -377,7 +396,7 @@ export async function renderHubItem(item: HubItem, project: HubProject, projectI
   const proj: DocProject = { name: project.name, code: project.code, producer: project.producer, phase: project.phase, seed: projectId, band: bandCache.get(key)!, legal: project.legal };
   const fingerprint = await contentFingerprint({ id: item.id, body, originals: item.originals.map((o) => o.url) });
   const cover = buildProjectDoc({ ...body, project: proj, generatedAt: new Date(), generatedBy: user, fingerprint }).output("arraybuffer");
-  const { bytes, missing } = await appendOriginals(cover, item.originals, `${item.number} · ${project.name}`, { voided: !!item.voided });
+  const { bytes, missing } = await appendOriginals(cover, item.originals, `${item.number} · ${project.name}`, { voided: !!item.voided, watermark: item.watermark });
   return { bytes, missing, fingerprint };
 }
 
