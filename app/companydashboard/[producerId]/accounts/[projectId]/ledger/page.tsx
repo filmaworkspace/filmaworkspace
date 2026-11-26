@@ -94,7 +94,7 @@ interface LedgerAccount {
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-const fmt = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+const fmt = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n || 0);
 const fmtDate = (d: Date | undefined) => d ? new Intl.DateTimeFormat("es-ES").format(d) : "—";
 const dateToISO = (s: string) => {
   if (!s) return "";
@@ -181,111 +181,25 @@ function MonthlyChart({ movimientos }: { movimientos: Movement[] }) {
   );
 }
 
-// ── PDF export (jsPDF via CDN script injection) ────────────────────────────────
-async function exportAccountPDF(account: LedgerAccount, projectName: string) {
-  // Dynamically load jsPDF if not present
-  if (!(window as any).jspdf) {
-    await new Promise<void>((res, rej) => {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      s.onload = () => res(); s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-  // Also load autotable
-  if (!(window as any).jspdf?.jsPDF?.API?.autoTable) {
-    await new Promise<void>((res, rej) => {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";
-      s.onload = () => res(); s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-
-  const { jsPDF } = (window as any).jspdf;
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const now = new Date().toLocaleDateString("es-ES");
-  const W = doc.internal.pageSize.getWidth();
-
-  // ── Header ──
-  doc.setFillColor(26, 25, 22);
-  doc.rect(0, 0, W, 22, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14); doc.setFont("helvetica", "bold");
-  doc.text("LIBRO MAYOR", 14, 10);
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.setTextColor(150, 150, 150);
-  doc.text(projectName, 14, 16);
-  doc.setTextColor(200, 200, 200);
-  doc.text(`Generado: ${now}`, W - 14, 16, { align: "right" });
-
-  // ── Account header ──
-  doc.setFillColor(248, 248, 246);
-  doc.rect(0, 24, W, 16, "F");
-  doc.setTextColor(26, 25, 22);
-  doc.setFontSize(16); doc.setFont("helvetica", "bold");
-  doc.text(`${account.code}  ${account.name}`, 14, 33);
-
-  // ── Summary boxes ──
-  const boxes = [
-    { label: "Suma Debe",  val: fmt(account.totalDebe) + " €",  x: W - 180 },
-    { label: "Suma Haber", val: fmt(account.totalHaber) + " €", x: W - 120 },
-    { label: "Saldo final",val: (account.saldoFinal >= 0 ? "D " : "A ") + fmt(Math.abs(account.saldoFinal)) + " €", x: W - 60 },
-  ];
-  boxes.forEach(b => {
-    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(120, 120, 120);
-    doc.text(b.label, b.x, 27);
-    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    doc.setTextColor(account.saldoFinal < 0 && b.label === "Saldo final" ? 153 : 26, account.saldoFinal < 0 && b.label === "Saldo final" ? 27 : 25, account.saldoFinal < 0 && b.label === "Saldo final" ? 27 : 22);
-    doc.text(b.val, b.x, 34);
-  });
-
-  // ── Table ──
-  (doc as any).autoTable({
-    startY: 44,
-    head: [["Fecha", "Nº Asiento", "Concepto", "Debe", "Haber", "Saldo progresivo"]],
-    body: account.movimientos.map(m => [
-      m.fecha,
-      m.entry,
-      m.concepto.length > 60 ? m.concepto.slice(0, 58) + "…" : m.concepto,
-      m.debe  > 0 ? fmt(m.debe)  : "—",
-      m.haber > 0 ? fmt(m.haber) : "—",
-      (m.saldo >= 0 ? "D " : "A ") + fmt(Math.abs(m.saldo)),
-    ]),
-    foot: [[
-      "", "", "TOTALES",
-      fmt(account.totalDebe) + " €",
-      fmt(account.totalHaber) + " €",
-      (account.saldoFinal >= 0 ? "D " : "A ") + fmt(Math.abs(account.saldoFinal)) + " €",
-    ]],
-    headStyles: { fillColor: [26, 25, 22], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-    footStyles: { fillColor: [245, 245, 243], textColor: [26, 25, 22], fontStyle: "bold", fontSize: 8 },
-    bodyStyles: { fontSize: 8, textColor: [50, 50, 50] },
-    columnStyles: {
-      0: { cellWidth: 22 }, 1: { cellWidth: 30 }, 2: { cellWidth: "auto" },
-      3: { cellWidth: 28, halign: "right" }, 4: { cellWidth: 28, halign: "right" },
-      5: { cellWidth: 35, halign: "right", fontStyle: "bold" },
+// ── PDF: diseño del Centro de documentación (cabecera del proyecto) ─────────
+async function exportAccountPDF(account: LedgerAccount, projectName: string, projectId: string, user: string) {
+  const { downloadProjectDoc, safeFile } = await import("@/lib/docs/export");
+  const saldo = (n: number) => `${n >= 0 ? "D" : "A"} ${fmt(Math.abs(n))}`;
+  await downloadProjectDoc({
+    db, projectId, user, fallback: { name: projectName },
+    fileName: `Mayor ${account.code} · ${safeFile(account.name)}.pdf`,
+    spec: {
+      orientation: "l",
+      docLabel: "Libro mayor", docType: "ledger", number: account.code,
+      meta: [["Cuenta", `${account.code} ${account.name}`], ["Grupo", account.group || "—"], ["Movimientos", String(account.movimientos.length)], ["Suma debe", `${fmt(account.totalDebe)} €`], ["Suma haber", `${fmt(account.totalHaber)} €`], ["Saldo final", `${saldo(account.saldoFinal)} €`]],
+      table: {
+        columns: [{ label: "Concepto", width: 113 }, { label: "Fecha", width: 24 }, { label: "Asiento", width: 30, mono: true }, { label: "Debe", width: 33, align: "right" }, { label: "Haber", width: 33, align: "right" }, { label: "Saldo", width: 32, align: "right" }],
+        rows: account.movimientos.map((m) => [m.concepto, m.fecha, m.entry, m.debe > 0 ? fmt(m.debe) : "", m.haber > 0 ? fmt(m.haber) : "", saldo(m.saldo)]),
+        foot: ["Totales", "", "", fmt(account.totalDebe), fmt(account.totalHaber), saldo(account.saldoFinal)],
+      },
+      notes: "Libro mayor · PGC 2007. Importes en euros.",
     },
-    alternateRowStyles: { fillColor: [250, 250, 248] },
-    didParseCell: (data: any) => {
-      if (data.section === "body") {
-        const m = account.movimientos[data.row.index];
-        if (m && m.saldo < 0 && data.column.index === 5) data.cell.styles.textColor = [153, 27, 27];
-      }
-    },
-    margin: { left: 14, right: 14 },
   });
-
-  // Footer
-  const pages = (doc as any).internal.getNumberOfPages();
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(180, 180, 180);
-    doc.text(`Página ${i} de ${pages}`, W - 14, doc.internal.pageSize.getHeight() - 6, { align: "right" });
-    doc.text("Libro Mayor · PGC 2007", 14, doc.internal.pageSize.getHeight() - 6);
-  }
-
-  doc.save(`mayor_${account.code}_${account.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.pdf`);
 }
 
 // ── Excel export (SheetJS) ────────────────────────────────────────────────────
@@ -507,7 +421,7 @@ export default function LedgerPage() {
 
   const handleExportPDF = async (acc: LedgerAccount) => {
     setExporting("pdf");
-    try { await exportAccountPDF(acc, projectName); showToast(`Mayor ${acc.code} exportado en PDF`); }
+    try { await exportAccountPDF(acc, projectName, projectId, contextUser?.name || contextUser?.email || "—"); showToast(`Mayor ${acc.code} exportado en PDF`); }
     catch (err) { console.error(err); showToast("Error al exportar PDF"); }
     finally { setExporting(null); }
   };

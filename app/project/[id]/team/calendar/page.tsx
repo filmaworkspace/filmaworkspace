@@ -45,7 +45,7 @@ import {
   X,
   Calendar,
   Filter,
-  Printer,
+  Download,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,6 +306,41 @@ export default function CalendarPage() {
     return [...manual, ...filteredAuto].sort((a, b) => a.date.localeCompare(b.date));
   }, [events, crewAutoEvents, filterCategory]);
 
+  // PDF del mes visible, con el diseño del Centro de documentación
+  const [exporting, setExporting] = useState(false);
+  const exportMonthPdf = async () => {
+    setExporting(true);
+    try {
+      const { downloadProjectDoc } = await import("@/lib/docs/export");
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const first = `${currentYear}-${pad(currentMonth + 1)}-01`;
+      const last = `${currentYear}-${pad(currentMonth + 1)}-${pad(new Date(currentYear, currentMonth + 1, 0).getDate())}`;
+      const inMonth = allEvents().filter((e) => (e.endDate || e.date) >= first && e.date <= last);
+      const byDay = new Map<string, CalendarEvent[]>();
+      for (const e of inMonth) { const d = e.date < first ? first : e.date; byDay.set(d, [...(byDay.get(d) || []), e]); }
+      const dayTitle = (ymd: string) => new Date(`${ymd}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+      const groups = [...byDay.keys()].sort().map((d) => {
+        const evs = byDay.get(d)!.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+        return {
+          title: dayTitle(d), note: `${evs.length} ${evs.length === 1 ? "evento" : "eventos"}`,
+          rows: evs.map((e) => [e.title, CATEGORY_CONFIG[e.category].label, e.allDay || !e.startTime ? "Todo el día" : `${e.startTime}${e.endTime ? `–${e.endTime}` : ""}`, e.crewMemberName || e.location || ""]),
+          subRows: evs.map((e) => [e.sceneNumber && `Escena ${e.sceneNumber}`, e.endDate && e.endDate > e.date ? `Hasta el ${new Date(`${e.endDate}T12:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "long" })}` : "", e.description].filter(Boolean).join(" · ") || null),
+        };
+      });
+      const label = `${MONTHS_ES[currentMonth]} ${currentYear}`;
+      await downloadProjectDoc({
+        db, projectId: id as string, user: auth.currentUser?.displayName || auth.currentUser?.email || "—",
+        fileName: `Calendario · ${label}.pdf`,
+        spec: {
+          docLabel: "Calendario de producción", docType: "calendar", number: label.toUpperCase(),
+          meta: [["Mes", label], ["Eventos", String(inMonth.length)], ["Filtro", filterCategory === "all" ? "Todos" : CATEGORY_CONFIG[filterCategory].label]],
+          table: groups.length ? { columns: [{ label: "Evento", width: 84 }, { label: "Tipo", width: 30 }, { label: "Hora", width: 26 }, { label: "Persona o lugar", width: 38 }], groups } : undefined,
+          body: groups.length ? undefined : ["No hay eventos este mes."],
+        },
+      });
+    } catch (e) { console.error(e); } finally { setExporting(false); }
+  };
+
   const eventsForDate = (ymd: string) =>
     allEvents().filter((e) => {
       if (e.endDate && e.endDate > e.date) {
@@ -488,7 +523,7 @@ export default function CalendarPage() {
         <div className="px-6 pt-8 sm:px-10">
           <PageHeader title="Calendario de producción" actions={
             <span className="flex items-center gap-2 print:hidden">
-              <IconButton label="Imprimir o guardar en PDF" onClick={() => window.print()}><Printer size={15} /></IconButton>
+              <IconButton label="Exportar el mes en PDF" onClick={exportMonthPdf} disabled={exporting}><Download size={15} /></IconButton>
               <Button variant="primary" onClick={() => openCreate()}><Plus size={14} /> Nuevo evento</Button>
             </span>
           } />

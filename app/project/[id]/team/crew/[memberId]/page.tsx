@@ -3,6 +3,7 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { AnchoredPanel } from "@/components/ds";
@@ -497,128 +498,33 @@ export default function CrewMemberPage() {
     if (!member) return;
     setExportingPdf(true);
     try {
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const W = 210; const mL = 14; const mR = W - 14;
-
-      // Header bar
-      pdf.setFillColor(15, 23, 42);
-      pdf.rect(0, 0, W, 28, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("FICHA DE CREW", mL, 12);
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(`Generado: ${new Date().toLocaleDateString("es-ES")}`, mL, 19);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("FILMA WORKSPACE", mR, 12, { align: "right" });
-
-      // Name + role block
-      let y = 40;
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFontSize(18);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(member.name, mL, y);
-      y += 7;
-      if (member.artisticName) {
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "italic");
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(`"${member.artisticName}"`, mL, y);
-        y += 6;
-      }
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(`${member.role}${member.department ? ` · ${member.department}` : ""}`, mL, y);
-      y += 4;
-      if (member.crewNumber) {
-        pdf.setFontSize(9);
-        pdf.setTextColor(148, 163, 184);
-        pdf.text(`#${member.crewNumber}`, mL, y);
-      }
-
-      // Accent line
-      y += 8;
-      pdf.setDrawColor(107, 163, 25);
-      pdf.setLineWidth(0.8);
-      pdf.line(mL, y, mR, y);
-      y += 8;
-
-      const section = (title: string) => {
-        pdf.setFillColor(248, 250, 252);
-        pdf.rect(mL, y - 4, mR - mL, 7, "F");
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(107, 163, 25);
-        pdf.text(title.toUpperCase(), mL + 2, y);
-        y += 6;
-      };
-
-      const row = (label: string, value: string, col2?: { label: string; value: string }) => {
-        const colW = col2 ? (mR - mL) / 2 - 2 : mR - mL;
-        pdf.setFontSize(7.5);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(148, 163, 184);
-        pdf.text(label, mL, y);
-        if (col2) pdf.text(col2.label, mL + colW + 4, y);
-        y += 4;
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(15, 23, 42);
-        pdf.text(value || "—", mL, y);
-        if (col2) pdf.text(col2.value || "—", mL + colW + 4, y);
-        y += 6;
-      };
-
-      // Contacto
-      section("Contacto");
-      row("Email", member.email || "—", { label: "Teléfono", value: member.phone || "—" });
-      if (member.address) row("Domicilio", member.address);
-      row("Municipio", member.municipality || "—", { label: "Código postal", value: member.postalCode || "—" });
-      y += 2;
-
-      // Personales
-      section("Datos personales");
-      row("DNI / NIE", member.dni ? "••••••••" : "—", { label: "Nº Seg. Social", value: member.socialSecurityNumber ? "••••••••" : "—" });
-      row("Fecha nacimiento", member.birthDate || "—", { label: "Nacionalidad", value: member.nationality || "—" });
-      if (member.birthPlace) row("Lugar nacimiento", member.birthPlace);
-      y += 2;
-
-      // Contrato
-      section("Contrato & Remuneración");
-      row("Fecha alta", member.startDate || "—", { label: "Baja aprox.", value: member.endDateApprox || "—" });
-      if (member.contractReason) row("Motivo contratación", member.contractReason);
-      if (member.salaryAmount) row("Salario bruto", `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryAmount)} € / ${member.salaryType === "weekly" ? "semana" : "mes"}`);
-      if (member.salaryPerSession) row("Salario por sesión", `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2 }).format(member.salaryPerSession)} €`, { label: "Sesiones", value: String(member.sessions || "—") });
-      row("Retención IRPF", member.irpfRate ? `${member.irpfRate}%` : "—", { label: "Régimen", value: member.regime || "—" });
-      y += 2;
-
-      // Notas
-      if (member.notes) {
-        section("Notas");
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(71, 85, 105);
-        const lines = pdf.splitTextToSize(member.notes, mR - mL - 4);
-        pdf.text(lines, mL + 2, y);
-        y += lines.length * 5 + 4;
-      }
-
-      // Footer
-      const pageH = 297;
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(0, pageH - 14, W, 14, "F");
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(148, 163, 184);
-      pdf.text("Filma Workspace · Documento confidencial", mL, pageH - 5);
-      pdf.text(`Pág. 1`, mR, pageH - 5, { align: "right" });
-
-      pdf.save(`ficha_${member.name.replace(/\s+/g, "_").toLowerCase()}.pdf`);
-    } catch (e) { console.error(e); }
+      const { downloadProjectDoc, safeFile } = await import("@/lib/docs/export");
+      const money = (n: number) => `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n)} €`;
+      const dmy = (s?: string) => (s ? new Date(`${s.slice(0, 10)}T12:00:00`).toLocaleDateString("es-ES") : "—");
+      const masked = (v?: string) => (v ? `••••${v.slice(-3)}` : "—");
+      const number = member.crewNumber ? `CRW-${String(member.crewNumber).padStart(4, "0")}` : "CRW";
+      const contract: [string, string][] = [["Alta", dmy(member.startDate)], ["Baja aprox.", dmy(member.endDateApprox)]];
+      if (member.contractReason) contract.push(["Motivo de contratación", member.contractReason]);
+      if (member.salaryAmount) contract.push(["Salario bruto", `${money(member.salaryAmount)} / ${member.salaryType === "weekly" ? "semana" : "mes"}`]);
+      if (member.salaryPerSession) contract.push(["Salario por sesión", `${money(member.salaryPerSession)}${member.sessions ? ` · ${member.sessions} sesiones` : ""}`]);
+      contract.push(["Retención IRPF", member.irpfRate ? `${member.irpfRate} %` : "—"], ["Régimen", member.regime || "—"]);
+      await downloadProjectDoc({
+        db, projectId, user: userName,
+        fileName: `${number} · ${safeFile(member.name)}.pdf`,
+        spec: {
+          docLabel: "Ficha de crew", docType: "crew", number,
+          status: { label: member.status === "inactive" ? "Baja" : member.status === "pending" ? "Pendiente de alta" : "Activo", tone: member.status === "active" ? "ok" : "warn" },
+          meta: [["Puesto", member.role || "—"], ["Departamento", member.department || "—"], ["Alta", dmy(member.startDate)], ["Baja aprox.", dmy(member.endDateApprox)]],
+          party: { title: "Persona", name: member.name, lines: [member.artisticName && member.artisticName !== member.name ? `«${member.artisticName}»` : "", member.company || ""].filter(Boolean) },
+          extraSections: [
+            { title: "Contacto", rows: [["Email", member.email || "—"], ["Teléfono", member.phone || "—"], ["Domicilio", [member.address, [member.postalCode, member.municipality].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"]] },
+            { title: "Datos personales", rows: [["DNI / NIE", masked(member.dni)], ["Nº Seguridad Social", masked(member.socialSecurityNumber)], ["Fecha de nacimiento", dmy(member.birthDate)], ["Lugar de nacimiento", member.birthPlace || "—"], ["Nacionalidad", member.nationality || "—"]] },
+            { title: "Contrato y remuneración", rows: contract },
+          ],
+          notes: member.notes || undefined,
+        },
+      });
+    } catch (e) { console.error(e); toast.error("No se pudo generar el PDF"); }
     finally { setExportingPdf(false); }
   };
 

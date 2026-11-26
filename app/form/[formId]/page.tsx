@@ -140,198 +140,76 @@ interface ExpenseItem {
 // ─── Resguardo PDF ────────────────────────────────────────────────────────────
 
 async function downloadResguardo(formDoc: FormDoc, responseData: any, formId: string) {
-  const { jsPDF } = await import("jspdf");
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, mL = 20, mR = 20, cW = W - mL - mR;
+  // Mismo diseño que el Centro de documentación: cabecera del proyecto y huella.
+  // Es un enlace público: no se lee nada más del proyecto (solo su nombre).
+  const { downloadProjectDoc, safeFile } = await import("@/lib/docs/export");
+  const money = (n: number) => `${new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" } as Intl.NumberFormatOptions).format(n)} €`;
+  const ref = formId.slice(0, 8).toUpperCase();
   const now = new Date();
-  const dateStr = now.toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-
-  let y = 22;
-
-  // Header bar
-  pdf.setFillColor(52, 42, 33);
-  pdf.rect(0, 0, W, 18, "F");
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.setTextColor(201, 183, 156);
-  pdf.text("FILMA WORKSPACE FORMS", mL, 11);
-  pdf.setFont("helvetica", "normal");
-  pdf.setTextColor(201, 183, 156);
-  pdf.text(dateStr + " · " + timeStr, W - mR, 11, { align: "right" });
-
-  y = 32;
-
-  // Title
-  const title = formDoc.type === "crew_onboarding"
-    ? "RESGUARDO DE FICHA DE ALTA"
-    : formDoc.type === "dietas_request"
-    ? "RESGUARDO DE INFORME DE DIETAS"
-    : "RESGUARDO DE SOLICITUD DE CAJA";
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(18);
-  pdf.setTextColor(52, 42, 33);
-  pdf.text(title, mL, y);
-
-  y += 6;
-  pdf.setDrawColor(201, 183, 156);
-  pdf.setLineWidth(0.5);
-  pdf.line(mL, y, W - mR, y);
-  y += 8;
-
-  // Project + ref
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8.5);
-  pdf.setTextColor(110, 110, 110);
-  pdf.text(`Proyecto: ${formDoc.projectName || "—"}`, mL, y);
-  pdf.text(`Ref: ${formId.slice(0, 8).toUpperCase()}`, W - mR, y, { align: "right" });
-  y += 12;
+  const r = responseData || {};
+  const base = { db: null, projectId: formDoc.projectId, fallback: { name: formDoc.projectName || "Proyecto" } };
+  const sent: [string, string] = ["Enviado", now.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })];
 
   if (formDoc.type === "crew_onboarding") {
-    // ── Crew sections
-    const sections: [string, [string, string][]][] = [
-      ["Datos personales", [
-        ["Nombre completo", `${responseData.firstName} ${responseData.lastName1}${responseData.lastName2 ? " " + responseData.lastName2 : ""}`],
-        ["Nombre en créditos", responseData.artisticName || "—"],
-        ["Documento", `${(responseData.docType || "").toUpperCase()} ${responseData.docNumber}`],
-        ["Fecha nacimiento", responseData.birthDate || "—"],
-        ["Nacionalidad", responseData.nationality || "—"],
-      ]],
-      ["Contacto", [
-        ["Email", responseData.email || "—"],
-        ["Teléfono", responseData.phone || "—"],
-        ["Dirección", `${responseData.address || ""}, ${responseData.postalCode || ""} ${responseData.city || ""}`],
-      ]],
-      ["Fiscal y bancario", [
-        ["Nº SS", responseData.ssNumber || "—"],
-        ["IRPF", responseData.irpfRate ? `${responseData.irpfRate}%` : "—"],
-        ["IBAN", responseData.iban || "—"],
-        ["Banco", responseData.bankName || "—"],
-        ["Titular", responseData.accountHolder || "—"],
-      ]],
-      ["Documentos adjuntos", DOC_UPLOADS_BASE.filter(d => responseData.docs?.[d.key]).map(d => [d.label, "✓ Adjuntado"] as [string, string])],
-    ];
-
-    for (const [sectionTitle, rows] of sections) {
-      if (y + rows.length * 7 + 14 > 280) { pdf.addPage(); y = 20; }
-      pdf.setFillColor(245, 243, 240);
-      pdf.rect(mL, y - 4, cW, 9, "F");
-      pdf.setFillColor(52, 42, 33);
-      pdf.rect(mL, y - 4, 2.5, 9, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8);
-      pdf.setTextColor(52, 42, 33);
-      pdf.text(sectionTitle.toUpperCase(), mL + 5, y + 1.5);
-      y += 10;
-      for (const [label, value] of rows) {
-        if (y > 280) { pdf.addPage(); y = 20; }
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(130, 120, 110);
-        pdf.text(label, mL + 3, y);
-        pdf.setTextColor(30, 30, 30);
-        const isOk = String(value).startsWith("✓");
-        if (isOk) pdf.setTextColor(22, 163, 74);
-        else if (value === "No adjuntado") pdf.setTextColor(200, 190, 180);
-        pdf.text(pdf.splitTextToSize(String(value), 90)[0], W - mR, y, { align: "right" });
-        pdf.setTextColor(220, 215, 210);
-        pdf.setLineWidth(0.2);
-        pdf.line(mL, y + 2, W - mR, y + 2);
-        y += 7;
-      }
-      y += 5;
-    }
-  } else {
-    // ── Box request
-    const expenses: any[] = responseData.expenses || [];
-    const total = expenses.reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.setTextColor(52, 42, 33);
-    pdf.text("SOLICITANTE", mL, y);
-    y += 5;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    pdf.setTextColor(30, 30, 30);
-    pdf.text(responseData.requesterName || "—", mL, y);
-    y += 3;
-    pdf.setFontSize(8);
-    pdf.setTextColor(110, 110, 110);
-    pdf.text(`Solicitud gestionada por: ${formDoc.createdByName}`, mL, y + 5);
-    if (responseData.notes?.trim()) {
-      y += 10;
-      pdf.setFont("helvetica", "italic");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(100, 90, 80);
-      pdf.text(`"${responseData.notes}"`, mL, y);
-    }
-    y += 14;
-
-    // Expenses table
-    pdf.setFillColor(245, 243, 240);
-    pdf.rect(mL, y - 4, cW, 9, "F");
-    pdf.setFillColor(52, 42, 33);
-    pdf.rect(mL, y - 4, 2.5, 9, "F");
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8);
-    pdf.setTextColor(52, 42, 33);
-    pdf.text("GASTOS SOLICITADOS", mL + 5, y + 1.5);
-    y += 10;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(110, 110, 110);
-    pdf.text("#", mL, y);
-    pdf.text("DESCRIPCIÓN", mL + 10, y);
-    pdf.text("IMPORTE", W - mR, y, { align: "right" });
-    y += 3;
-    pdf.setDrawColor(210, 200, 190);
-    pdf.setLineWidth(0.3);
-    pdf.line(mL, y, W - mR, y);
-    y += 5;
-
-    for (let i = 0; i < expenses.length; i++) {
-      const e = expenses[i];
-      if (y > 275) { pdf.addPage(); y = 20; }
-      if (i % 2 === 0) { pdf.setFillColor(252, 251, 249); pdf.rect(mL, y - 3.5, cW, 7, "F"); }
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(100, 90, 80);
-      pdf.text(String(i + 1), mL + 1, y);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(pdf.splitTextToSize(e.description || "—", 130)[0], mL + 10, y);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(`${Number(e.amount || 0).toFixed(2)} €`, W - mR, y, { align: "right" });
-      y += 7;
-    }
-
-    y += 3;
-    pdf.setDrawColor(52, 42, 33);
-    pdf.setLineWidth(0.5);
-    pdf.line(mL + 100, y, W - mR, y);
-    y += 6;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.setTextColor(52, 42, 33);
-    pdf.text("TOTAL", mL + 100, y);
-    pdf.text(`${total.toFixed(2)} €`, W - mR, y, { align: "right" });
+    const name = [r.firstName, r.lastName1, r.lastName2].filter(Boolean).join(" ");
+    await downloadProjectDoc({
+      ...base, user: name || "Crew", fileName: `Resguardo de alta · ${safeFile(name || ref)}.pdf`,
+      spec: {
+        docLabel: "Resguardo de alta", docType: "form", number: `ALTA ${ref}`,
+        status: { label: "Recibida", tone: "ok" },
+        meta: [sent, ["Puesto", formDoc.prefilled?.role || "—"], ["Departamento", formDoc.prefilled?.department || "—"], ["Gestiona", formDoc.createdByName || "—"]],
+        party: { title: "Persona", name: name || "—", lines: [r.artisticName ? `Nombre en créditos: ${r.artisticName}` : ""].filter(Boolean) },
+        extraSections: [
+          { title: "Datos personales", rows: [["Documento", `${(r.docType || "").toUpperCase()} ${r.docNumber || ""}`.trim() || "—"], ["Fecha de nacimiento", r.birthDate || "—"], ["Nacionalidad", r.nationality || "—"]] },
+          { title: "Contacto", rows: [["Email", r.email || "—"], ["Teléfono", r.phone || "—"], ["Dirección", [r.address, [r.postalCode, r.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"]] },
+          { title: "Fiscal y bancario", rows: [["Nº Seguridad Social", r.ssNumber || "—"], ["IRPF", r.irpfRate ? `${r.irpfRate} %` : "—"], ["IBAN", r.iban || "—"], ["Banco", r.bankName || "—"], ["Titular", r.accountHolder || "—"]] },
+        ],
+        table: { columns: [{ label: "Documento", width: 130 }, { label: "Estado", width: 48, align: "right" }], rows: DOC_UPLOADS_BASE.map((d) => [d.label.replace(" — ", " · "), r.docs?.[d.key] ? "Adjunto" : "No adjunto"]) },
+        highlight: { title: "Ficha enviada", text: "Producción revisará tus datos y documentos. Guarda este resguardo como justificante del envío." },
+      },
+    });
+    return;
   }
 
-  // Footer
-  const pages = (pdf as any).internal.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    pdf.setPage(p);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(7);
-    pdf.setTextColor(180, 170, 160);
-    pdf.line(mL, 287, W - mR, 287);
-    pdf.text("Generado con Filma Workspace Forms · Este documento es un resguardo del envío y no tiene validez contractual.", mL, 292);
-    pdf.text(`${p} / ${pages}`, W - mR, 292, { align: "right" });
+  if (formDoc.type === "dietas_request") {
+    const LABELS: Record<string, string> = { meals: "Comida", halfPerDiem: "Media dieta", perDiem: "Dieta", halfIntlPerDiem: "Media dieta int.", intlPerDiem: "Dieta int.", accommodation: "Alojamiento", car: "Vehículo" };
+    const entries = (r.entries || {}) as Record<string, Record<string, Record<string, boolean>>>;
+    const groups = (formDoc.people || []).map((p) => {
+      const days = Object.entries(entries[p.memberId] || {}).filter(([, t]) => Object.values(t).some(Boolean)).sort(([a], [b]) => a.localeCompare(b));
+      return {
+        title: [p.firstName, p.lastName1].filter(Boolean).join(" "), note: `${days.length} ${days.length === 1 ? "día" : "días"}`,
+        rows: days.map(([d, t]) => [new Date(`${d}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }), Object.keys(t).filter((k) => t[k]).map((k) => LABELS[k] || k).join(", ")]),
+      };
+    }).filter((g) => g.rows.length);
+    const dmy = (d?: string) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString("es-ES") : "—");
+    await downloadProjectDoc({
+      ...base, user: formDoc.createdByName || "—", fileName: `Resguardo de dietas · ${ref}.pdf`,
+      spec: {
+        docLabel: "Resguardo de dietas", docType: "form", number: `DIETAS ${ref}`,
+        status: { label: "Enviado", tone: "ok" },
+        meta: [sent, ["Desde", dmy(formDoc.dateFrom)], ["Hasta", dmy(formDoc.dateTo)], ["Personas", String(groups.length)]],
+        table: groups.length ? { columns: [{ label: "Día", width: 70 }, { label: "Marcado", width: 108 }], groups } : undefined,
+        body: groups.length ? undefined : ["No se marcó ningún día."],
+      },
+    });
+    return;
   }
 
-  const slug = formDoc.type === "box_request" ? "solicitud-caja" : "ficha-alta";
-  pdf.save(`${slug}_${formId.slice(0, 8)}_${now.toISOString().slice(0, 10)}.pdf`);
+  // Solicitud de caja
+  const expenses: any[] = r.expenses || [];
+  const total = expenses.reduce((a: number, e: any) => a + (Number(e.amount) || 0), 0);
+  await downloadProjectDoc({
+    ...base, user: r.requesterName || "—", fileName: `Resguardo de caja · ${safeFile(r.requesterName || ref)}.pdf`,
+    spec: {
+      docLabel: "Solicitud de caja", docType: "form", number: `CAJA ${ref}`,
+      status: { label: "Enviada", tone: "ok" },
+      meta: [sent, ["Gastos", String(expenses.length)], ["Gestiona", formDoc.createdByName || "—"]],
+      party: { title: "Solicitante", name: r.requesterName || "—", lines: [] },
+      summary: r.notes?.trim() ? { title: "Notas", text: r.notes.trim() } : undefined,
+      table: { columns: [{ label: "Descripción", width: 140 }, { label: "Importe", width: 38, align: "right" }], rows: expenses.map((e) => [e.description || "—", money(Number(e.amount) || 0)]) },
+      totals: { base: money(total), rows: [], label: "Total solicitado" },
+    },
+  });
 }
 
 // ─── FileUploadField ──────────────────────────────────────────────────────────

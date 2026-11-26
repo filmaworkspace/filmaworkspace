@@ -78,7 +78,7 @@ export async function contentFingerprint(data: unknown): Promise<string> {
 // ─── Código de color por tipo de documento ───────────────────────────────────
 // La proforma va en rojo: no vale como justificante y, cuando llega la factura
 // definitiva, se sustituye (el mismo documento pasa a ser factura).
-export type DocTypeKey = "po" | "invoice" | "proforma" | "budget" | "guarantee" | "box" | "supplier" | "crew" | "sign";
+export type DocTypeKey = "po" | "invoice" | "proforma" | "budget" | "guarantee" | "box" | "supplier" | "crew" | "sign" | "crewList" | "calendar" | "ledger" | "form";
 export const DOC_TYPES: Record<DocTypeKey, { label: string; rgb: RGB; hex: string }> = {
   po:        { label: "Orden de compra",  rgb: [47, 82, 224],  hex: "#2F52E0" },
   invoice:   { label: "Factura",          rgb: [5, 150, 105],  hex: "#059669" },
@@ -90,6 +90,11 @@ export const DOC_TYPES: Record<DocTypeKey, { label: string; rgb: RGB; hex: strin
   // Equipo
   crew:      { label: "Documentación de crew", rgb: [107, 163, 25], hex: "#6BA319" },
   sign:      { label: "Filma Sign",       rgb: [36, 64, 110],  hex: "#24406E" },
+  crewList:  { label: "Crew list",        rgb: [107, 163, 25], hex: "#6BA319" },
+  calendar:  { label: "Calendario",       rgb: [107, 163, 25], hex: "#6BA319" },
+  form:      { label: "Resguardo",        rgb: [107, 163, 25], hex: "#6BA319" },
+  // Contabilidad (otros)
+  ledger:    { label: "Libro mayor",      rgb: [47, 82, 224],  hex: "#2F52E0" },
 };
 /** Tipos de cada centro de documentación. */
 export const ACCOUNTING_DOC_TYPES: DocTypeKey[] = ["po", "invoice", "proforma", "budget", "guarantee", "box", "supplier"];
@@ -110,8 +115,11 @@ export interface DocApproval {
   auditId?: string;
 }
 export interface DocColumn { label: string; width: number; align?: "left" | "right"; mono?: boolean }
+export interface DocTableGroup { title: string; note?: string; rows: string[][]; subRows?: (string | null)[] }
 export interface ProjectDocSpec {
   project: DocProject;
+  /** Vertical (por defecto) u horizontal para tablas anchas. */
+  orientation?: "p" | "l";
   docLabel: string;        // "Orden de compra"
   docType: DocTypeKey;
   number: string;          // "LUZ-PO-0013"
@@ -126,11 +134,12 @@ export interface ProjectDocSpec {
   highlight?: { title: string; text: string };
   /** Firma al final (cartas, vales). */
   signature?: { label: string; name: string; role?: string }[];
-  table?: { columns: DocColumn[]; rows: string[][]; subRows?: (string | null)[] };
+  /** Tabla: filas sueltas o agrupadas (departamentos, cuentas…), con fila de totales opcional. */
+  table?: { columns: DocColumn[]; rows?: string[][]; subRows?: (string | null)[]; groups?: DocTableGroup[]; foot?: string[] };
   /** La base imponible es la cifra protagonista; IVA, IRPF y total van debajo en pequeño. */
-  totals?: { base: string; rows: [string, string][] };
-  /** Historial de versiones (siempre al pie del documento). */
-  versions: { version: string; at: Date; by: string; change: string }[];
+  totals?: { base: string; rows: [string, string][]; label?: string };
+  /** Historial de versiones (al pie del documento). Los listados no lo llevan. */
+  versions?: { version: string; at: Date; by: string; change: string }[];
   approvals?: DocApproval[];
   extraSections?: { title: string; rows: [string, string][] }[];
   notes?: string;
@@ -143,8 +152,9 @@ const fmtStamp = (d: Date) =>
   `${d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
 
 export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
-  const pdf = new jsPDF({ unit: "mm", format: "a4" });
-  const W = 210, M = 16, BOTTOM = 266;
+  const land = spec.orientation === "l";
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: land ? "landscape" : "portrait" });
+  const W = land ? 297 : 210, H = land ? 210 : 297, M = 16, BOTTOM = H - 31;
   const pal = projectPalette(spec.project.seed);
   const ACC: RGB = pal.base[1];
   const set = (size: number, color: RGB, style: "normal" | "bold" = "normal") => { pdf.setFont("helvetica", style); pdf.setFontSize(size); pdf.setTextColor(...color); };
@@ -158,7 +168,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
   pdf.setFillColor(...TYPE.rgb); pdf.rect(0, HB, W, 1.6, "F");
   const white: RGB = [255, 255, 255];
   if (spec.project.producer) { set(6.5, white); pdf.text(spec.project.producer.toUpperCase(), M, 11, { charSpace: 0.8 }); }
-  set(17, white, "bold"); pdf.text(pdf.splitTextToSize(spec.project.name, 110)[0], M, 20.5);
+  set(17, white, "bold"); pdf.text(pdf.splitTextToSize(spec.project.name, W - 100)[0], M, 20.5);
   set(7.5, white); pdf.text([spec.project.code, spec.project.phase].filter(Boolean).join("   ·   "), M, 26.5);
   // Tipo: pastilla de su color
   set(6.8, white, "bold");
@@ -173,7 +183,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
 
   // ── Datos clave ────────────────────────────────────────────────────────────
   y = HB + 10;
-  const cells = spec.meta.slice(0, 4);
+  const cells = spec.meta.slice(0, land ? 6 : 4);
   const cw = (W - 2 * M) / Math.max(1, cells.length);
   cells.forEach(([k, v], i) => {
     const x = M + i * cw;
@@ -194,7 +204,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     return yy;
   };
   if (spec.party) {
-    y = party(spec.party, M, 120) + 3;
+    y = party(spec.party, M, land ? 180 : 120) + 3;
   }
   if (spec.summary) {
     set(6.5, FAINT, "bold"); pdf.text(spec.summary.title.toUpperCase(), M, y, { charSpace: 0.4 });
@@ -223,26 +233,54 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     const cols = spec.table.columns;
     const xs: number[] = []; let acc = M;
     cols.forEach((c) => { xs.push(c.align === "right" ? acc + c.width : acc); acc += c.width; });
-    ensure(20);
-    set(6.5, MUTED, "bold");
-    cols.forEach((c, i) => pdf.text(c.label.toUpperCase(), xs[i], y, c.align === "right" ? { align: "right" } : { charSpace: 0.3 }));
-    y += 2.4; pdf.setDrawColor(...INK); pdf.setLineWidth(0.35); pdf.line(M, y, W - M, y); y += 5.4;
-    spec.table.rows.forEach((r, ri) => {
+    const head = () => {
+      set(6.5, MUTED, "bold");
+      cols.forEach((c, i) => pdf.text(c.label.toUpperCase(), xs[i], y, c.align === "right" ? { align: "right" } : { charSpace: 0.3 }));
+      y += 2.4; pdf.setDrawColor(...INK); pdf.setLineWidth(0.35); pdf.line(M, y, W - M, y); y += 5.4;
+    };
+    // Salto de página con la cabecera de la tabla repetida
+    const brk = (h: number) => { if (y + h > BOTTOM) { pdf.addPage(); y = 22; head(); } };
+    const cell = (c: DocColumn, v: string, x: number, emph: boolean) => {
+      if (c.mono) pdf.setFont("courier", "normal"); else pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(c.mono ? 8.5 : 9); pdf.setTextColor(...(emph ? INK : TEXT));
+      pdf.text(pdf.splitTextToSize(v || "", c.width - 3)[0] || "", x, y, c.align === "right" ? { align: "right" } : {});
+    };
+    const row = (r: string[], sub: string | null | undefined) => {
       set(9, INK);
       const first = pdf.splitTextToSize(r[0] || "—", cols[0].width - 4);
-      const sub = spec.table!.subRows?.[ri];
       const h = first.length * 4.3 + (sub ? 3.6 : 0) + 2;
-      ensure(h + 2);
+      brk(h + 2);
       pdf.text(first, xs[0], y);
       if (sub) { set(7.5, MUTED); pdf.text(sub, xs[0], y + first.length * 4.3); }
-      cols.slice(1).forEach((c, i) => {
-        if (c.mono) pdf.setFont("courier", "normal"); else pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(c.mono ? 8.5 : 9); pdf.setTextColor(...(i === cols.length - 2 ? INK : TEXT));
-        pdf.text(r[i + 1] || "", xs[i + 1], y, c.align === "right" ? { align: "right" } : {});
-      });
+      cols.slice(1).forEach((c, i) => cell(c, r[i + 1], xs[i + 1], i === cols.length - 2));
       y += h - 1.6;
       pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.line(M, y, W - M, y); y += 4.4;
-    });
+    };
+    ensure(20);
+    head();
+    if (spec.table.groups) {
+      spec.table.groups.forEach((g, gi) => {
+        brk(16);
+        if (gi) y += 2;
+        pdf.setFillColor(...SOFT); pdf.rect(M, y - 4.2, W - 2 * M, 6.6, "F");
+        pdf.setFillColor(...TYPE.rgb); pdf.rect(M, y - 4.2, 1.2, 6.6, "F");
+        set(7.5, INK, "bold"); pdf.text(g.title.toUpperCase(), M + 4, y, { charSpace: 0.4 });
+        if (g.note) { set(7.5, MUTED); pdf.text(g.note, W - M - 2, y, { align: "right" }); }
+        y += 7;
+        g.rows.forEach((r, ri) => row(r, g.subRows?.[ri]));
+      });
+    } else {
+      (spec.table.rows || []).forEach((r, ri) => row(r, spec.table!.subRows?.[ri]));
+    }
+    if (spec.table.foot) {
+      brk(9);
+      y -= 2.2; pdf.setDrawColor(...INK); pdf.setLineWidth(0.35); pdf.line(M, y, W - M, y); y += 5;
+      cols.forEach((c, i) => {
+        set(9, INK, "bold");
+        pdf.text(pdf.splitTextToSize(spec.table!.foot![i] || "", c.width - 3)[0] || "", xs[i], y, c.align === "right" ? { align: "right" } : {});
+      });
+      y += 8;
+    }
   }
 
   // ── Importes: base imponible protagonista ─────────────────────────────────
@@ -250,7 +288,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     ensure(26 + spec.totals.rows.length * 5);
     const bx = W - M - 72, bw = 72;
     pdf.setFillColor(...ACC); pdf.roundedRect(bx, y, bw, 17, 1.6, 1.6, "F");
-    set(6.5, white, "bold"); pdf.text("BASE IMPONIBLE", bx + 5, y + 5.6, { charSpace: 0.5 });
+    set(6.5, white, "bold"); pdf.text((spec.totals.label || "Base imponible").toUpperCase(), bx + 5, y + 5.6, { charSpace: 0.5 });
     set(17, white, "bold"); pdf.text(spec.totals.base, bx + bw - 5, y + 13, { align: "right" });
     y += 22.5;
     for (const [k, v] of spec.totals.rows) {
@@ -321,7 +359,8 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     y += 34;
   }
 
-  // ── Historial de versiones (siempre) ──────────────────────────────────────
+  // ── Historial de versiones ────────────────────────────────────────────────
+  if (spec.versions?.length) {
   ensure(12 + spec.versions.length * 5.2);
   set(6.5, FAINT, "bold"); pdf.text("HISTORIAL DE VERSIONES", M, y, { charSpace: 0.4 }); y += 2.6;
   pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.line(M, y, W - M, y); y += 4.4;
@@ -333,6 +372,7 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
     y += 5.2;
   }
   y += 4;
+  }
 
   if (spec.notes) {
     ensure(14);
@@ -349,14 +389,14 @@ export function buildProjectDoc(spec: ProjectDocSpec): jsPDF {
       pdf.setFillColor(...TYPE.rgb); pdf.rect(0, 0, W, 2.2, "F");
       set(7, MUTED); pdf.text(`${spec.project.name}  ·  ${spec.number}`, M, 10);
     }
-    if (spec.project.legal) { set(6.3, FAINT); pdf.text(pdf.splitTextToSize(spec.project.legal, W - 2 * M)[0], M, 276); }
-    pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.line(M, 279, W - M, 279);
+    if (spec.project.legal) { set(6.3, FAINT); pdf.text(pdf.splitTextToSize(spec.project.legal, W - 2 * M)[0], M, H - 21); }
+    pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.line(M, H - 18, W - M, H - 18);
     set(6.8, MUTED);
-    pdf.text(`${spec.number}${spec.version ? ` · ${spec.version}` : ""}  ·  Generado el ${fmtStamp(spec.generatedAt)} por ${spec.generatedBy}`, M, 283.5);
+    pdf.text(`${spec.number}${spec.version ? ` · ${spec.version}` : ""}  ·  Generado el ${fmtStamp(spec.generatedAt)} por ${spec.generatedBy}`, M, H - 13.5);
     pdf.setFont("courier", "normal"); pdf.setFontSize(6.3); pdf.setTextColor(...FAINT);
-    pdf.text(`SHA-256 ${spec.fingerprint.slice(0, 32)}…`, M, 287.5);
-    set(6.8, MUTED); pdf.text(`${i} / ${pages}`, W - M, 283.5, { align: "right" });
-    set(6.3, FAINT); pdf.text("Filma Workspace", W - M, 287.5, { align: "right" });
+    pdf.text(`SHA-256 ${spec.fingerprint.slice(0, 32)}…`, M, H - 9.5);
+    set(6.8, MUTED); pdf.text(`${i} / ${pages}`, W - M, H - 13.5, { align: "right" });
+    set(6.3, FAINT); pdf.text("Filma Workspace", W - M, H - 9.5, { align: "right" });
   }
   return pdf;
 }

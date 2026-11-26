@@ -723,140 +723,28 @@ export default function CrewPage() {
   const handleExportPdf = async () => {
     setExportingPdf(true);
     try {
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-      const pageW = 210;
-      const pageH = 297;
-      const mL = 18;
-      const mR = 18;
-      const cW = pageW - mL - mR;
-      const green: [number, number, number] = [107, 163, 25];
-      const dark: [number, number, number]  = [22, 22, 22];
-      const mid: [number, number, number]   = [110, 110, 110];
-      const light: [number, number, number] = [245, 245, 245];
-
-      const colW = [52, 55, 36, 31] as const; // PUESTO | NOMBRE | TELÉFONO | EMAIL
-      const col = [mL, mL + colW[0], mL + colW[0] + colW[1], mL + colW[0] + colW[1] + colW[2]];
-
+      const { downloadProjectDoc } = await import("@/lib/docs/export");
       const now = new Date();
-      const dateStr = now.toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-
-      let y = 22;
-
-      // ── Header ─────────────────────────────────────────────────────────────
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...mid);
-      doc.text((projectName || "Proyecto").toUpperCase(), mL, y);
-      doc.text(dateStr, pageW - mR, y, { align: "right" });
-
-      y += 9;
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(26);
-      doc.setTextColor(...dark);
-      doc.text("CREW LIST", pageW / 2, y, { align: "center" });
-
-      y += 5;
-      doc.setDrawColor(...green);
-      doc.setLineWidth(0.6);
-      doc.line(mL, y, pageW - mR, y);
-      y += 11;
-
-      // ── Per department ─────────────────────────────────────────────────────
-      for (const dept of deptOrder) {
-        const members = crew.filter(
-          (m) =>
-            m.status !== "inactive" &&
-            (m.department?.trim() || CREW_SECTIONS[m.section].label) === dept
-        );
-        if (members.length === 0) continue;
-
-        const blockHeight = 10 + members.length * 7 + 8;
-        if (y + blockHeight > pageH - 14) {
-          doc.addPage();
-          y = 22;
-          // mini-header on continuation pages
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(7);
-          doc.setTextColor(...mid);
-          doc.text((projectName || "Proyecto").toUpperCase(), mL, 14);
-          doc.text("CREW LIST", pageW / 2, 14, { align: "center" });
-          doc.text(dateStr, pageW - mR, 14, { align: "right" });
-          doc.setDrawColor(...light);
-          doc.setLineWidth(0.3);
-          doc.line(mL, 17, pageW - mR, 17);
-        }
-
-        // Department header bar
-        doc.setFillColor(...light);
-        doc.roundedRect(mL, y - 4.5, cW, 9, 1.2, 1.2, "F");
-        doc.setFillColor(...green);
-        doc.roundedRect(mL, y - 4.5, 2.5, 9, 0.5, 0.5, "F");
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(...dark);
-        doc.text(dept.toUpperCase(), mL + 6, y + 0.5);
-
-        // member count badge
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(...mid);
-        doc.text(`${members.length} miembro${members.length !== 1 ? "s" : ""}`, pageW - mR, y + 0.5, { align: "right" });
-
-        y += 8;
-
-        // Column headers
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.5);
-        doc.setTextColor(...mid);
-        doc.text("PUESTO",             col[0], y);
-        doc.text("NOMBRE EN CRÉDITOS", col[1], y);
-        doc.text("TELÉFONO",           col[2], y);
-        doc.text("EMAIL",              col[3], y);
-
-        y += 2;
-        doc.setDrawColor(220, 220, 220);
-        doc.setLineWidth(0.25);
-        doc.line(mL, y, pageW - mR, y);
-        y += 4.5;
-
-        // Rows
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        members.forEach((m, i) => {
-          if (i % 2 === 0) {
-            doc.setFillColor(251, 252, 250);
-            doc.rect(mL, y - 3.5, cW, 7, "F");
-          }
-          doc.setTextColor(...dark);
-          doc.text(doc.splitTextToSize(m.role || "—", colW[0] - 3)[0], col[0], y);
-          doc.text(doc.splitTextToSize(creditName(m), colW[1] - 3)[0], col[1], y);
-          doc.setTextColor(...mid);
-          doc.text(m.phone || "—", col[2], y);
-          doc.text(doc.splitTextToSize(m.email || "—", colW[3] - 1)[0], col[3], y);
-          y += 7;
-        });
-
-        y += 7;
-      }
-
-      // ── Footer ─────────────────────────────────────────────────────────────
-      const totalPages = (doc as any).internal.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.5);
-        doc.setTextColor(...mid);
-        doc.text(`${p} / ${totalPages}`, pageW / 2, pageH - 8, { align: "center" });
-        doc.setDrawColor(...light);
-        doc.setLineWidth(0.3);
-        doc.line(mL, pageH - 11, pageW - mR, pageH - 11);
-      }
-
-      doc.save(`crew-list_${(projectName || "proyecto").replace(/\s+/g, "-").toLowerCase()}_${now.toISOString().slice(0, 10)}.pdf`);
+      const groups = deptOrder.map((dept) => {
+        const members = crew.filter((m) => m.status !== "inactive" && (m.department?.trim() || CREW_SECTIONS[m.section].label) === dept);
+        return {
+          title: dept, note: `${members.length} ${members.length === 1 ? "persona" : "personas"}`,
+          rows: members.map((m) => [m.role || "—", creditName(m), m.phone || "—", m.email || "—"]),
+        };
+      }).filter((g) => g.rows.length);
+      const total = groups.reduce((a, g) => a + g.rows.length, 0);
+      await downloadProjectDoc({
+        db, projectId: id, user: userName,
+        fileName: `Crew list · ${(projectName || "Proyecto")} · ${now.toISOString().slice(0, 10)}.pdf`,
+        spec: {
+          docLabel: "Crew list", docType: "crewList", number: "CREW LIST",
+          meta: [["Fecha", now.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })], ["Departamentos", String(groups.length)], ["Personas", String(total)]],
+          table: {
+            columns: [{ label: "Puesto", width: 52 }, { label: "Nombre en créditos", width: 50 }, { label: "Teléfono", width: 30 }, { label: "Email", width: 46 }],
+            groups,
+          },
+        },
+      });
       setShowCrewListModal(false);
     } catch (e) {
       console.error(e);

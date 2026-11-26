@@ -60,7 +60,6 @@ import {
 } from "lucide-react";
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
-import jsPDF from "jspdf";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { syncBudget } from "@/lib/ledgerClient";

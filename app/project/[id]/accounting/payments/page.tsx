@@ -63,7 +63,6 @@ import {
 } from "lucide-react";
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
-import jsPDF from "jspdf";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";

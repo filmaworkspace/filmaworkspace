@@ -78,7 +78,6 @@ import { repairDoc } from "@/lib/approvalActions";
 
 const toDateAny = (v: any): Date => (v?.toDate ? v.toDate() : new Date(v));
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { FilmaPDF } from "@/lib/pdfBuilder";
 import { syncBudget } from "@/lib/ledgerClient";
 import { AmountSummary } from "@/components/accounting/AmountSummary";
 import { SupplierHeader } from "@/components/accounting/SupplierPreview";
