@@ -143,7 +143,7 @@ export const IconButton = forwardRef<HTMLButtonElement, React.ButtonHTMLAttribut
 // ─── Formularios ─────────────────────────────────────────────────────────────
 const CONTROL =
   "w-full rounded-md border border-slate-200 bg-white text-[13px] text-slate-900 placeholder:text-slate-400 transition " +
-  "focus:border-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-900/10 disabled:bg-[#F7F7F8] disabled:text-slate-500";
+  "focus:border-slate-400 focus:outline-none disabled:bg-[#F7F7F8] disabled:text-slate-500";
 
 export function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (

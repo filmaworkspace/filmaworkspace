@@ -158,9 +158,19 @@ table.tbl thead th.text-right:not([class*="w-"]) {
   outline-offset: 2px;
   border-radius: 4px;
 }
-:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
-  outline: 2px solid #2f52e0 !important;
-  outline-offset: 0;
+/* Campos de texto (búsquedas, formularios): foco mínimo. Solo se oscurece el
+   borde del propio campo, sin contorno azul ni halo alrededor. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #94a3b8 !important;
+}
+/* Campos compuestos (prefijo de teléfono, buscadores con icono en el borde) */
+[class*="focus-within:ring"]:focus-within {
+  box-shadow: none !important;
+  border-color: #94a3b8 !important;
 }
 
 /* Menos movimiento para quien lo pide en el sistema. */
