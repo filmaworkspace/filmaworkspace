@@ -3,7 +3,7 @@
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { toast } from "@/lib/toast";
+import { confirmDialog, toast } from "@/lib/toast";
 import Link from "next/link";
 import { inter } from "@/lib/fonts";
 import { AnchoredPanel } from "@/components/ds";
@@ -38,6 +38,7 @@ import {
   Send,
   Upload,
   X,
+  QrCode,
 } from "lucide-react";
 
 // ─── Internal ────────────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ const APPROVAL_CONFIG: Record<ApprovalStatus, { label: string; bg: string; text:
 interface CrewMember {
   id: string;
   crewNumber?: string;
+  accreditation?: { token: string } | null;
   section: CrewSection;
   firstName?: string;
   lastName1?: string;
@@ -322,6 +324,7 @@ export default function CrewMemberPage() {
         regime:               d.regime               || "",
         bankAccount:          d.bankAccount          || "",
         documents:                  d.documents                        || {},
+        accreditation:              d.accreditation                    || null,
         notes:                      d.notes                            || "",
         formSentAt:                 d.formSentAt?.toDate(),
         formSentBy:                 d.formSentBy                       || "",
@@ -528,6 +531,29 @@ export default function CrewMemberPage() {
     finally { setExportingPdf(false); }
   };
 
+  // ── Acreditación con QR ──────────────────────────────────────────────────────
+  const [accrBusy, setAccrBusy] = useState(false);
+  const downloadAccreditation = async (reissue: boolean) => {
+    if (!member) return;
+    setAccrBusy(true);
+    try {
+      const { accreditationsPdf, reissueAccreditation, savePdf } = await import("@/lib/team/accreditation");
+      const proj = await getDoc(doc(db, "projects", projectId)).catch(() => null);
+      const person = {
+        id: member.id, name: member.artisticName?.trim() || member.name, role: member.role, department: member.department,
+        crewNumber: member.crewNumber, startDate: member.startDate, endDate: member.endDateApprox,
+        photoUrl: (member.documents as Record<string, string> | undefined)?.photoAccreditation || member.photoUrl || undefined,
+        accreditation: member.accreditation || null,
+      };
+      if (reissue) await reissueAccreditation(projectId, person, userName);
+      const pdf = await accreditationsPdf({ projectId, projectName: proj?.data()?.name || "Proyecto", coverUrl: proj?.data()?.coverUrl || null, people: [person], user: userName });
+      setMember({ ...member, accreditation: person.accreditation });
+      savePdf(pdf, `Acreditación · ${member.name}.pdf`);
+      if (reissue) toast.success("QR reemitido: el anterior ya no vale");
+    } catch (e) { console.error(e); toast.error("No se pudo generar la acreditación"); }
+    finally { setAccrBusy(false); }
+  };
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(formUrl);
@@ -612,6 +638,18 @@ export default function CrewMemberPage() {
                 {exportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
                 <span className="inline">Ficha PDF</span>
               </button>
+
+              {/* Acreditación con QR */}
+              <button onClick={() => void downloadAccreditation(false)} disabled={accrBusy || member.status === "inactive"}
+                title={member.status === "inactive" ? "Solo para personas de alta" : "Tarjeta con foto y QR de verificación"}
+                className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors">
+                {accrBusy ? <RefreshCw size={14} className="animate-spin" /> : <QrCode size={14} />}
+                Acreditación
+              </button>
+              {member.accreditation?.token && member.status !== "inactive" && (
+                <button onClick={async () => { if (await confirmDialog({ title: "Reemitir acreditación", message: "El QR actual dejará de valer. Úsalo si la tarjeta se ha perdido.", confirmLabel: "Reemitir" })) void downloadAccreditation(true); }}
+                  disabled={accrBusy} className="text-xs text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline">Reemitir QR</button>
+              )}
 
               {/* Approval status + send for approval */}
               {member.approvalStatus && (() => {

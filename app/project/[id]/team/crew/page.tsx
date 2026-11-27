@@ -1,4 +1,5 @@
 "use client";
+import { toast as toastX } from "@/lib/toast";
 
 // ─── Framework ────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
@@ -104,6 +105,7 @@ const REQUIRED_DOC_COUNT = 6;
 interface CrewMember {
   id: string;
   crewNumber: string;       // e.g. "0001"
+  accreditation?: { token: string } | null;
   section: CrewSection;
   firstName: string;
   lastName1: string;
@@ -472,6 +474,7 @@ export default function CrewPage() {
           contractReason:   v.contractReason   || "",
           notes:            v.notes            || "",
           documents:        v.documents        || {},
+          accreditation:    v.accreditation    || null,
           createdAt:        v.createdAt?.toDate() || new Date(),
           createdBy:        v.createdBy        || "",
           createdByName:    v.createdByName    || "",
@@ -720,6 +723,26 @@ export default function CrewPage() {
     setShowCrewListModal(true);
   };
 
+  // Acreditaciones con QR de lo que se ve en la lista (solo personas de alta)
+  const [accrProgress, setAccrProgress] = useState<string | null>(null);
+  const exportAccreditations = async () => {
+    const people = filteredCrew.filter((m) => m.status === "active");
+    if (!people.length) { toastX.error("No hay personas de alta en la lista"); return; }
+    setAccrProgress(`0/${people.length}`);
+    try {
+      const { accreditationsPdf, savePdf } = await import("@/lib/team/accreditation");
+      const proj = await getDoc(doc(db, "projects", id)).catch(() => null);
+      const pdf = await accreditationsPdf({
+        projectId: id, projectName: projectName || "Proyecto", coverUrl: proj?.data()?.coverUrl || null, user: userName,
+        people: people.map((m) => ({ id: m.id, name: creditName(m), role: m.role, department: m.department?.trim() || CREW_SECTIONS[m.section].label, crewNumber: m.crewNumber, startDate: m.startDate, endDate: m.endDateApprox, photoUrl: (m.documents as Record<string, string> | undefined)?.photoAccreditation || undefined, accreditation: m.accreditation })),
+        onProgress: (d, t) => setAccrProgress(`${d}/${t}`),
+      });
+      savePdf(pdf, `Acreditaciones · ${projectName || "Proyecto"}.pdf`);
+      toastX.success(`${people.length} ${people.length === 1 ? "acreditación" : "acreditaciones"}`);
+    } catch (e) { console.error(e); toastX.error("No se pudieron generar las acreditaciones"); }
+    finally { setAccrProgress(null); }
+  };
+
   const handleExportPdf = async () => {
     setExportingPdf(true);
     try {
@@ -834,10 +857,12 @@ export default function CrewPage() {
         title={<>Crew <span className="text-base font-normal text-slate-400">{crew.filter((m) => m.status !== "inactive").length}</span></>}
         actions={
           <>
+            {accrProgress && <span className="text-xs tabular-nums text-slate-500">Generando acreditaciones {accrProgress}…</span>}
             <Menu trigger={(toggle) => <IconButton label="Más acciones" onClick={toggle}><MoreHorizontal size={16} /></IconButton>}>
               {(close) => (
                 <>
                   <MenuItem onClick={() => { close(); openCrewListModal(); }}>Crew list (PDF)</MenuItem>
+                  <MenuItem onClick={() => { close(); void exportAccreditations(); }}>Acreditaciones con QR (PDF)</MenuItem>
                   <MenuItem onClick={() => { close(); exportCsv(); }}>Exportar CSV</MenuItem>
                 </>
               )}
