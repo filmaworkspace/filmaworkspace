@@ -30,6 +30,8 @@ export default function ClientLayout({
     pathname?.startsWith("/timesheet-review") ||
     pathname?.startsWith("/access") ||
     pathname?.startsWith("/caja/") ||
+    pathname?.startsWith("/auditoria/") ||
+    pathname?.startsWith("/acreditacion/") ||
     pathname?.startsWith("/sign/") ||
     pathname?.startsWith("/demo/") ||
     pathname?.startsWith("/guias") ||

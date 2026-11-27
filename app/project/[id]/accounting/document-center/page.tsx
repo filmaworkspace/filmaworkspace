@@ -13,11 +13,12 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { zipSync } from "fflate";
-import { AlertTriangle, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Folder, FolderOpen, Hash, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Folder, FolderOpen, Hash, RefreshCw, ShieldCheck } from "lucide-react";
+import { AuditLinksModal, AuditShareModal } from "@/components/accounting/AuditShare";
 import { db } from "@/lib/firebase";
 import { useAccountingPermissions } from "@/hooks/useAccountingPermissions";
 import { scopeFromPermissions } from "@/lib/accountingScope";
-import { Button, Checkbox, EmptyState, IconButton, Modal, NoAccess, Page, PageHeader, PageLoading, Select, Spinner, useToast } from "@/components/ds";
+import { Button, Checkbox, EmptyState, IconButton, Menu, MenuItem, Modal, NoAccess, Page, PageHeader, PageLoading, Select, Spinner, useToast } from "@/components/ds";
 import SearchBar, { type SearchField } from "@/components/SearchBar";
 import { loadHub, numberingGaps, renderHubItem, type HubItem, type HubProject } from "@/lib/docs/hub";
 import { ACCOUNTING_DOC_TYPES, DOC_TYPES, type DocTypeKey } from "@/lib/docs/projectPdf";
@@ -56,6 +57,8 @@ function HubInner() {
   const [items, setItems] = useState<HubItem[]>([]);
   const [used, setUsed] = useState<{ PO: number[]; INV: number[] }>({ PO: [], INV: [] });
   const [path, setPath] = useState<string[]>([]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set(TOP));
   const [field, setField] = useState<F>("all");
   const [q, setQ] = useState("");
@@ -228,6 +231,14 @@ function HubInner() {
         actions={
           <>
             <IconButton label="Actualizar" onClick={load}><RefreshCw size={15} className={loading ? "animate-spin" : ""} /></IconButton>
+            {permissions.canViewAllPOs && (
+              <Menu trigger={(t) => <Button onClick={t}><ShieldCheck size={14} /> Auditoría</Button>}>
+                {(close) => <>
+                  <MenuItem onClick={() => { close(); setShareOpen(true); }}>Compartir con auditor</MenuItem>
+                  <MenuItem onClick={() => { close(); setLinksOpen(true); }}>Enlaces de auditor</MenuItem>
+                </>}
+              </Menu>
+            )}
             {selectedItems.length > 0 ? (
               <Button variant="primary" onClick={() => downloadZip(selectedItems, `${project?.code || "docs"}_seleccion_${selectedItems.length}.zip`)}><Download size={14} /> Descargar selección ({selectedItems.length})</Button>
             ) : (
@@ -238,6 +249,11 @@ function HubInner() {
           </>
         }
       />
+
+      <AuditShareModal open={shareOpen} onClose={() => setShareOpen(false)} projectId={projectId} project={project}
+        all={items} folder={folderItems} folderName={path[path.length - 1] || "Carpeta"} selection={selectedItems}
+        user={{ uid: permissions.userId || "", name: permissions.userName || "" }} />
+      <AuditLinksModal open={linksOpen} onClose={() => setLinksOpen(false)} projectId={projectId} userName={permissions.userName || ""} />
 
       {(warnings > 0 || gaps.length > 0) && (
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">

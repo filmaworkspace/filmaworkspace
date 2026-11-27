@@ -85,6 +85,13 @@ service firebase.storage {
       allow write: if notImpersonating() && (isAdmin() || hasTeamAccess(projectId));
     }
 
+    // Paquetes congelados para auditores: los sube contabilidad y solo los
+    // entrega el servidor (api/audit). Nadie los lee directamente.
+    match /projects/{projectId}/audit/{allPaths=**} {
+      allow read: if false;
+      allow write: if notImpersonating() && (isAdmin() || hasAccounting(projectId));
+    }
+
     match /projects/{projectId}/cover/{allPaths=**} {
       allow read: if isAdmin() || hasProjectAccess(projectId);
       allow write: if notImpersonating() && (isAdmin() || hasPermission(projectId, 'config') || isEPorPM(projectId));
@@ -100,9 +107,9 @@ service firebase.storage {
     // Otras carpetas de proyecto que pueda haber: como antes (lee el
     // proyecto, escribe contabilidad o configuración).
     match /projects/{projectId}/{folder}/{allPaths=**} {
-      allow read: if !(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
+      allow read: if !(folder in ['audit', 'crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
                      (isAdmin() || hasProjectAccess(projectId));
-      allow write: if notImpersonating() && (!(folder in ['crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
+      allow write: if notImpersonating() && (!(folder in ['audit', 'crew', 'cover', 'invoices', 'pos', 'receipts', 'cardExpenses', 'transferExpenses', 'transferEnvelopes', 'cash']) &&
                       (isAdmin() || hasPermission(projectId, 'accounting') || hasPermission(projectId, 'config')));
     }
 
